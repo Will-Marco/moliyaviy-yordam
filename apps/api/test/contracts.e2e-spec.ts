@@ -56,6 +56,7 @@ describe('Contracts (Module 2)', () => {
       startDate: '2026-01-01',
       endDate: '2027-07-31',
       currentRate: { ratePercent: '14', effectiveFrom: '2026-01-01' },
+      totals: { disbursed: '0.00', repaid: '0.00', interestPaid: '0.00', principalBalance: '0.00' },
       rates: [{ ratePercent: '14', changedOn: '2026-01-01', effectiveFrom: '2026-01-01' }],
     });
   });

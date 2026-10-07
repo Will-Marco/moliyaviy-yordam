@@ -44,6 +44,7 @@ model Contract {
   startDate   DateTime     @map("start_date") @db.Date
   endDate     DateTime     @map("end_date") @db.Date
   rateChanges RateChange[]
+  operations  Operation[]
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -65,4 +66,31 @@ model RateChange {
 
   @@index([contractId, effectiveFrom])
   @@map("rate_changes")
+}
+
+enum OperationType {
+  /// Berildi — asosiy qarzni oshiradi
+  DISBURSEMENT
+  /// Asosiy qarz qaytarildi — asosiy qarzni kamaytiradi
+  PRINCIPAL_REPAYMENT
+  /// Foiz to'landi — faqat foiz qarzini kamaytiradi (CR-8)
+  INTEREST_PAYMENT
+
+  @@map("operation_type")
+}
+
+/// Shartnoma bo'yicha pul harakati (SRS Modul 3). Hisob har doim shulardan qayta hisoblanadi (CR-9).
+model Operation {
+  id         String        @id @default(uuid(7)) @db.Uuid
+  contractId String        @map("contract_id") @db.Uuid
+  contract   Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  date       DateTime      @db.Date
+  type       OperationType
+  amount     Decimal       @db.Decimal(18, 2)
+  note       String?       @db.VarChar(500)
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([contractId, date])
+  @@map("operations")
 }

@@ -1,11 +1,13 @@
 import { fromDbDate, IsoDate } from '../common/dates.js';
 import { moneyString, rateString } from '../common/decimal.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { ledgerTotals } from '../operations/ledger.js';
 
 export const contractInclude = {
   lender: { select: { id: true, name: true, tin: true } },
   borrower: { select: { id: true, name: true, tin: true } },
   rateChanges: { orderBy: [{ effectiveFrom: 'asc' }, { createdAt: 'asc' }] },
+  operations: { select: { id: true, date: true, type: true, amount: true } },
 } satisfies Prisma.ContractInclude;
 
 export type ContractRecord = Prisma.ContractGetPayload<{ include: typeof contractInclude }>;
@@ -26,6 +28,8 @@ export interface ContractView {
   startDate: IsoDate;
   endDate: IsoDate;
   currentRate: { ratePercent: string; effectiveFrom: IsoDate };
+  /** FR-3.5 — from all recorded operations. */
+  totals: { disbursed: string; repaid: string; interestPaid: string; principalBalance: string };
   rates?: RateView[];
 }
 
@@ -42,6 +46,7 @@ export function toContractView(record: ContractRecord, today: IsoDate, withRates
     effectiveFrom: fromDbDate(r.effectiveFrom),
   }));
   const { ratePercent, effectiveFrom } = currentRate(rates, today);
+  const totals = ledgerTotals(record.operations.map((op) => ({ ...op, date: fromDbDate(op.date) })));
   return {
     id: record.id,
     number: record.number,
@@ -52,6 +57,12 @@ export function toContractView(record: ContractRecord, today: IsoDate, withRates
     startDate: fromDbDate(record.startDate),
     endDate: fromDbDate(record.endDate),
     currentRate: { ratePercent, effectiveFrom },
+    totals: {
+      disbursed: moneyString(totals.disbursed),
+      repaid: moneyString(totals.repaid),
+      interestPaid: moneyString(totals.interestPaid),
+      principalBalance: moneyString(totals.principalBalance),
+    },
     ...(withRates && { rates }),
   };
 }

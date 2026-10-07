@@ -60,6 +60,16 @@ export class ContractsService {
 
   async update(id: string, dto: UpdateContractDto): Promise<ContractView> {
     const current = await this.get(id);
+    const partiesChange =
+      (dto.lenderId !== undefined && dto.lenderId !== current.lender.id) ||
+      (dto.borrowerId !== undefined && dto.borrowerId !== current.borrower.id);
+    if (partiesChange && (await this.prisma.operation.count({ where: { contractId: id } }))) {
+      const message = "Operatsiyasi bor shartnomada tomonlarni o'zgartirib bo'lmaydi";
+      throw fieldErrors({
+        ...(dto.lenderId !== current.lender.id && dto.lenderId !== undefined && { lenderId: message }),
+        ...(dto.borrowerId !== current.borrower.id && dto.borrowerId !== undefined && { borrowerId: message }),
+      });
+    }
     await this.assertTerms({
       lenderId: dto.lenderId ?? current.lender.id,
       borrowerId: dto.borrowerId ?? current.borrower.id,

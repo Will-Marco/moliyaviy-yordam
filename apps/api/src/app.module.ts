@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { CompaniesModule } from './companies/companies.module.js';
 import { validateEnv } from './config/env.js';
 import { ContractsModule } from './contracts/contracts.module.js';
+import { OperationsModule } from './operations/operations.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -13,6 +14,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     AuthModule,
     CompaniesModule,
     ContractsModule,
+    OperationsModule,
   ],
 })
 export class AppModule {}
