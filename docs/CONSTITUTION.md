@@ -12,8 +12,9 @@
 6. Avtonomiya: kod yozishda erkin, arxitektura/muhim qaror oldidan so'rash.
 
 ## Moliyaviy aniqlik (bu loyihaning eng muhim qonuni)
-7. Pul va stavka **hech qachon `float`/`number`** bilan hisoblanmaydi — DB'da `Decimal`, kodda decimal kutubxona.
-8. Hisoblash qoidalari faqat `SRS.md §4` (CR-1…CR-9) dan olinadi. Qoida o'zgarsa — avval SRS, keyin test, keyin kod.
+7. Pul va stavka **hech qachon `float`/`number`** bilan hisoblanmaydi — DB'da `Decimal`, kodda decimal kutubxona
+   yoki butun son (BigInt: tiyin, stavka ×10⁴). Decimal → BigInt faqat `toFixed()` orqali. (Sir, 2026-10-07)
+8. Hisoblash qoidalari faqat `SRS.md §4` (CR-1…CR-11) dan olinadi. Qoida o'zgarsa — avval SRS, keyin test, keyin kod.
 9. Foiz yadrosi — **sof funksiya**, DB/HTTP/vaqtga bog'liq emas ("bugun" parametr sifatida beriladi).
 10. Har CR qoidasi kamida bitta test bilan qoplanadi; SRS'dagi etalon misol (yanvar = 552 328,77) doim yashil.
 11. Ekran, Excel va faktura **bitta** yadro natijasidan oladi — raqam ikki joyda alohida hisoblanmaydi.

@@ -46,7 +46,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - **CR-2 Yil kunlari:** `D` kalendar yiliga qarab 365 yoki 366 (actual/actual). 2026 va 2027 — 365.
 - **CR-3 Oddiy foiz:** foiz faqat asosiy qarzga hisoblanadi; to'lanmagan foizga foiz hisoblanmaydi.
 - **CR-4 Oylik foiz:** `Oy foizi = Σ foiz(D)` oy kunlari bo'yicha. Ichki hisobda **yaxlitlash yo'q**
-  (Decimal). Hisobot, Excel va faktura uchun oy yakuni **2 xonagacha** (tiyin, half-up) yaxlitlanadi.
+  (aniq kasr: butun sonlar — tiyin × stavka × kun — bitta bo'lish). Hisobot, Excel va faktura uchun oy yakuni
+  **2 xonagacha** (tiyin) yaxlitlanadi: **yarmi noldan uzoqqa** (0,5 tiyin → 1; −0,5 tiyin → −1).
 - **CR-5 Stavka o'zgarishi:** buxgalter yangi stavkani `o'zgartirish sanasi` bilan kiritadi.
   - sana oyning **1-kuni** bo'lsa → shu kundan amal qiladi;
   - aks holda → **keyingi oyning 1-kunidan** amal qiladi.
@@ -60,6 +61,9 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - **CR-9 Qayta hisob:** hisobot har doim operatsiyalardan qayta hisoblanadi (saqlangan "kesh" haqiqat
   manbai emas). O'tgan sanaga operatsiya kiritilsa yoki o'zgartirilsa — hisob avtomatik yangilanadi.
 
+- **CR-11 Bugungacha:** barcha hisob (qoldiq, jamilar, oylik hisobot, foiz qarzi) `sana ≤ bugun` bo'lgan
+  operatsiyalardan. Kelajak sanali operatsiya saqlanadi ("rejalashtirilgan"), sanasi kelganda hisobga kiradi.
+  Boshlanishdan oldingi operatsiyalar qoldiqqa kiradi, foiz esa faqat boshlanish sanasidan (CR-5). Sir, 2026-10-07.
 - **CR-10 Manfiy qoldiq:** asosiy qarz qoldig'idan ko'p qaytarilsa (ogohlantirish bilan saqlanadi),
   qoldiq **manfiy** bo'ladi va CR-1 formulasi o'zgarmasdan qo'llanadi — o'sha kunlar uchun foiz
   **manfiy** (beruvchi oluvchidan qarzdor). Sir qarori, 2026-10-07.
@@ -126,13 +130,18 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   limitdan oshganda ogohlantirish chiqadi, "Baribir saqlash" bilan saqlanadi.
 
 ### Modul 4: Oylik foiz hisoboti (yadro)
-- FR-4.1 — Shartnoma bo'yicha oylik jadval (boshlanish oyidan joriy oygacha, muddatdan keyin
-  qarz qolsa davom etadi): oy, stavka, oy boshidagi qoldiq, berildi, qaytarildi, oy oxiridagi
-  qoldiq, hisoblangan foiz, to'langan foiz, foiz qarzi (yig'ma).
-- FR-4.2 — Oy ichidagi bo'laklar (davr, qoldiq, stavka, kun, foiz) — tekshirish uchun ochiladigan tafsilot.
-- FR-4.3 — Hisob CR-1…CR-9 ga to'liq mos.
-- *Acceptance:* etalon misol → yanvar 552 328,77; oy o'rtasida stavka o'zgarishi, muddatdan keyingi
-  oy, kabisa yil (sintetik test) — testlar bilan tasdiqlangan.
+- FR-4.1 — Shartnoma bo'yicha oylik jadval — **boshlanish oyidan joriy oygacha** (joriy oy "bugungacha"
+  belgisi bilan): oy, stavka, oy boshidagi qoldiq, berildi, qaytarildi, oy oxiridagi qoldiq, hisoblangan foiz,
+  to'langan foiz, foiz qarzi (yig'ma). `boshidagi + berildi − qaytarildi = oxiridagi`.
+- FR-4.2 — Oy ichidagi bo'laklar (davr, qoldiq, stavka, kun, foiz — 6 xona) — ochiladigan tafsilot.
+- FR-4.3 — Hisob CR-1…CR-11 ga to'liq mos; yadro sof funksiya, mustaqil kunma-kun hisob bilan tekshirilgan.
+- FR-4.4 — **Foiz qarzi** (ro'yxat va shartnoma kartasi) — **tugagan oylar** bo'yicha (faktura bilan bir xil);
+  shartnoma sahifasida qo'shimcha "bugungacha hisoblangan" foiz.
+- FR-4.5 — Ogohlantirishlar (FR-3.3 ga qo'shimcha): **foiz to'lovi > to'lov sanasigacha hisoblangan foiz qarzi**
+  (tugagan oylar + to'lov oyi to'lov kunigacha, yaxlitlangan − boshqa foiz to'lovlari); **kelajak sana** (CR-11).
+- *Acceptance:* etalon → yanvar 552 328,77; fevral 2026 → 483 287,67; kabisa fevral 2028; oy o'rtasidagi start,
+  1-sanadan stavka o'zgarishi, manfiy qoldiq, muddatdan keyingi oy — testlar bilan; yadro tasodifiy ma'lumotda
+  kunma-kun hisob bilan tiyinigacha teng.
 
 ### Modul 5: Stavkani o'zgartirish
 - FR-5.1 — Yangi stavka + o'zgartirish sanasi (default — bugun). Amal qilish sanasi CR-5 bo'yicha
@@ -198,7 +207,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - *Acceptance:* buxgalterlar server manzili orqali kirib ishlay oladi.
 
 ## 6. Nofunktsional talablar
-- **Aniqlik:** pul va stavka hech qachon `float`'da hisoblanmaydi — DB'da `Decimal`, kodda decimal kutubxona.
+- **Aniqlik:** pul va stavka hech qachon `float`'da hisoblanmaydi — DB'da `Decimal`, kodda decimal kutubxona
+  yoki butun son (BigInt, tiyin) — foiz yadrosi BigInt'da.
 - **Performance:** bitta shartnoma hisoboti (19+ oy, yuzlab operatsiya) < 1 s.
 - **Security:** HTTPS; parol hash'langan; login urinishlariga rate-limit; secret'lar `.env`'da, repo'da emas.
   Didox akkaunt parollari DB'da **shifrlangan** (AES-256-GCM, kalit `.env` da); ERI kaliti va .pfx
