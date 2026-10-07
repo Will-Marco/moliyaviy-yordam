@@ -1,5 +1,11 @@
 import { Module } from '@nestjs/common';
+import { ContractsModule } from '../contracts/contracts.module.js';
+import { OperationsModule } from '../operations/operations.module.js';
+import { ExportController } from './export.controller.js';
 import { ReportController } from './report.controller.js';
 
-@Module({ controllers: [ReportController] })
+@Module({
+  imports: [ContractsModule, OperationsModule],
+  controllers: [ReportController, ExportController],
+})
 export class InterestModule {}
