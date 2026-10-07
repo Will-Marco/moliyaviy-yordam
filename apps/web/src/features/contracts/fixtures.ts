@@ -32,7 +32,7 @@ export const etalon: Contract = {
     principalBalance: '45000000.00',
     interestDebt: '1035616.44',
   },
-  rates: [{ ratePercent: '14', changedOn: '2026-01-01', effectiveFrom: '2026-01-01' }],
+  rates: [{ id: '0192f000-0000-7000-8000-0000000000r1', initial: true, ratePercent: '14', changedOn: '2026-01-01', effectiveFrom: '2026-01-01' }],
 }
 
 export const etalonOperations: Operation[] = [

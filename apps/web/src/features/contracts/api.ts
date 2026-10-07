@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
+import type { Warning } from '@/lib/warnings'
 
 export interface Party {
   id: string
@@ -8,6 +9,9 @@ export interface Party {
 }
 
 export interface Rate {
+  id: string
+  /** Entered with the contract — can be corrected, never deleted (FR-5.3/5.4). */
+  initial: boolean
   ratePercent: string
   changedOn: string
   effectiveFrom: string
@@ -64,6 +68,38 @@ export function useSaveContract(id?: string) {
       id
         ? apiFetch<Contract>(`/contracts/${id}`, { method: 'PATCH', body })
         : apiFetch<Contract>('/contracts', { method: 'POST', body }),
+    onSuccess: () => client.invalidateQueries({ queryKey: contractsKey }),
+  })
+}
+
+// ---- Module 5: rate history ----
+
+
+export interface RateInput {
+  ratePercent: string
+  changedOn?: string
+  confirmWarnings?: boolean
+}
+
+type RateResult = { contract: Contract; warnings: Warning[] }
+
+/** id → correct the initial rate (PATCH); no id → add a change (POST). */
+export function useSaveRate(contractId: string, id?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: RateInput) =>
+      apiFetch<RateResult>(id ? `/contracts/${contractId}/rates/${id}` : `/contracts/${contractId}/rates`, {
+        method: id ? 'PATCH' : 'POST',
+        body,
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: contractsKey }),
+  })
+}
+
+export function useDeleteRate(contractId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/contracts/${contractId}/rates/${id}`, { method: 'DELETE' }),
     onSuccess: () => client.invalidateQueries({ queryKey: contractsKey }),
   })
 }

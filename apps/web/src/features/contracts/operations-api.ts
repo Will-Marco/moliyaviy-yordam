@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch, ApiError } from '@/lib/api'
+import { apiFetch } from '@/lib/api'
+import type { Warning } from '@/lib/warnings'
 import { contractsKey } from './api'
 
 export type OperationType = 'DISBURSEMENT' | 'PRINCIPAL_REPAYMENT' | 'INTEREST_PAYMENT'
@@ -22,11 +23,6 @@ export interface OperationInput {
   amount: string
   note: string | null
   confirmWarnings?: boolean
-}
-
-export interface Warning {
-  code: string
-  message: string
 }
 
 const operationsKey = (contractId: string) => [...contractsKey, contractId, 'operations'] as const
@@ -62,13 +58,6 @@ export function useDeleteOperation(contractId: string) {
     mutationFn: (id: string) => apiFetch<void>(`/contracts/${contractId}/operations/${id}`, { method: 'DELETE' }),
     onSuccess: invalidate,
   })
-}
-
-/** FR-3.3: a 409 that lists warnings the accountant may confirm with "Baribir saqlash". */
-export function warningsToConfirm(error: unknown): Warning[] | null {
-  if (!(error instanceof ApiError) || error.status !== 409) return null
-  const body = error.body as { code?: string; warnings?: Warning[] } | undefined
-  return body?.code === 'CONFIRMATION_REQUIRED' && body.warnings ? body.warnings : null
 }
 
 export const OPERATION_TYPES: { value: OperationType; label: string; long: string }[] = [

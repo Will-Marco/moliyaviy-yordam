@@ -4,12 +4,12 @@ import { Link, useParams } from 'react-router'
 import { QueryErrorState } from '@/components/QueryErrorState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate, formatMoney, formatRate, isNegativeMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { type Party, useContract } from './api'
 import { ContractFormDialog } from './ContractFormDialog'
 import { OperationsCard } from './OperationsCard'
+import { RatesCard } from './RatesCard'
 import { ReportCard } from './ReportCard'
 
 export function ContractPage() {
@@ -106,31 +106,7 @@ export function ContractPage() {
 
       <ReportCard contractId={c.id} />
 
-      <Card className="gap-0 p-0">
-        <CardHeader className="p-4">
-          <CardTitle className="text-base">Stavkalar tarixi</CardTitle>
-        </CardHeader>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Amal qiladi</TableHead>
-                <TableHead>Kiritilgan sana</TableHead>
-                <TableHead className="text-right">Stavka</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(c.rates ?? []).map((rate) => (
-                <TableRow key={`${rate.effectiveFrom}-${rate.changedOn}-${rate.ratePercent}`}>
-                  <TableCell className="tabular-nums">{`${formatDate(rate.effectiveFrom)} dan`}</TableCell>
-                  <TableCell className="text-muted-foreground tabular-nums">{formatDate(rate.changedOn)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatRate(rate.ratePercent)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+      <RatesCard contract={c} />
 
       {editing && <ContractFormDialog open contract={c} onOpenChange={setEditing} />}
     </section>

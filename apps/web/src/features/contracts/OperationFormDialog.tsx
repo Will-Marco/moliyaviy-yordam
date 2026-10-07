@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { LoaderCircle, TriangleAlert } from 'lucide-react'
+import { LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { FormField } from '@/components/FormField'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,8 +20,11 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
 import { formatMoney, formatMoneyInput, parseMoneyInput } from '@/lib/format'
+import { todayIso } from '@/lib/dates'
 import { describedBy } from '@/lib/form'
 import { cn } from '@/lib/utils'
+import { type Warning, warningsToConfirm } from '@/lib/warnings'
+import { ConfirmWarnings } from '@/components/ConfirmWarnings'
 import type { Contract } from './api'
 import {
   type Operation,
@@ -29,8 +32,6 @@ import {
   OPERATION_TYPES,
   type OperationType,
   useSaveOperation,
-  type Warning,
-  warningsToConfirm,
 } from './operations-api'
 
 // Mirrors apps/api/src/operations/dto/operation.dto.ts.
@@ -50,8 +51,6 @@ const schema = z
   })
 
 type Values = z.input<typeof schema>
-
-const todayIso = () => new Date().toLocaleDateString('en-CA')
 
 interface Props {
   contract: Contract
@@ -121,32 +120,12 @@ export function OperationFormDialog({ contract, open, onOpenChange, operation }:
         </DialogHeader>
 
         {warnings ? (
-          <>
-            <Alert className="border-amber-300 bg-amber-50 text-amber-950">
-              <TriangleAlert className="text-amber-700" />
-              <AlertTitle>Diqqat</AlertTitle>
-              <AlertDescription className="text-amber-950">
-                <ul className="list-inside list-disc">
-                  {warnings.map((w) => (
-                    <li key={w.code}>{w.message}</li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
-            <DialogFooter>
-              <Button variant="outline" className="h-9" onClick={() => setWarnings(null)} disabled={save.isPending}>
-                O'zgartirish
-              </Button>
-              <Button
-                className="h-9"
-                disabled={save.isPending}
-                onClick={() => pending && submit({ ...pending, confirmWarnings: true })}
-              >
-                {save.isPending && <LoaderCircle className="animate-spin" aria-hidden="true" />}
-                Baribir saqlash
-              </Button>
-            </DialogFooter>
-          </>
+          <ConfirmWarnings
+            warnings={warnings}
+            pending={save.isPending}
+            onBack={() => setWarnings(null)}
+            onConfirm={() => pending && submit({ ...pending, confirmWarnings: true })}
+          />
         ) : (
           <form onSubmit={onSubmit} noValidate className="grid gap-4">
             {errors.root && (
