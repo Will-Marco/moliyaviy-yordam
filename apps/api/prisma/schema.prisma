@@ -23,5 +23,46 @@ model Company {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  lentContracts     Contract[] @relation("lender")
+  borrowedContracts Contract[] @relation("borrower")
+
   @@map("companies")
+}
+
+/// Moliyaviy yordam shartnomasi (SRS Modul 2). Pul — Decimal, sanalar — faqat sana.
+model Contract {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  number      String       @db.VarChar(50)
+  /// Shartnoma imzolangan sana
+  signedOn    DateTime     @map("signed_on") @db.Date
+  lenderId    String       @map("lender_id") @db.Uuid
+  lender      Company      @relation("lender", fields: [lenderId], references: [id], onDelete: Restrict)
+  borrowerId  String       @map("borrower_id") @db.Uuid
+  borrower    Company      @relation("borrower", fields: [borrowerId], references: [id], onDelete: Restrict)
+  /// Jami berilishi mumkin bo'lgan summa (CR-7)
+  limitAmount Decimal      @map("limit_amount") @db.Decimal(18, 2)
+  startDate   DateTime     @map("start_date") @db.Date
+  endDate     DateTime     @map("end_date") @db.Date
+  rateChanges RateChange[]
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([lenderId, borrowerId, number])
+  @@index([borrowerId])
+  @@map("contracts")
+}
+
+/// Stavkalar tarixi (CR-5). Birinchi yozuv — boshlang'ich stavka, boshlanish sanasidan amal qiladi.
+model RateChange {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  contractId    String   @map("contract_id") @db.Uuid
+  contract      Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  /// Yillik foiz stavkasi, % (masalan 14.5)
+  ratePercent   Decimal  @map("rate_percent") @db.Decimal(7, 4)
+  changedOn     DateTime @map("changed_on") @db.Date
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([contractId, effectiveFrom])
+  @@map("rate_changes")
 }

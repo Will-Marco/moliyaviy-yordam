@@ -1,4 +1,4 @@
-import { BadRequestException, ValidationError, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ConflictException, ValidationError, ValidationPipe } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import { ValidateIf } from 'class-validator';
 
@@ -29,3 +29,13 @@ export const validationPipe = new ValidationPipe({
       errors: collect(errors),
     }),
 });
+
+/** Field-level error with the same shape as the validation pipe, for rules that need the database. */
+export function fieldErrors(errors: Record<string, string>, status: 400 | 409 = 400) {
+  const body = {
+    statusCode: status,
+    message: status === 409 ? Object.values(errors)[0] : "Ma'lumotlar noto'g'ri",
+    errors: Object.fromEntries(Object.entries(errors).map(([field, message]) => [field, [message]])),
+  };
+  return status === 409 ? new ConflictException(body) : new BadRequestException(body);
+}
