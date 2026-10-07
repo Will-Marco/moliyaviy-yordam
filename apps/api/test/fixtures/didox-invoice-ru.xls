@@ -1,0 +1,246 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Worksheet</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table>
+			<table>
+				<tr><th colspan="11" rowspan="3" align="center"><div class="be__title">
+                Счет-фактура<br>№ 690 от 15.09.2026<br>к договору № 1 от 27.01.2026            </div></th></tr>
+			</table>
+			<tr><td colspan="11">&nbsp;</td></tr>
+			<table>
+				<tr>
+				<td colspan="5">
+				<table border="1">
+				<tr>
+					<td colspan="2">
+						Поставщик:
+					</td>
+					<td colspan="3" align="left">
+						"ALFA SAVDO" MCHJ
+					</td>
+				</tr>
+				<tr>
+					<td colspan="2">
+						Адрес:
+					</td>
+					<td colspan="3" align="left">
+						ТАШКЕНТ ГОРОД ЧИЛАНЗАРСКИЙ РАЙОН Bunyodkor ko'chasi, 1  
+					</td>
+				</tr>
+				<tr>
+					<td colspan="2">
+						Идентификационный номер поставщика (ИНН):
+					</td>
+					<td colspan="3" align="left">
+						300000001
+					</td>
+				</tr>
+				<tr>
+					<td colspan="2">
+						Регистрационный код плательщика НДС:
+					</td>
+					<td colspan="3" align="left">
+						326020000001 (сертификат активный)
+					</td>
+				</tr>
+				<tr>
+					<td colspan="2">
+						Р/С:
+					</td>
+					<td colspan="3" align="left">
+						20208000100000000001&nbsp;
+					</td>
+				</tr>
+				<tr>
+					<td colspan="2">
+						МФО:
+					</td>
+					<td colspan="3" align="left">
+						01071&nbsp;
+					</td>
+				</tr>
+				<tr>
+					<td colspan="2">
+						TG:
+					</td>
+					<td colspan="3" align="left">
+						
+					</td>
+				</tr>
+			</table>
+				</td>
+				<td colspan="6">
+				<table border="1">
+				<tr>
+					<td colspan="3">
+						Покупатель:
+					</td>
+					<td colspan="3" align="left">
+						"BETA TEXNO" MCHJ
+					</td>
+				</tr>
+				<tr>
+					<td colspan="3">
+						Адрес:
+					</td>
+					<td colspan="3" align="left">
+						Самарқанд вилояти, Самарқанд шаҳри, Registon MFY, Oʻzbekiston ko'chasi, 5-uy  
+					</td>
+				</tr>
+				<tr>
+					<td colspan="3">
+						Идентификационный номер покупателя (ИНН):
+					</td>
+					<td colspan="3" align="left">
+						300000002
+					</td>
+				</tr>
+				<tr>
+					<td colspan="3">
+						Регистрационный код плательщика НДС:
+					</td>
+					<td colspan="3" align="left">
+						326020000002 (сертификат активный)
+					</td>
+				</tr>
+				<tr>
+					<td colspan="3">
+						Р/С:
+					</td>
+					<td colspan="3" align="left">
+						20208000100000000002&nbsp;
+					</td>
+				</tr>
+				<tr>
+					<td colspan="3">
+						МФО:
+					</td>
+					<td colspan="3" align="left">
+						00440&nbsp;
+					</td>
+				</tr>
+				<tr>
+					<td colspan="3">
+						TG:
+					</td>
+					<td colspan="3" align="left">
+						
+					</td>
+				</tr>
+			</table>
+				</td>
+				</tr>
+			</table>
+			<tr><td colspan="11">&nbsp;</td></tr>
+			<table class="be__products-table" border="1">
+    <thead>
+    <tr>
+        <th rowspan="2">№</th>
+                        <th rowspan="2">Наименование товаров (услуг)</th>
+                            <th rowspan="2" class="be__w-30">Идентификационный код и название по Единому электронному национальному каталогу товаров (услуг)</th>
+                        <th rowspan="2">Единица измерения</th>
+        <th rowspan="2">Количество</th>
+        <th rowspan="2">Цена</th>
+                <th rowspan="2">Стоимость<br>поставки</th>
+        <th colspan="2">НДС</th>
+        <th rowspan="2">Стоимость поставки<br>с учетом НДС</th>
+                    <th rowspan="2">Происхождение товара</th>
+            </tr>
+    <tr>
+                <th>Ставка</th>
+        <th>Сумма</th>
+    </tr>
+    <tr>
+        <td></td>
+        
+        
+        
+        
+                            
+        
+                            
+        
+                    <td class="be__tac">1</td>
+                    <td class="be__tac">2</td>
+                    <td class="be__tac">3</td>
+                    <td class="be__tac">4</td>
+                    <td class="be__tac">5</td>
+                    <td class="be__tac">6</td>
+                    <td class="be__tac">7</td>
+                    <td class="be__tac">8</td>
+                    <td class="be__tac">9</td>
+                    <td class="be__tac">10</td>
+            </tr>
+    </thead>
+    <tbody>
+                <tr>
+            <td class="be__tac">1</td>
+                                    <td class="be__word_wrap">Берилган молиявий ёрдамнинг фоиз куринишидаги даромади за январь 2026 г.</td>
+                                        <td class="be__word_wrap">
+                    10401999001000000
+                                            -
+                                        Маблағларни ўтказиш билан боғлиқ молиявий операциялар (мукофот тўловларидан ташқари)
+                </td>
+                                    <td>
+                                    xizmat (so’m)
+                            </td>
+            <td class="be__tac_no_wrap">
+                                    1,000000
+                            </td>
+            <td class="be__tar_no_wrap">
+                                    552 328,77
+                            </td>
+                        <td class="be__tar_no_wrap">552 328,77</td>
+                            <td class="be__tac"> Без</td>
+                <td class="be__tac"> НДС</td>
+                <td class="be__tar_no_wrap">552 328,77</td>
+                                        <td>Оказание услуг</td>
+                    </tr>
+                <tr>
+                
+        <td class="be__tar bold" colspan="2">Итого</td>
+
+        
+                    <td></td>
+        
+        
+        <td></td>
+        <td></td>
+        <td></td>
+                        <td class="be__tar bold">552 328,77</td>
+                    <td colspan="2"></td>
+                <td class="be__tar bold">552 328,77</td>
+                    <td class="be__tar"></td>
+            </tr>
+    </tbody>
+</table>
+			<tr><td colspan="11">&nbsp;</td></tr>
+			<div class="be__doc_totalsum">
+            Всего к оплате:
+                                        Пятьсот пятьдесят две тысячи триста двадцать восемь сум 77 тийин
+                                                . Без НДС
+                            .
+                                            </div>
+			<tr><td colspan="11">&nbsp;</td></tr>
+      
+			<table>
+			<tr>
+				<td colspan="5.5">
+					<table>
+						<tr></tr><tr></tr><tr></tr><tr></tr><tr></tr><tr></tr>
+					</table>
+				</td>
+				<td colspan="5.5">
+					<table>
+						<tr></tr><tr></tr><tr>
+						<td></td>
+						<td align="center">(подпись покупателя или уполномоченного представителя)</td>
+					</tr>
+					<tr></tr><tr>
+						<td colspan="2" style="border-bottom: 1px solid #000" align="center"></td>
+					</tr>
+					<tr>
+						<td colspan="2" align="center">ФИО получателя</td>
+					</tr>
+					</table>
+				</td>
+			</tr>
+			</table>
+		</table></body></html>
