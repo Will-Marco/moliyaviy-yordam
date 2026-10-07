@@ -89,10 +89,20 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 
 ### Modul 2: Shartnoma yaratish
 - FR-2.1 — Shartnoma: raqami, sanasi, beruvchi firma, oluvchi firma, summa (limit),
-  boshlanish va tugash sanasi, boshlang'ich yillik stavka (%).
-- FR-2.2 — Beruvchi va oluvchi bir xil firma bo'lolmaydi.
-- FR-2.3 — Shartnomalar ro'yxati: tomonlar, limit, jami berilgan, asosiy qarz qoldig'i, foiz qarzi.
-- *Acceptance:* A→B, A→C, E→B shartnomalar yaratiladi va ro'yxatda ko'rinadi.
+  boshlanish va tugash sanasi, boshlang'ich yillik stavka (%). Boshlang'ich stavka stavkalar
+  tarixining birinchi yozuvi bo'ladi va boshlanish sanasidan amal qiladi (CR-5).
+- FR-2.2 — Beruvchi va oluvchi bir xil firma bo'lolmaydi. Tugash sanasi boshlanishdan keyin;
+  limit > 0; 0 < stavka ≤ 100.
+- FR-2.3 — Shartnomalar ro'yxati: №, sana, beruvchi → oluvchi, limit, muddat, joriy stavka.
+  "Jami berilgan" va "asosiy qarz qoldig'i" ustunlari — Modul 3 da, "foiz qarzi" — Modul 4 da qo'shiladi.
+- FR-2.4 — Shartnoma raqami **bir beruvchi–oluvchi juftligi ichida** takrorlanmaydi
+  (boshqa juftlikda bir xil raqam mumkin).
+- FR-2.5 — Tahrirlash: raqam, sana, limit, muddat. Tomonlar — shartnomada operatsiya bo'lmaguncha
+  (Modul 3 bu cheklovni qo'shadi). Stavka bu yerda tahrirlanmaydi — faqat Modul 5 (tarix orqali).
+- FR-2.6 — Shartnoma sahifasi (`/contracts/:id`): rekvizitlar, tomonlar, stavka; keyingi modullar
+  (operatsiyalar, hisobot) shu sahifaga qo'shiladi.
+- *Acceptance:* A→B, A→C, E→B shartnomalar yaratiladi va ro'yxatda ko'rinadi; etalon shartnoma
+  (10 000 000 000, 14%, 01.01.2026–31.07.2027) to'g'ri saqlanadi va ko'rsatiladi.
 
 ### Modul 3: Operatsiyalar
 - FR-3.1 — Operatsiya kiritish: sana, turi (`berildi` / `asosiy qarz qaytarildi` / `foiz to'landi`), summa, izoh.
