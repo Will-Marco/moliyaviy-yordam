@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 7 — Oylik faktura ro'yxati (**pending** — yangi sessiyada reja tuziladi)
+**Joriy modul:** 9 — Serverga joylash (**pending** — M8 partner token kutmoqda)
 **Oxirgi yangilanish:** 2026-10-07
 
 ## Modullar
@@ -17,7 +17,7 @@
 | 4 | Oylik foiz hisoboti | Buxgalter shartnoma bo'yicha har oy foizini va bo'laklarini ko'radi | complex | accepted | FR-4.1–4.5; yadro BigInt, kunma-kun oracle + 150 tasodifiy shartnoma; API unit 57 + e2e 79, web 73; brauzerda etalon yanvar–oktabr tekshirildi | 2026-10-07 |
 | 5 | Stavkani o'zgartirish | Buxgalter yangi stavka kiritadi, u qachondan amal qilishini ko'radi | standard | accepted | FR-5.1–5.5; API unit 64 + e2e 86, web 81; brauzerda 15.03→01.04, retroaktiv ogohlantirish, aprel 16% va o'chirish tekshirildi | 2026-10-07 |
 | 6 | Excel eksport | Buxgalter oylik hisobotni .xlsx qilib yuklab oladi | standard | accepted | FR-6.1–6.4; API unit 68 + e2e 91 (fayl qayta o'qilib tiyinigacha solishtiriladi), web 82; haqiqiy fayl dev serverdan yuklab tekshirildi | 2026-10-07 |
-| 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | pending | SRS §5 M7 | |
+| 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | accepted | FR-7.1–7.5; API unit 97 + e2e 101, web 95; brauzerda etalon yanvar, nusxalash, belgilash/409/olib tashlash | 2026-10-07 |
 | 8 | Didox API — avtomatik qoralamalar | Oy 1-kuni ilova barcha firmalarga o'zi kirib, oy fakturalari qoralamalarini Didox'da yaratadi | complex | pending | ⏸ partner token (Sir so'raydi, mijoz nomidan); test: bo'sh raqam/sana, LgotaId | |
 | 9 | Serverga joylash | Barcha buxgalterlar server manzili orqali kiradi | standard | pending | inson qadamlari — `wizard` | |
 
@@ -25,21 +25,25 @@ Status: `pending → in-progress → review → accepted`
 Hajm: `trivial | standard | complex`
 
 ## Keyingi sessiya uchun (2026-10-07 dagi to'xtash nuqtasi)
-- **Navbat: Modul 7** (SRS §5 "Modul 7"). Lifecycle: o'lchash → reja → Sir'dan qarorlar → TDD → review → Acceptance Report.
-  M7 ma'lumoti M4 hisobot natijasidan (`apps/api/src/interest/report.ts` → `reportView`) olinadi — faqat **tugagan oylar**
-  (`partial: false`), summa = yaxlitlangan `interest`. Qator nomi shabloni va doimiy maydonlar — SRS §9.1.
-  M8 (Didox API) shu ro'yxatga tayanadi: holat `tayyor` / `qoralama yaratildi` (+ Didox hujjat ID) — M7 da jadval kerak.
+- **Navbat:** M8 (Didox API) partner token kutmoqda → taklif: **Modul 9** (serverga joylash, `wizard`) — Sir'dan server
+  ma'lumotlari (OS, domen, kim boshqaradi) kerak. Token kelsa M8 birinchi.
+- M8 uchun tayyor: `invoice_drafts` (contractId × month, amount, didoxDocumentId, draftedAt) — M8 shu jadvalga yozadi;
+  `InvoicesService.list` / `monthInterest` (`apps/api/src/invoices/`) — qaysi fakturalar `tayyor` ekanini beradi.
 - **Ishga tushirish:** `pnpm dev:api` (3000) va `pnpm dev:web` (5173, `/api` proxy). PostgreSQL lokal:
-  `moliyaviy_yordam_dev`, testlar — `moliyaviy_yordam_test`. Dev login — `apps/api/.env` 1-qatordagi izohda.
+  `moliyaviy_yordam_dev`, testlar — `moliyaviy_yordam_test`. Dev login — `apps/api/.env` 2-qatordagi izohda.
   Dev bazada etalon shartnoma (№ 1, ALFA SAVDO → BETA TEXNO, 05.01 — 60 mln, 20.01 — 15 mln, 14%).
 - **Testlar:** `pnpm test` (unit, api+web), `pnpm test:e2e` (api, `TEST_TODAY` = 2026-10-07, `createTestApp({ today })`).
   Supertest: `agent.post()` argumentlari ichida `await` ishlatmang — ID'larni oldin oling.
+  Prisma 7: `migrate dev` client'ni yangilamaydi — keyin `npx prisma generate`.
 - **Uslub:** TDD (RED → GREEN), har modulda `code-review` (high) + `ReportFindings`, brauzerda tekshiruv,
   commit — inglizcha Conventional Commits, `Co-Authored-By` siz; modul qabul qilingach `main` ga push.
-- **Sir'dan kutilayotganlar:** Didox partner token (mijoz nomidan, Sir so'raydi) — M8 bloker; o'zbek tilidagi
-  Didox faktura eksporti namunasi (FR-1.3 tekshiruvi); server ma'lumotlari (OS, domen) — M9.
+- **Sir'dan kutilayotganlar:** Didox partner token (mijoz nomidan) — M8 bloker; o'zbek tilidagi Didox faktura
+  eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-07 — M7 qabul qilindi — Sir
+- 2026-10-07 — M7: `GET /invoices` (oy + barcha beruvchilar + qatorlar), `PUT/DELETE /invoices/:month/:contractId/draft`; qayta belgilash — 409 ALREADY_DRAFTED; faqat tugagan oy va foiz > 0; oy summasi yadroda oy oxirigacha hisoblanadi; nusxalash — Clipboard API + execCommand zaxirasi
+- 2026-10-07 — M7 reja: `invoice_drafts` jadvali (faqat qoralama holati; `tayyor` = yozuv yo'q), belgilash paytidagi summa saqlanadi va farq qilsa ogohlantirish; summa nusxasi `552328.77`; Didox ID ixtiyoriy; alohida "Fakturalar" sahifasi — Sir
 - 2026-10-07 — Kunlik hisob, **B qoidasi** (kun oxiridagi qoldiq; berilgan kun hisobga kiradi) — Sir tanlovi
 - 2026-10-07 — Oddiy foiz, penya yo'q; muddatdan keyin qarz qolsa foiz davom etadi — Sir
 - 2026-10-07 — Limit = jami berilgan summa; qaytarish limitni tiklamaydi — Sir
@@ -82,6 +86,8 @@ Hajm: `trivial | standard | complex`
 - 2026-10-07 — Mijoz suhbati: faktura qatori doimiy (faqat oy va narx o'zgaradi); faktura raqami/sanasini buxgalter Didox'da qo'yadi; ilova faqat qoralama yaratadi — SRS §9.1–9.2
 
 ## Ochiq risk / texnik qarz
+- M7: `552328.77` summa formati haqiqiy Didox formasida tekshirilmagan
+- Global query `retry` 400 xatolarni ham 2 marta qayta uradi (sekin xato ko'rsatish) — 4xx'da retry'ni o'chirish mumkin
 - Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; shadcn CLI (web dependencies'da — devDependencies'ga o'tkazish kerak); exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi
 - M6: Excel tugmasi oddiy havola — sessiya tugagan bo'lsa JSON xato fayli yuklanadi (kam uchraydi)
 - M4: ro'yxat har so'rovda har shartnoma uchun to'liq yadroni ishlatadi — yuzlab shartnomada yetarli; ko'paysa yengil "faqat jamilar" rejimi yoki kesh
