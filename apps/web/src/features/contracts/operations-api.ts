@@ -12,6 +12,8 @@ export interface Operation {
   note: string | null
   /** Principal balance after this operation. */
   balanceAfter: string
+  /** Dated after today — not yet in any figure (CR-11). */
+  scheduled: boolean
 }
 
 export interface OperationInput {

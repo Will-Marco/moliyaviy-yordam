@@ -12,6 +12,24 @@ export function formatMoney(value: string): string {
   return `${negative ? '\u2212' : ''}${group(whole)},${fraction.padEnd(2, '0').slice(0, 2)}`
 }
 
+/** Like formatMoney but keeps every fraction digit: "552328.767123" → "552 328,767123". */
+export function formatDecimal(value: string): string {
+  const negative = value.startsWith('-')
+  const [whole, fraction] = (negative ? value.slice(1) : value).split('.')
+  return `${negative ? '\u2212' : ''}${group(whole)}${fraction ? `,${fraction}` : ''}`
+}
+
+const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr']
+
+/** "2026-01" → "Yanvar 2026" */
+export function formatMonth(value: string): string {
+  const [year, month] = value.split('-')
+  return `${MONTHS[Number(month) - 1]} ${year}`
+}
+
+/** "2026-01-05" → "05.01" */
+export const formatDayMonth = (value: string) => formatDate(value).slice(0, 5)
+
 export const isNegativeMoney = (value: string) => value.startsWith('-') && !/^-0*(\.0*)?$/.test(value)
 
 /** "14.5" → "14,5 %". */

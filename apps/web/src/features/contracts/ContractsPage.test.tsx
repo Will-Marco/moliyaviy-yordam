@@ -20,6 +20,7 @@ describe('ContractsPage', () => {
     expect(within(row).getByText('14 %')).toBeInTheDocument()
     expect(within(row).getByText('60 000 000,00')).toBeInTheDocument()
     expect(within(row).getByText('45 000 000,00')).toBeInTheDocument()
+    expect(within(row).getByText('1 035 616,44')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '№ 1' })).toHaveAttribute('href', `/contracts/${etalon.id}`)
   })
 

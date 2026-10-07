@@ -68,6 +68,7 @@ export function ContractsPage() {
                 <TableHead className="text-right">Summa (limit)</TableHead>
                 <TableHead className="text-right">Jami berilgan</TableHead>
                 <TableHead className="text-right">Qoldiq</TableHead>
+                <TableHead className="text-right">Foiz qarzi</TableHead>
                 <TableHead>Muddat</TableHead>
                 <TableHead className="text-right">Stavka</TableHead>
               </TableRow>
@@ -98,6 +99,7 @@ export function ContractsPage() {
                   >
                     {formatMoney(c.totals.principalBalance)}
                   </TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{formatMoney(c.totals.interestDebt)}</TableCell>
                   <TableCell className="tabular-nums">{`${formatDate(c.startDate)} – ${formatDate(c.endDate)}`}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatRate(c.currentRate.ratePercent)}</TableCell>
                 </TableRow>

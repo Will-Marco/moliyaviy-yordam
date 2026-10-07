@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { type Party, useContract } from './api'
 import { ContractFormDialog } from './ContractFormDialog'
 import { OperationsCard } from './OperationsCard'
+import { ReportCard } from './ReportCard'
 
 export function ContractPage() {
   const { id = '' } = useParams()
@@ -93,12 +94,17 @@ export function ContractPage() {
                   {formatMoney(c.totals.principalBalance)} so'm
                 </span>
               </Term>
+              <Term label="Foiz qarzi">
+                <span className="font-mono tabular-nums">{formatMoney(c.totals.interestDebt)} so'm</span>
+              </Term>
             </dl>
           </CardContent>
         </Card>
       </div>
 
       <OperationsCard contract={c} />
+
+      <ReportCard contractId={c.id} />
 
       <Card className="gap-0 p-0">
         <CardHeader className="p-4">

@@ -24,8 +24,15 @@ export interface Contract {
   startDate: string
   endDate: string
   currentRate: { ratePercent: string; effectiveFrom: string }
-  /** FR-3.5 — from all recorded operations. */
-  totals: { disbursed: string; repaid: string; interestPaid: string; principalBalance: string }
+  /** FR-3.5 — as of today (CR-11). */
+  totals: {
+    disbursed: string
+    repaid: string
+    interestPaid: string
+    principalBalance: string
+    /** Completed months only — the invoiced debt (FR-4.4). */
+    interestDebt: string
+  }
   rates?: Rate[]
 }
 

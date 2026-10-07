@@ -12,6 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -78,9 +79,14 @@ export function OperationsCard({ contract }: { contract: Contract }) {
             </TableHeader>
             <TableBody>
               {operations.data.map((op) => (
-                <TableRow key={op.id}>
-                  <TableCell className="tabular-nums" title={typeLabel(op)}>
+                <TableRow key={op.id} className={cn(op.scheduled && 'text-muted-foreground')}>
+                  <TableCell className="whitespace-nowrap tabular-nums" title={typeLabel(op)}>
                     {formatDate(op.date)}
+                    {op.scheduled && (
+                      <Badge variant="outline" className="ml-2" title="Sanasi kelganda hisobga kiradi">
+                        Rejalashtirilgan
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono tabular-nums">{amountIn(op, 'DISBURSEMENT')}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums">{amountIn(op, 'PRINCIPAL_REPAYMENT')}</TableCell>
