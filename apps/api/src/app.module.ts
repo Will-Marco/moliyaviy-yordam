@@ -6,6 +6,7 @@ import { CompaniesModule } from './companies/companies.module.js';
 import { validateEnv } from './config/env.js';
 import { ContractsModule } from './contracts/contracts.module.js';
 import { InterestModule } from './interest/interest.module.js';
+import { InvoicesModule } from './invoices/invoices.module.js';
 import { OperationsModule } from './operations/operations.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
@@ -19,6 +20,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     ContractsModule,
     OperationsModule,
     InterestModule,
+    InvoicesModule,
   ],
 })
 export class AppModule {}

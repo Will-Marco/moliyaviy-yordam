@@ -1,4 +1,4 @@
-import type { IsoDate } from '../common/dates.js';
+import { IsoDate, previousMonth } from '../common/dates.js';
 
 /** CR-5: entered on the 1st → in force that day; otherwise from the 1st of the next month. */
 export function effectiveFromOf(changedOn: IsoDate): IsoDate {
@@ -19,7 +19,5 @@ export function retroactiveMonths(
   const current = today.slice(0, 7);
   const from = [effectiveFrom.slice(0, 7), startDate.slice(0, 7)].sort().at(-1)!;
   if (from >= current) return null;
-  const [year, month] = current.split('-').map(Number);
-  const to = month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
-  return { from, to };
+  return { from, to: previousMonth(current) };
 }

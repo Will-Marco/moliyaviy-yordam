@@ -31,22 +31,23 @@ model Company {
 
 /// Moliyaviy yordam shartnomasi (SRS Modul 2). Pul — Decimal, sanalar — faqat sana.
 model Contract {
-  id          String       @id @default(uuid(7)) @db.Uuid
-  number      String       @db.VarChar(50)
+  id            String         @id @default(uuid(7)) @db.Uuid
+  number        String         @db.VarChar(50)
   /// Shartnoma imzolangan sana
-  signedOn    DateTime     @map("signed_on") @db.Date
-  lenderId    String       @map("lender_id") @db.Uuid
-  lender      Company      @relation("lender", fields: [lenderId], references: [id], onDelete: Restrict)
-  borrowerId  String       @map("borrower_id") @db.Uuid
-  borrower    Company      @relation("borrower", fields: [borrowerId], references: [id], onDelete: Restrict)
+  signedOn      DateTime       @map("signed_on") @db.Date
+  lenderId      String         @map("lender_id") @db.Uuid
+  lender        Company        @relation("lender", fields: [lenderId], references: [id], onDelete: Restrict)
+  borrowerId    String         @map("borrower_id") @db.Uuid
+  borrower      Company        @relation("borrower", fields: [borrowerId], references: [id], onDelete: Restrict)
   /// Jami berilishi mumkin bo'lgan summa (CR-7)
-  limitAmount Decimal      @map("limit_amount") @db.Decimal(18, 2)
-  startDate   DateTime     @map("start_date") @db.Date
-  endDate     DateTime     @map("end_date") @db.Date
-  rateChanges RateChange[]
-  operations  Operation[]
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  limitAmount   Decimal        @map("limit_amount") @db.Decimal(18, 2)
+  startDate     DateTime       @map("start_date") @db.Date
+  endDate       DateTime       @map("end_date") @db.Date
+  rateChanges   RateChange[]
+  operations    Operation[]
+  invoiceDrafts InvoiceDraft[]
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([lenderId, borrowerId, number])
   @@index([borrowerId])
@@ -93,4 +94,23 @@ model Operation {
 
   @@index([contractId, date])
   @@map("operations")
+}
+
+/// Faktura qoralamasi holati (FR-7.4). Yozuv yo'q — "tayyor"; bor — "qoralama yaratildi".
+/// Belgilash paytidagi summa saqlanadi: oy qayta hisoblansa, farq ko'rsatiladi.
+model InvoiceDraft {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  contractId      String   @map("contract_id") @db.Uuid
+  contract        Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  /// "yyyy-mm"
+  month           String   @db.Char(7)
+  amount          Decimal  @db.Decimal(18, 2)
+  didoxDocumentId String?  @map("didox_document_id") @db.VarChar(100)
+  draftedAt       DateTime @map("drafted_at") @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([contractId, month])
+  @@index([month])
+  @@map("invoice_drafts")
 }
