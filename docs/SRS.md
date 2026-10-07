@@ -60,6 +60,10 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - **CR-9 Qayta hisob:** hisobot har doim operatsiyalardan qayta hisoblanadi (saqlangan "kesh" haqiqat
   manbai emas). O'tgan sanaga operatsiya kiritilsa yoki o'zgartirilsa — hisob avtomatik yangilanadi.
 
+- **CR-10 Manfiy qoldiq:** asosiy qarz qoldig'idan ko'p qaytarilsa (ogohlantirish bilan saqlanadi),
+  qoldiq **manfiy** bo'ladi va CR-1 formulasi o'zgarmasdan qo'llanadi — o'sha kunlar uchun foiz
+  **manfiy** (beruvchi oluvchidan qarzdor). Sir qarori, 2026-10-07.
+
 **Etalon misol (acceptance test):** shartnoma 2026-01-01, stavka 14%; 05.01 — 60 000 000 berildi;
 20.01 — 15 000 000 asosiy qarz qaytarildi.
 60 000 000 × 15 kun (5–19) + 45 000 000 × 12 kun (20–31) → **yanvar foizi = 552 328,77 so'm**
@@ -105,15 +109,21 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   (10 000 000 000, 14%, 01.01.2026–31.07.2027) to'g'ri saqlanadi va ko'rsatiladi.
 
 ### Modul 3: Operatsiyalar
-- FR-3.1 — Operatsiya kiritish: sana, turi (`berildi` / `asosiy qarz qaytarildi` / `foiz to'landi`), summa, izoh.
-- FR-3.2 — Operatsiyani tahrirlash va o'chirish (tasdiq bilan).
-- FR-3.3 — Ogohlantirishlar (bloklamaydi):
-  - jami berilgan > limit;
-  - qaytarilgan asosiy qarz > o'sha sanadagi qoldiq;
-  - foiz to'lovi > foiz qarzi;
+- FR-3.1 — Operatsiya kiritish: sana, turi (`berildi` / `asosiy qarz qaytarildi` / `foiz to'landi`), summa (> 0), izoh.
+- FR-3.2 — Operatsiyani tahrirlash va o'chirish (o'chirish — tasdiq bilan). Hisob har doim qayta hisoblanadi (CR-9).
+- FR-3.3 — Ogohlantirishlar (**bloklamaydi**). "Saqlash" bosilganda forma ichida ko'rsatiladi; buxgalter
+  **"Baribir saqlash"** bilan tasdiqlaydi. Ogohlantirish bo'lmasa — darhol saqlanadi:
+  - jami berilgan > limit (qanchaga oshishi bilan);
+  - operatsiyadan keyin asosiy qarz qoldig'i **manfiy** bo'ladigan sana (CR-10);
   - operatsiya sanasi shartnoma boshlanishidan oldin;
   - muddatdan keyin `berildi` operatsiyasi.
-- *Acceptance:* 60 mln berish va 15 mln qaytarishdan keyin qoldiq 45 mln; limitdan oshganda ogohlantirish chiqadi, saqlash baribir mumkin.
+  - "Foiz to'lovi > foiz qarzi" — **Modul 4** da (foiz hisobi kerak).
+- FR-3.4 — Shartnoma sahifasida operatsiyalar jadvali: sana, berildi, qaytarildi, foiz to'landi,
+  har operatsiyadan keyingi qoldiq, izoh.
+- FR-3.5 — Shartnoma kartasida va ro'yxatda: **jami berilgan** va **asosiy qarz qoldig'i** (FR-2.3).
+- FR-3.6 — Operatsiyasi bor shartnomada tomonlarni o'zgartirib bo'lmaydi (FR-2.5).
+- *Acceptance:* 05.01 — 60 000 000 berish va 20.01 — 15 000 000 qaytarishdan keyin qoldiq 45 000 000;
+  limitdan oshganda ogohlantirish chiqadi, "Baribir saqlash" bilan saqlanadi.
 
 ### Modul 4: Oylik foiz hisoboti (yadro)
 - FR-4.1 — Shartnoma bo'yicha oylik jadval (boshlanish oyidan joriy oygacha, muddatdan keyin
