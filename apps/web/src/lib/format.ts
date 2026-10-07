@@ -67,3 +67,10 @@ export function formatMoneyInput(input: string): string | null {
   const amount = parseMoneyInput(input)
   return amount === null ? null : formatMoney(amount)
 }
+
+/** A moment ("2026-09-30T20:00:00.000Z") → the accountants' calendar date in Tashkent ("01.10.2026"). */
+export function formatInstantDate(value: string): string {
+  return new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric' }).format(
+    new Date(value),
+  )
+}

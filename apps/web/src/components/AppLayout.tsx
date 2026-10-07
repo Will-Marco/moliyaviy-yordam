@@ -1,4 +1,4 @@
-import { Building2, FileText, Landmark, LogOut } from 'lucide-react'
+import { Building2, FileText, Landmark, LogOut, Receipt } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useLogout } from '@/features/auth/api'
@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 
 const nav = [
   { to: '/contracts', label: 'Shartnomalar', icon: FileText },
+  { to: '/invoices', label: 'Fakturalar', icon: Receipt },
   { to: '/companies', label: 'Firmalar', icon: Building2 },
 ]
 

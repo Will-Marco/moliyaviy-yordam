@@ -1,4 +1,4 @@
-import { formatDate, formatMoney, formatRate, parseMoneyInput, parseRateInput } from './format'
+import { formatDate, formatInstantDate, formatMoney, formatRate, parseMoneyInput, parseRateInput } from './format'
 
 const nb = ' '
 
@@ -33,5 +33,12 @@ describe('format', () => {
   it('formats rates and dates the Uzbek way', () => {
     expect(formatRate('14.5')).toBe(`14,5${nb}%`)
     expect(formatDate('2026-01-01')).toBe('01.01.2026')
+  })
+})
+
+describe('formatInstantDate', () => {
+  it('shows the Tashkent calendar date, not UTC', () => {
+    expect(formatInstantDate('2026-09-30T20:00:00.000Z')).toBe('01.10.2026')
+    expect(formatInstantDate('2026-10-01T04:00:00.000Z')).toBe('01.10.2026')
   })
 })
