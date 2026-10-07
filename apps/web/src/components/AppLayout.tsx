@@ -1,10 +1,13 @@
-import { Building2, Landmark, LogOut } from 'lucide-react'
+import { Building2, FileText, Landmark, LogOut } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useLogout } from '@/features/auth/api'
 import { cn } from '@/lib/utils'
 
-const nav = [{ to: '/companies', label: 'Firmalar', icon: Building2 }]
+const nav = [
+  { to: '/contracts', label: 'Shartnomalar', icon: FileText },
+  { to: '/companies', label: 'Firmalar', icon: Building2 },
+]
 
 export function AppLayout() {
   const navigate = useNavigate()
@@ -19,7 +22,7 @@ export function AppLayout() {
         Asosiy kontentga o'tish
       </a>
       <header className="bg-card border-b">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-6">
           <div className="flex items-center gap-2 font-semibold">
             <span className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md">
               <Landmark className="size-4" aria-hidden="true" />
@@ -47,11 +50,12 @@ export function AppLayout() {
             variant="ghost"
             size="sm"
             className="h-9"
+            aria-label="Chiqish"
             disabled={logout.isPending}
             onClick={() => logout.mutate(undefined, { onSettled: () => navigate('/login', { replace: true }) })}
           >
             <LogOut aria-hidden="true" />
-            Chiqish
+            <span className="hidden sm:inline">Chiqish</span>
           </Button>
         </div>
       </header>

@@ -3,6 +3,8 @@ import { AppLayout } from '@/components/AppLayout'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
 import { CompaniesPage } from '@/features/companies/CompaniesPage'
+import { ContractPage } from '@/features/contracts/ContractPage'
+import { ContractsPage } from '@/features/contracts/ContractsPage'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -12,7 +14,9 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { index: true, element: <Navigate to="/companies" replace /> },
+          { index: true, element: <Navigate to="/contracts" replace /> },
+          { path: '/contracts', element: <ContractsPage /> },
+          { path: '/contracts/:id', element: <ContractPage /> },
           { path: '/companies', element: <CompaniesPage /> },
         ],
       },

@@ -27,7 +27,7 @@ export function LoginPage() {
   const { errors } = formState
 
   const onSubmit = handleSubmit((values) =>
-    login.mutate(values, { onSuccess: () => navigate('/companies', { replace: true }) }),
+    login.mutate(values, { onSuccess: () => navigate('/contracts', { replace: true }) }),
   )
 
   return (

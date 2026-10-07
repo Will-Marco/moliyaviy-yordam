@@ -33,6 +33,7 @@ export function renderWithProviders(ui: ReactElement, { route = '/', path = '*' 
           <Route path={path} element={ui} />
           <Route path="/login" element={<div>LOGIN PAGE</div>} />
           <Route path="/companies" element={<div>COMPANIES PAGE</div>} />
+          <Route path="/contracts" element={<div>CONTRACTS PAGE</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

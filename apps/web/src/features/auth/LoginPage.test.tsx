@@ -24,7 +24,7 @@ describe('LoginPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent("Login yoki parol noto'g'ri")
   })
 
-  it('goes to the companies page after a successful login', async () => {
+  it('goes to the contracts page after a successful login', async () => {
     const { calls } = mockApi({
       'POST /api/auth/login': () => ({ status: 200, body: { username: 'admin' } }),
     })
@@ -32,7 +32,7 @@ describe('LoginPage', () => {
     await userEvent.type(screen.getByLabelText('Login'), 'admin')
     await userEvent.type(screen.getByLabelText('Parol'), 'secret')
     await userEvent.click(screen.getByRole('button', { name: 'Kirish' }))
-    expect(await screen.findByText('COMPANIES PAGE')).toBeInTheDocument()
+    expect(await screen.findByText('CONTRACTS PAGE')).toBeInTheDocument()
     expect(calls[0].body).toEqual({ username: 'admin', password: 'secret' })
   })
 })
