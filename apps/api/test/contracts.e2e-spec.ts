@@ -57,7 +57,7 @@ describe('Contracts (Module 2)', () => {
       endDate: '2027-07-31',
       currentRate: { ratePercent: '14', effectiveFrom: '2026-01-01' },
       totals: { disbursed: '0.00', repaid: '0.00', interestPaid: '0.00', principalBalance: '0.00', interestDebt: '0.00' },
-      rates: [{ ratePercent: '14', changedOn: '2026-01-01', effectiveFrom: '2026-01-01' }],
+      rates: [{ id: expect.any(String), initial: true, ratePercent: '14', changedOn: '2026-01-01', effectiveFrom: '2026-01-01' }],
     });
   });
 
@@ -146,7 +146,9 @@ describe('Contracts (Module 2)', () => {
       .patch(`/api/contracts/${created.id}`)
       .send({ startDate: '2025-12-01', signedOn: '2025-11-20' })
       .expect(200);
-    expect(res.body.rates).toEqual([{ ratePercent: '14', changedOn: '2025-11-20', effectiveFrom: '2025-12-01' }]);
+    expect(res.body.rates).toEqual([
+      { id: expect.any(String), initial: true, ratePercent: '14', changedOn: '2025-11-20', effectiveFrom: '2025-12-01' },
+    ]);
     expect(res.body.currentRate.effectiveFrom).toBe('2025-12-01');
   });
 

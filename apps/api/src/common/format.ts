@@ -19,3 +19,10 @@ export function formatTiyin(tiyin: bigint): string {
 
 /** "2026-01-25" → "25.01.2026" */
 export const formatDate = (date: IsoDate) => date.split('-').reverse().join('.');
+
+const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'];
+
+/** "2026-04" → "Aprel 2026" */
+export function formatMonth(month: string): string {
+  return `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
+}

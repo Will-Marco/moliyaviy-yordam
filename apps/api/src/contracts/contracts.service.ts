@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Clock } from '../common/clock.js';
 import { toDbDate } from '../common/dates.js';
+import { formatDate } from '../common/format.js';
 import { fieldErrors } from '../common/validation.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -68,6 +69,12 @@ export class ContractsService {
       throw fieldErrors({
         ...(dto.lenderId !== current.lender.id && dto.lenderId !== undefined && { lenderId: message }),
         ...(dto.borrowerId !== current.borrower.id && dto.borrowerId !== undefined && { borrowerId: message }),
+      });
+    }
+    const laterRate = (current.rates ?? []).find((r) => !r.initial && dto.startDate && r.effectiveFrom <= dto.startDate);
+    if (laterRate) {
+      throw fieldErrors({
+        startDate: `Boshlanish sanasi stavka o'zgarishidan (${formatDate(laterRate.effectiveFrom)}) oldin bo'lishi kerak`,
       });
     }
     await this.assertTerms({

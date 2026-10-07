@@ -15,6 +15,9 @@ export const contractInclude = {
 export type ContractRecord = Prisma.ContractGetPayload<{ include: typeof contractInclude }>;
 
 export interface RateView {
+  id: string;
+  /** The rate entered with the contract (FR-5.3/5.4). */
+  initial: boolean;
   ratePercent: string;
   changedOn: IsoDate;
   effectiveFrom: IsoDate;
@@ -37,13 +40,16 @@ export interface ContractView {
 }
 
 /** The rate in force `today` (CR-5): latest effective one; before the start date — the initial rate. */
-export function currentRate(rates: RateView[], today: IsoDate): RateView {
+export function currentRate<T extends Pick<RateView, 'effectiveFrom'>>(rates: T[], today: IsoDate): T {
   const inForce = rates.filter((r) => r.effectiveFrom <= today);
   return inForce.at(-1) ?? rates[0];
 }
 
 export function toContractView(record: ContractRecord, today: IsoDate, withRates: boolean): ContractView {
+  const initialId = [...record.rateChanges].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id;
   const rates = record.rateChanges.map((r) => ({
+    id: r.id,
+    initial: r.id === initialId,
     ratePercent: rateString(r.ratePercent),
     changedOn: fromDbDate(r.changedOn),
     effectiveFrom: fromDbDate(r.effectiveFrom),
