@@ -1,0 +1,12 @@
+{
+  "name": "moliyaviy-yordam",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter api start:dev",
+    "dev:web": "pnpm --filter web dev",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter api test:e2e",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint"
+  }
+}
