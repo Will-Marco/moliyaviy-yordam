@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 6 — Excel eksport (**pending** — reja Sir tasdig'ini kutmoqda)
+**Joriy modul:** 7 — Oylik faktura ro'yxati (**pending** — yangi sessiyada reja tuziladi)
 **Oxirgi yangilanish:** 2026-10-07
 
 ## Modullar
@@ -16,13 +16,28 @@
 | 3 | Operatsiyalar | Buxgalter berildi/qaytarildi/foiz to'landi kiritadi, qoldiq va ogohlantirishni ko'radi | standard | accepted | FR-3.1–3.6; API unit 39 + e2e 72, web 69; brauzerda etalon (qoldiq 45 mln), limit ogohlantirishi, o'chirish tekshirildi | 2026-10-07 |
 | 4 | Oylik foiz hisoboti | Buxgalter shartnoma bo'yicha har oy foizini va bo'laklarini ko'radi | complex | accepted | FR-4.1–4.5; yadro BigInt, kunma-kun oracle + 150 tasodifiy shartnoma; API unit 57 + e2e 79, web 73; brauzerda etalon yanvar–oktabr tekshirildi | 2026-10-07 |
 | 5 | Stavkani o'zgartirish | Buxgalter yangi stavka kiritadi, u qachondan amal qilishini ko'radi | standard | accepted | FR-5.1–5.5; API unit 64 + e2e 86, web 81; brauzerda 15.03→01.04, retroaktiv ogohlantirish, aprel 16% va o'chirish tekshirildi | 2026-10-07 |
-| 6 | Excel eksport | Buxgalter oylik hisobotni .xlsx qilib yuklab oladi | standard | pending | | |
+| 6 | Excel eksport | Buxgalter oylik hisobotni .xlsx qilib yuklab oladi | standard | accepted | FR-6.1–6.4; API unit 68 + e2e 91 (fayl qayta o'qilib tiyinigacha solishtiriladi), web 82; haqiqiy fayl dev serverdan yuklab tekshirildi | 2026-10-07 |
 | 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | pending | SRS §5 M7 | |
 | 8 | Didox API — avtomatik qoralamalar | Oy 1-kuni ilova barcha firmalarga o'zi kirib, oy fakturalari qoralamalarini Didox'da yaratadi | complex | pending | ⏸ partner token (Sir so'raydi, mijoz nomidan); test: bo'sh raqam/sana, LgotaId | |
 | 9 | Serverga joylash | Barcha buxgalterlar server manzili orqali kiradi | standard | pending | inson qadamlari — `wizard` | |
 
 Status: `pending → in-progress → review → accepted`
 Hajm: `trivial | standard | complex`
+
+## Keyingi sessiya uchun (2026-10-07 dagi to'xtash nuqtasi)
+- **Navbat: Modul 7** (SRS §5 "Modul 7"). Lifecycle: o'lchash → reja → Sir'dan qarorlar → TDD → review → Acceptance Report.
+  M7 ma'lumoti M4 hisobot natijasidan (`apps/api/src/interest/report.ts` → `reportView`) olinadi — faqat **tugagan oylar**
+  (`partial: false`), summa = yaxlitlangan `interest`. Qator nomi shabloni va doimiy maydonlar — SRS §9.1.
+  M8 (Didox API) shu ro'yxatga tayanadi: holat `tayyor` / `qoralama yaratildi` (+ Didox hujjat ID) — M7 da jadval kerak.
+- **Ishga tushirish:** `pnpm dev:api` (3000) va `pnpm dev:web` (5173, `/api` proxy). PostgreSQL lokal:
+  `moliyaviy_yordam_dev`, testlar — `moliyaviy_yordam_test`. Dev login — `apps/api/.env` 1-qatordagi izohda.
+  Dev bazada etalon shartnoma (№ 1, ALFA SAVDO → BETA TEXNO, 05.01 — 60 mln, 20.01 — 15 mln, 14%).
+- **Testlar:** `pnpm test` (unit, api+web), `pnpm test:e2e` (api, `TEST_TODAY` = 2026-10-07, `createTestApp({ today })`).
+  Supertest: `agent.post()` argumentlari ichida `await` ishlatmang — ID'larni oldin oling.
+- **Uslub:** TDD (RED → GREEN), har modulda `code-review` (high) + `ReportFindings`, brauzerda tekshiruv,
+  commit — inglizcha Conventional Commits, `Co-Authored-By` siz; modul qabul qilingach `main` ga push.
+- **Sir'dan kutilayotganlar:** Didox partner token (mijoz nomidan, Sir so'raydi) — M8 bloker; o'zbek tilidagi
+  Didox faktura eksporti namunasi (FR-1.3 tekshiruvi); server ma'lumotlari (OS, domen) — M9.
 
 ## Qaror jurnali
 - 2026-10-07 — Kunlik hisob, **B qoidasi** (kun oxiridagi qoldiq; berilgan kun hisobga kiradi) — Sir tanlovi
@@ -44,6 +59,9 @@ Hajm: `trivial | standard | complex`
 - 2026-10-07 — **Didox yo'li qayta ko'rildi → partner API** (kengaytma bekor). Firma Didox akkaunt paroli shifrlangan saqlanadi, ERI hech qachon — Sir
 - 2026-10-07 — Didox: avtomatik — oy 1-kuni ilova akkauntlarga (1 akkaunt → ko'p firma) kiradi va barcha qoralamalarni yaratadi; ilovada tasdiq yo'q; buxgalter Didox'da raqam/sana qo'yib birdaniga imzolaydi. Partner token mijoz nomidan, Sir so'raydi — Sir
 - 2026-10-07 — Avtomatik qoralamalar oy 1-kuni 09:00 gacha tayyor (start 06:00, vaqtinchalik xatolarga 07:00/08:00 qayta urinish); xabar faqat ilovada — Sir
+- 2026-10-07 — M6 qabul qilindi — Sir
+- 2026-10-07 — M6: `GET /contracts/:id/report.xlsx` (exceljs, serverda, hisobot natijasidan); 3 varaq; summalar raqam `#,##0.00`, 15 xonadan uzuni matn
+- 2026-10-07 — M6 reja: summalar raqam (15 xonadan uzuni matn); 3 varaq (Oylik hisobot, Bo'laklar, Operatsiyalar); barcha shartnomalar eksporti — yo'q; kutubxona exceljs — Sir
 - 2026-10-07 — M5 qabul qilindi — Sir
 - 2026-10-07 — M5: `/contracts/:id/rates` (POST qo'shish, PATCH faqat boshlang'ich qiymati, DELETE boshlang'ichdan boshqasi); RETROACTIVE ogohlantirish — 409 + confirmWarnings; boshlanish sanasi stavka o'zgarishlaridan oldin qolishi shart; ogohlantirish UI umumiy `ConfirmWarnings`
 - 2026-10-07 — M5 reja: boshlang'ichdan boshqa o'zgarishni o'chirish (tahrir yo'q); o'tgan/kelajak sana mumkin, tugagan oyga tushsa ogohlantirish; boshlang'ich stavka qiymatini tuzatish (ogohlantirish bilan); yangi o'zgarish boshlang'ichdan keyin amal qiladi — Sir
@@ -64,6 +82,8 @@ Hajm: `trivial | standard | complex`
 - 2026-10-07 — Mijoz suhbati: faktura qatori doimiy (faqat oy va narx o'zgaradi); faktura raqami/sanasini buxgalter Didox'da qo'yadi; ilova faqat qoralama yaratadi — SRS §9.1–9.2
 
 ## Ochiq risk / texnik qarz
+- Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; shadcn CLI (web dependencies'da — devDependencies'ga o'tkazish kerak); exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi
+- M6: Excel tugmasi oddiy havola — sessiya tugagan bo'lsa JSON xato fayli yuklanadi (kam uchraydi)
 - M4: ro'yxat har so'rovda har shartnoma uchun to'liq yadroni ishlatadi — yuzlab shartnomada yetarli; ko'paysa yengil "faqat jamilar" rejimi yoki kesh
 - M4: operatsiyani o'chirish ogohlantirishsiz (tasdiq oynasi bor) — o'chirish foiz to'lovini ortiqcha qilib qo'yishi mumkin
 - M1 FR-1.3: o'zbek (kirill) tilidagi Didox eksport yorliqlari haqiqiy fayl bilan tekshirilmagan — o'zbekcha eksport namunasi kerak

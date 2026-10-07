@@ -157,9 +157,15 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   aprel foizi yangi stavka bilan hisoblanadi.
 
 ### Modul 6: Excel eksport
-- FR-6.1 — Shartnoma bo'yicha `.xlsx`: 1-varaq — oylik jadval (FR-4.1), 2-varaq — kunlik bo'laklar (FR-4.2),
-  sarlavhada shartnoma rekvizitlari.
-- *Acceptance:* yuklab olingan fayl ekrandagi raqamlar bilan tiyinigacha mos.
+- FR-6.1 — Shartnoma sahifasida "Excel yuklab olish" → `.xlsx`, **serverda** Modul 4 hisobot natijasidan
+  (CONSTITUTION §11). Fayl nomi: `Shartnoma_<№>_<beruvchi>_<sana>.xlsx`.
+- FR-6.2 — Varaqlar: **"Oylik hisobot"** (sarlavhada rekvizitlar: shartnoma № va sanasi, beruvchi/oluvchi STIR bilan,
+  limit, muddat, joriy stavka, hisobot sanasi; oylik jadval + jami; joriy oy belgisi), **"Bo'laklar"** (FR-4.2),
+  **"Operatsiyalar"** (berildi/qaytarildi/foiz to'landi, qoldiq, izoh — akt sverka sifatida).
+- FR-6.3 — Summalar Excel'da **raqam** (`# ##0,00`), hisob-kitob qilsa bo'ladi. 15 muhim xonadan uzun summa
+  (Excel aniqlik chegarasi) — aniqlik yo'qolmasligi uchun **matn**.
+- FR-6.4 — Barcha shartnomalarni bitta faylga eksport — **kirmaydi** (keyinroq alohida modul bo'lishi mumkin).
+- *Acceptance:* yuklab olingan fayl ekrandagi raqamlar bilan tiyinigacha mos (e2e fayl qayta o'qilib solishtiriladi).
 
 ### Modul 7: Oylik faktura ro'yxati (ilovada)
 - FR-7.1 — Oy tanlanadi → shu oy uchun foizi > 0 bo'lgan har shartnoma bo'yicha bitta faktura qatori:
