@@ -14,7 +14,7 @@ export interface LedgerOperation {
 }
 
 export interface Warning {
-  code: 'LIMIT_EXCEEDED' | 'NEGATIVE_BALANCE' | 'BEFORE_START' | 'AFTER_END';
+  code: 'LIMIT_EXCEEDED' | 'NEGATIVE_BALANCE' | 'BEFORE_START' | 'AFTER_END' | 'FUTURE_DATE' | 'INTEREST_OVERPAID';
   message: string;
 }
 

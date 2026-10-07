@@ -1,6 +1,8 @@
 import { fromDbDate, IsoDate } from '../common/dates.js';
 import { moneyString, rateString } from '../common/decimal.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { computeInterest } from '../interest/engine.js';
+import { completedInterestDebt, engineInput, money } from '../interest/report.js';
 import { ledgerTotals } from '../operations/ledger.js';
 
 export const contractInclude = {
@@ -29,7 +31,8 @@ export interface ContractView {
   endDate: IsoDate;
   currentRate: { ratePercent: string; effectiveFrom: IsoDate };
   /** FR-3.5 — from all recorded operations. */
-  totals: { disbursed: string; repaid: string; interestPaid: string; principalBalance: string };
+  /** As of today (CR-11). interestDebt — completed months only (FR-4.4). */
+  totals: { disbursed: string; repaid: string; interestPaid: string; principalBalance: string; interestDebt: string };
   rates?: RateView[];
 }
 
@@ -46,7 +49,10 @@ export function toContractView(record: ContractRecord, today: IsoDate, withRates
     effectiveFrom: fromDbDate(r.effectiveFrom),
   }));
   const { ratePercent, effectiveFrom } = currentRate(rates, today);
-  const totals = ledgerTotals(record.operations.map((op) => ({ ...op, date: fromDbDate(op.date) })));
+  const toDate = record.operations.filter((op) => fromDbDate(op.date) <= today);
+  const totals = ledgerTotals(toDate.map((op) => ({ ...op, date: fromDbDate(op.date) })));
+  const { months } = computeInterest(engineInput(record, today));
+  const paid = months.reduce((sum, m) => sum + m.interestPaid, 0n);
   return {
     id: record.id,
     number: record.number,
@@ -62,6 +68,7 @@ export function toContractView(record: ContractRecord, today: IsoDate, withRates
       repaid: moneyString(totals.repaid),
       interestPaid: moneyString(totals.interestPaid),
       principalBalance: moneyString(totals.principalBalance),
+      interestDebt: money(completedInterestDebt(months, paid)),
     },
     ...(withRates && { rates }),
   };

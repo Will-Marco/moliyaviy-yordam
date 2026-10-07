@@ -10,5 +10,12 @@ export function formatMoney(value: Prisma.Decimal): string {
   return `${value.isNegative() ? MINUS : ''}${whole.replace(/\B(?=(\d{3})+(?!\d))/g, NBSP)},${fraction}`;
 }
 
+/** 56958904n tiyin → "569 589,04" (for bigint results of the interest engine). */
+export function formatTiyin(tiyin: bigint): string {
+  const abs = (tiyin < 0n ? -tiyin : tiyin).toString().padStart(3, '0');
+  const whole = abs.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+  return `${tiyin < 0n ? MINUS : ''}${whole},${abs.slice(-2)}`;
+}
+
 /** "2026-01-25" → "25.01.2026" */
 export const formatDate = (date: IsoDate) => date.split('-').reverse().join('.');

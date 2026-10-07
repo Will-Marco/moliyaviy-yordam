@@ -68,6 +68,7 @@ describe('Operations (Module 3)', () => {
         amount: '60000000.00',
         note: null,
         balanceAfter: '60000000.00',
+        scheduled: false,
       },
       {
         id: expect.any(String),
@@ -76,6 +77,7 @@ describe('Operations (Module 3)', () => {
         amount: '15000000.00',
         note: 'Asosiy qarzdan',
         balanceAfter: '45000000.00',
+        scheduled: false,
       },
     ]);
   });
@@ -89,8 +91,8 @@ describe('Operations (Module 3)', () => {
       interestPaid: '552328.77',
       principalBalance: '45000000.00',
     };
-    expect((await agent.get(`/api/contracts/${contractId}`)).body.totals).toEqual(totals);
-    expect((await agent.get('/api/contracts')).body[0].totals).toEqual(totals);
+    expect((await agent.get(`/api/contracts/${contractId}`)).body.totals).toMatchObject(totals);
+    expect((await agent.get('/api/contracts')).body[0].totals).toMatchObject(totals);
   });
 
   it('asks for confirmation when the limit is exceeded, then saves (FR-3.3)', async () => {
