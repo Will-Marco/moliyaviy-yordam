@@ -144,10 +144,17 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   kunma-kun hisob bilan tiyinigacha teng.
 
 ### Modul 5: Stavkani o'zgartirish
-- FR-5.1 — Yangi stavka + o'zgartirish sanasi (default — bugun). Amal qilish sanasi CR-5 bo'yicha
-  avtomatik hisoblanib, foydalanuvchiga ko'rsatiladi.
-- FR-5.2 — Stavkalar tarixi shartnoma sahifasida ko'rinadi.
-- *Acceptance:* 15-martda kiritilgan stavka 1-apreldan, 1-aprelda kiritilgani 1-apreldan amal qiladi.
+- FR-5.1 — Yangi stavka + o'zgartirish sanasi (default — bugun; o'tgan yoki kelajak sana ham mumkin).
+  Amal qilish sanasi CR-5 bo'yicha avtomatik hisoblanib, kiritish paytida ko'rsatiladi. Amal qilish sanasi
+  boshlang'ich stavka sanasidan (shartnoma boshlanishi) **keyin** bo'lishi shart.
+- FR-5.2 — Stavkalar tarixi shartnoma sahifasida (amal qiladi, kiritilgan sana, stavka).
+- FR-5.3 — Boshlang'ich stavkadan boshqa istalgan o'zgarishni **o'chirish** (tasdiq bilan). Tahrir yo'q —
+  noto'g'risi o'chirilib, to'g'risi qayta kiritiladi.
+- FR-5.4 — Boshlang'ich stavkaning faqat **qiymatini** tuzatish (sanasi o'zgarmaydi).
+- FR-5.5 — Ogohlantirish (bloklamaydi, "Baribir saqlash"): amal qilish sanasi **tugagan oyga** tushsa yoki
+  boshlang'ich stavka tuzatilsa — qaysi tugagan oylar qayta hisoblanishi ko'rsatiladi (faktura yuborilgan bo'lishi mumkin).
+- *Acceptance:* 15-martda kiritilgan stavka 1-apreldan, 1-aprelda kiritilgani 1-apreldan amal qiladi;
+  aprel foizi yangi stavka bilan hisoblanadi.
 
 ### Modul 6: Excel eksport
 - FR-6.1 — Shartnoma bo'yicha `.xlsx`: 1-varaq — oylik jadval (FR-4.1), 2-varaq — kunlik bo'laklar (FR-4.2),
