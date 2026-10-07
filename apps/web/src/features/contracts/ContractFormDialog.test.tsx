@@ -40,7 +40,7 @@ describe('ContractFormDialog', () => {
       signedOn: '2026-01-01',
       lenderId: companyA.id,
       borrowerId: companyB.id,
-      limitAmount: '10000000000',
+      limitAmount: '10000000000.00',
       startDate: '2026-01-01',
       endDate: '2027-07-31',
       ratePercent: '14',

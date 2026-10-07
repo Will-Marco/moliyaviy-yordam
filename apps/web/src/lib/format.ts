@@ -5,11 +5,14 @@ const RATE = /^\d{1,3}(\.\d{1,4})?$/
 
 const group = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, NBSP)
 
-/** "10000000000.00" → "10 000 000 000,00" (non-breaking spaces). */
+/** "10000000000.00" → "10 000 000 000,00", "-5.00" → "−5,00" (non-breaking spaces, true minus sign). */
 export function formatMoney(value: string): string {
-  const [whole, fraction = ''] = value.split('.')
-  return `${group(whole)},${fraction.padEnd(2, '0').slice(0, 2)}`
+  const negative = value.startsWith('-')
+  const [whole, fraction = ''] = (negative ? value.slice(1) : value).split('.')
+  return `${negative ? '\u2212' : ''}${group(whole)},${fraction.padEnd(2, '0').slice(0, 2)}`
 }
+
+export const isNegativeMoney = (value: string) => value.startsWith('-') && !/^-0*(\.0*)?$/.test(value)
 
 /** "14.5" → "14,5 %". */
 export const formatRate = (value: string) => `${value.replace('.', ',')}${NBSP}%`
@@ -39,4 +42,10 @@ export function rateInRange(value: string): boolean {
   const [whole, fraction = ''] = value.split('.')
   const units = BigInt(whole) * 10_000n + BigInt(fraction.padEnd(4, '0'))
   return units > 0n && units <= 100n * 10_000n
+}
+
+/** "60000000" typed → "60 000 000,00" for display once the field loses focus; null if not an amount. */
+export function formatMoneyInput(input: string): string | null {
+  const amount = parseMoneyInput(input)
+  return amount === null ? null : formatMoney(amount)
 }

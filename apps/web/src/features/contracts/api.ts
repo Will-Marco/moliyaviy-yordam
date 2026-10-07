@@ -24,6 +24,8 @@ export interface Contract {
   startDate: string
   endDate: string
   currentRate: { ratePercent: string; effectiveFrom: string }
+  /** FR-3.5 — from all recorded operations. */
+  totals: { disbursed: string; repaid: string; interestPaid: string; principalBalance: string }
   rates?: Rate[]
 }
 
@@ -38,7 +40,7 @@ export interface ContractInput {
   ratePercent?: string
 }
 
-const contractsKey = ['contracts'] as const
+export const contractsKey = ['contracts'] as const
 
 export function useContracts() {
   return useQuery({ queryKey: contractsKey, queryFn: () => apiFetch<Contract[]>('/contracts') })

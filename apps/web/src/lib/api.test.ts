@@ -33,6 +33,13 @@ describe('apiFetch', () => {
     expect(error.fieldErrors).toEqual({ tin: "STIR 9 ta raqamdan iborat bo'lishi kerak" })
   })
 
+  it('keeps the response body for callers that need more than field errors', async () => {
+    const body = { code: 'CONFIRMATION_REQUIRED', message: "Ogohlantirishlarni ko'rib chiqing", warnings: [] }
+    mockApi({ 'POST /api/x': () => ({ status: 409, body }) })
+    const error = await rejection(apiFetch('/x', { method: 'POST', body: {} }))
+    expect(error.body).toEqual(body)
+  })
+
   it('falls back to a generic message when the server sends none', async () => {
     mockApi({ 'GET /api/companies': () => ({ status: 500 }) })
     const error = await rejection(apiFetch('/companies'))

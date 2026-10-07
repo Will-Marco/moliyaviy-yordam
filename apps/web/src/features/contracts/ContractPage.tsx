@@ -5,9 +5,11 @@ import { QueryErrorState } from '@/components/QueryErrorState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { formatDate, formatMoney, formatRate } from '@/lib/format'
+import { formatDate, formatMoney, formatRate, isNegativeMoney } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { type Party, useContract } from './api'
 import { ContractFormDialog } from './ContractFormDialog'
+import { OperationsCard } from './OperationsCard'
 
 export function ContractPage() {
   const { id = '' } = useParams()
@@ -78,10 +80,25 @@ export function ContractPage() {
               <Term label="Joriy stavka">
                 <span className="tabular-nums">{formatRate(c.currentRate.ratePercent)}</span>
               </Term>
+              <Term label="Jami berilgan">
+                <span className="font-mono tabular-nums">{formatMoney(c.totals.disbursed)} so'm</span>
+              </Term>
+              <Term label="Asosiy qarz qoldig'i">
+                <span
+                  className={cn(
+                    'font-mono tabular-nums',
+                    isNegativeMoney(c.totals.principalBalance) && 'text-destructive',
+                  )}
+                >
+                  {formatMoney(c.totals.principalBalance)} so'm
+                </span>
+              </Term>
             </dl>
           </CardContent>
         </Card>
       </div>
+
+      <OperationsCard contract={c} />
 
       <Card className="gap-0 p-0">
         <CardHeader className="p-4">

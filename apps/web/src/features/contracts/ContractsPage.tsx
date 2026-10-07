@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useCompanies } from '@/features/companies/api'
-import { formatDate, formatMoney, formatRate } from '@/lib/format'
+import { formatDate, formatMoney, formatRate, isNegativeMoney } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { useContracts } from './api'
 import { ContractFormDialog } from './ContractFormDialog'
 
@@ -65,6 +66,8 @@ export function ContractsPage() {
                 <TableHead>Shartnoma</TableHead>
                 <TableHead>Tomonlar</TableHead>
                 <TableHead className="text-right">Summa (limit)</TableHead>
+                <TableHead className="text-right">Jami berilgan</TableHead>
+                <TableHead className="text-right">Qoldiq</TableHead>
                 <TableHead>Muddat</TableHead>
                 <TableHead className="text-right">Stavka</TableHead>
               </TableRow>
@@ -86,6 +89,15 @@ export function ContractsPage() {
                     <span className="sr-only"> ga</span>
                   </TableCell>
                   <TableCell className="text-right font-mono tabular-nums">{formatMoney(c.limitAmount)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{formatMoney(c.totals.disbursed)}</TableCell>
+                  <TableCell
+                    className={cn(
+                      'text-right font-mono tabular-nums',
+                      isNegativeMoney(c.totals.principalBalance) && 'text-destructive',
+                    )}
+                  >
+                    {formatMoney(c.totals.principalBalance)}
+                  </TableCell>
                   <TableCell className="tabular-nums">{`${formatDate(c.startDate)} – ${formatDate(c.endDate)}`}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatRate(c.currentRate.ratePercent)}</TableCell>
                 </TableRow>

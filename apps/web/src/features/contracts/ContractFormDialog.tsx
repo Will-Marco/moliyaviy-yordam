@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { useCompanies } from '@/features/companies/api'
 import { ApiError } from '@/lib/api'
-import { formatMoney, formatRate, parseMoneyInput, parseRateInput } from '@/lib/format'
+import { formatMoney, formatMoneyInput, formatRate, parseMoneyInput, parseRateInput } from '@/lib/format'
 import { describedBy } from '@/lib/form'
 import { type Contract, type ContractInput, useSaveContract } from './api'
 import { CompanyPicker } from './CompanyPicker'
@@ -60,7 +60,7 @@ function initialValues(contract?: Contract): ContractFormValues {
 export function ContractFormDialog({ open, onOpenChange, contract }: Props) {
   const companies = useCompanies()
   const save = useSaveContract(contract?.id)
-  const { register, control, handleSubmit, setError, formState } = useForm<ContractFormValues>({
+  const { register, control, handleSubmit, setError, setValue, formState } = useForm<ContractFormValues>({
     resolver: zodResolver(contract ? editContractSchema : createContractSchema),
     defaultValues: initialValues(contract),
   })
@@ -158,8 +158,8 @@ export function ContractFormDialog({ open, onOpenChange, contract }: Props) {
                   {...limit.inputProps}
                   {...register('limitAmount', {
                     onBlur: (event) => {
-                      const amount = parseMoneyInput(event.target.value)
-                      if (amount) event.target.value = formatMoney(amount)
+                      const formatted = formatMoneyInput(event.target.value)
+                      if (formatted) setValue('limitAmount', formatted)
                     },
                   })}
                 />

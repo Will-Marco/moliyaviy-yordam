@@ -4,12 +4,15 @@ export class ApiError extends Error {
   readonly status: number
   /** First message per field, as sent by the API's validation pipe. */
   readonly fieldErrors: Record<string, string>
+  /** Raw error body, for responses that carry more than a message (e.g. warnings to confirm). */
+  readonly body: unknown
 
-  constructor(status: number, message: string, fieldErrors: Record<string, string> = {}) {
+  constructor(status: number, message: string, fieldErrors: Record<string, string> = {}, body?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.fieldErrors = fieldErrors
+    this.body = body
   }
 }
 
@@ -42,7 +45,7 @@ export async function apiFetch<T>(path: string, { method = 'GET', body }: ApiOpt
   const fieldErrors = Object.fromEntries(
     Object.entries(payload.errors ?? {}).map(([field, messages]) => [field, messages[0]]),
   )
-  throw new ApiError(response.status, message, fieldErrors)
+  throw new ApiError(response.status, message, fieldErrors, data)
 }
 
 export const isUnauthorized = (error: unknown) => error instanceof ApiError && error.status === 401

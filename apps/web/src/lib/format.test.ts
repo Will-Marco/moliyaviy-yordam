@@ -8,6 +8,7 @@ describe('format', () => {
     ['552328.77', `552${nb}328,77`],
     ['0.5', '0,50'],
     ['999', '999,00'],
+    ['-5000000.00', `\u2212${'5'}${nb}000${nb}000,00`],
   ])('formatMoney(%s)', (value, text) => expect(formatMoney(value)).toBe(text))
 
   it.each([
