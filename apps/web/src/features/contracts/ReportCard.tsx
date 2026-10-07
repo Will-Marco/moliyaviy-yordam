@@ -1,8 +1,9 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, FileDown } from 'lucide-react'
 import { Fragment, type ReactNode, useState } from 'react'
 import { QueryErrorState } from '@/components/QueryErrorState'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDayMonth, formatDecimal, formatMoney, formatMonth, formatRate, isNegativeMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -26,6 +27,15 @@ export function ReportCard({ contractId }: { contractId: string }) {
       <CardHeader className="p-4">
         <CardTitle className="text-base">Oylik hisobot</CardTitle>
         <CardDescription>Foiz har kun oxiridagi qoldiq bo'yicha hisoblanadi, oy yakuni tiyinga yaxlitlanadi.</CardDescription>
+        <CardAction>
+          {/* Same-origin GET: the session cookie travels; the server builds the file from this report (FR-6.1). */}
+          <Button asChild variant="outline" className="h-9">
+            <a href={`/api/contracts/${contractId}/report.xlsx`} download>
+              <FileDown aria-hidden="true" />
+              Excel yuklab olish
+            </a>
+          </Button>
+        </CardAction>
       </CardHeader>
 
       {report.error ? (

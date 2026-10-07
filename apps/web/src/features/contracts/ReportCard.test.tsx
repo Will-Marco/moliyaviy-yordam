@@ -22,6 +22,14 @@ describe('ReportCard (FR-4.1, FR-4.2)', () => {
     expect(mar).toHaveTextContent('15.03 gacha')
   })
 
+  it('offers the report as an Excel download (FR-6.1)', async () => {
+    mockApi({ [`GET ${reportPath}`]: () => ({ status: 200, body: etalonReport }) })
+    renderWithProviders(<ReportCard contractId={etalon.id} />)
+    const link = await screen.findByRole('link', { name: 'Excel yuklab olish' })
+    expect(link).toHaveAttribute('href', `/api/contracts/${etalon.id}/report.xlsx`)
+    expect(link).toHaveAttribute('download')
+  })
+
   it('opens the segments behind a month', async () => {
     mockApi({ [`GET ${reportPath}`]: () => ({ status: 200, body: etalonReport }) })
     renderWithProviders(<ReportCard contractId={etalon.id} />)
