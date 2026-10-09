@@ -22,6 +22,7 @@
     "pretest:e2e": "DOTENV_CONFIG_PATH=.env.test prisma migrate deploy",
     "postinstall": "prisma generate",
     "hash-password": "node scripts/hash-password.ts",
+    "seed:demo": "node scripts/seed-demo.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
