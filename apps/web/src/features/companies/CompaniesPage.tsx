@@ -1,10 +1,11 @@
 import { Building2, FileUp, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { QueryErrorState } from '@/components/QueryErrorState'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { type Company, useCompanies } from './api'
+import { type Company, missingRequisites, useCompanies } from './api'
 import { CompanyFormDialog } from './CompanyFormDialog'
 import { ImportCompaniesDialog } from './ImportCompaniesDialog'
 
@@ -77,14 +78,19 @@ export function CompaniesPage() {
                 <TableRow key={company.id}>
                   <TableCell className="max-w-72 min-w-52 whitespace-normal">
                     <div className="font-medium">{company.name}</div>
-                    <div className="text-muted-foreground text-xs">{company.address}</div>
+                    {company.address && <div className="text-muted-foreground text-xs">{company.address}</div>}
+                    {missingRequisites(company) && (
+                      <Badge variant="outline" className="mt-1 border-amber-300 bg-amber-50 text-amber-900">
+                        Rekvizitlar to'liq emas
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono tabular-nums">{company.tin}</TableCell>
                   <TableCell className="font-mono tabular-nums">
-                    {company.vatRegCode ?? <span className="text-muted-foreground">—</span>}
+                    {company.vatRegCode ?? <Dash />}
                   </TableCell>
-                  <TableCell className="font-mono tabular-nums">{company.bankAccount}</TableCell>
-                  <TableCell className="font-mono tabular-nums">{company.mfo}</TableCell>
+                  <TableCell className="font-mono tabular-nums">{company.bankAccount ?? <Dash />}</TableCell>
+                  <TableCell className="font-mono tabular-nums">{company.mfo ?? <Dash />}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -115,3 +121,5 @@ export function CompaniesPage() {
     </section>
   )
 }
+
+const Dash = () => <span className="text-muted-foreground">—</span>

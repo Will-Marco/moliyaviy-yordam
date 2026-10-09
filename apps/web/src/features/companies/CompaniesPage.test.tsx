@@ -23,6 +23,17 @@ describe('CompaniesPage', () => {
     expect(within(row).getByText('01071')).toBeInTheDocument()
   })
 
+  it('marks a company whose requisites are not filled in yet', async () => {
+    const partial = { ...alfa, id: '0192f000-0000-7000-8000-000000000002', name: 'BEST FOR GOOD FUTURE', address: null, bankAccount: null, mfo: null }
+    mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa, partial] }) })
+    renderWithProviders(<CompaniesPage />)
+    const row = (await screen.findByText('BEST FOR GOOD FUTURE')).closest('tr')!
+    expect(within(row).getByText("Rekvizitlar to'liq emas")).toBeInTheDocument()
+    expect(within(row).getAllByText('—')).toHaveLength(3)
+    const full = screen.getByText('"ALFA SAVDO" MCHJ').closest('tr')!
+    expect(within(full).queryByText("Rekvizitlar to'liq emas")).not.toBeInTheDocument()
+  })
+
   it('shows an empty state with a call to action', async () => {
     mockApi({ 'GET /api/companies': () => ({ status: 200, body: [] }) })
     renderWithProviders(<CompaniesPage />)

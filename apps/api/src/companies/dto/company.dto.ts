@@ -12,10 +12,11 @@ export class CreateCompanyDto {
   name: string;
 
   @Trim()
+  @IsOptional()
   @IsString()
   @IsNotEmpty({ message: 'Manzil kiritilmagan' })
   @MaxLength(500)
-  address: string;
+  address?: string | null;
 
   @Trim()
   @IsString()
@@ -29,17 +30,19 @@ export class CreateCompanyDto {
   vatRegCode?: string | null;
 
   @Trim()
+  @IsOptional()
   @IsString()
   @digits(20, 'Hisob raqami')
-  bankAccount: string;
+  bankAccount?: string | null;
 
   @Trim()
+  @IsOptional()
   @IsString()
   @digits(5, 'MFO')
-  mfo: string;
+  mfo?: string | null;
 }
 
-/** PATCH: every field optional; required columns may not be set to null. */
+/** PATCH: every field optional; name and STIR may not be set to null, the requisites may (FR-1.2). */
 export class UpdateCompanyDto {
   @Trim()
   @OptionalNonNull()
@@ -49,11 +52,11 @@ export class UpdateCompanyDto {
   name?: string;
 
   @Trim()
-  @OptionalNonNull()
+  @IsOptional()
   @IsString()
   @IsNotEmpty({ message: 'Manzil kiritilmagan' })
   @MaxLength(500)
-  address?: string;
+  address?: string | null;
 
   @Trim()
   @OptionalNonNull()
@@ -68,14 +71,14 @@ export class UpdateCompanyDto {
   vatRegCode?: string | null;
 
   @Trim()
-  @OptionalNonNull()
+  @IsOptional()
   @IsString()
   @digits(20, 'Hisob raqami')
-  bankAccount?: string;
+  bankAccount?: string | null;
 
   @Trim()
-  @OptionalNonNull()
+  @IsOptional()
   @IsString()
   @digits(5, 'MFO')
-  mfo?: string;
+  mfo?: string | null;
 }

@@ -80,6 +80,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - FR-1.2 — Firma qo'shish / tahrirlash / ro'yxat. Maydonlar (schyot-faktura rekvizitlari, §9.1):
   nomi, manzil, STIR (INN, 9 raqam), QQS to'lovchi registratsiya kodi (ixtiyoriy),
   hisob raqami (р/с, 20 raqam), MFO (5 raqam).
+  Majburiy — faqat **nomi va STIR**; manzil, р/с, MFO keyin to'ldirilishi mumkin (odatda FR-1.3 importi
+  bilan). To'ldirilmagan firma ro'yxatda "Rekvizitlar to'liq emas" belgisi bilan ko'rinadi (Sir, 2026-10-09).
   Didox ulanishi (faqat beruvchi firmalar uchun) — Modul 8 da qo'shiladi.
 - FR-1.3 — **Didox faktura fayllaridan import:** buxgalter Didox'dan yuklab olingan schyot-faktura
   fayl(lar)ini (`.xls`, ichi HTML; §9.1 namunasi) tanlaydi → har fayldan **sotuvchi va xaridor**

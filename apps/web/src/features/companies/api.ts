@@ -4,14 +4,18 @@ import { apiFetch } from '@/lib/api'
 export interface Company {
   id: string
   name: string
-  address: string
+  /** Address, bank account and MFO may be filled in later (FR-1.2). */
+  address: string | null
   tin: string
   vatRegCode: string | null
-  bankAccount: string
-  mfo: string
+  bankAccount: string | null
+  mfo: string | null
 }
 
 export type CompanyInput = Omit<Company, 'id'>
+
+/** Requisites an invoice needs but that may still be missing. */
+export const missingRequisites = (c: Company) => !c.address || !c.bankAccount || !c.mfo
 
 const companiesKey = ['companies'] as const
 

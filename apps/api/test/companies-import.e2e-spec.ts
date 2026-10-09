@@ -72,6 +72,23 @@ describe('Company import from Didox invoices (FR-1.3)', () => {
     expect(list[1].vatRegCode).toBe('326020000002');
   });
 
+  it('fills in the requisites of a company added with only a name and STIR', async () => {
+    await agent.post('/api/companies').send({ name: 'BETA TEXNO', tin: '300000002' }).expect(201);
+    const preview = await agent
+      .post('/api/companies/import/preview')
+      .send({ files: [file('690.xls')] })
+      .expect(200);
+    expect(preview.body.items[1]).toMatchObject({
+      tin: '300000002',
+      status: 'update',
+      changes: ['name', 'address', 'vatRegCode', 'bankAccount', 'mfo'],
+    });
+    await agent.post('/api/companies/import').send({ files: [file('690.xls')] }).expect(200);
+    const beta = (await agent.get('/api/companies')).body.find((c: { tin: string }) => c.tin === '300000002');
+    expect(beta).toMatchObject({ bankAccount: '20208000100000000002', mfo: '00440' });
+    expect(beta.address).toEqual(expect.any(String));
+  });
+
   it('takes the newest invoice when a STIR appears in several files', async () => {
     const older = invoice
       .replace('№ 690 от 15.09.2026', '№ 512 от 15.03.2026')

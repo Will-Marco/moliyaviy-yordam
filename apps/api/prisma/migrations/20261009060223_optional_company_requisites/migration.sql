@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "companies" ALTER COLUMN "address" DROP NOT NULL,
+ALTER COLUMN "bank_account" DROP NOT NULL,
+ALTER COLUMN "mfo" DROP NOT NULL;

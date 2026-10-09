@@ -28,6 +28,7 @@ interface Props {
   company?: Company
 }
 
+const LATER = "Ixtiyoriy — Didox fakturasidan import qilinsa o'zi to'ladi"
 const empty: CompanyFormValues = { name: '', address: '', tin: '', vatRegCode: '', bankAccount: '', mfo: '' }
 
 type FieldConfig = {
@@ -41,24 +42,38 @@ type FieldConfig = {
 
 const fieldConfig: FieldConfig[] = [
   { name: 'name', label: 'Nomi', required: true, wide: true, hint: 'Masalan: "ALFA SAVDO" MCHJ' },
-  { name: 'address', label: 'Manzil', required: true, wide: true },
+  { name: 'address', label: 'Manzil', wide: true, hint: LATER },
   { name: 'tin', label: 'STIR', required: true, digits: 9 },
   { name: 'vatRegCode', label: 'QQS registratsiya kodi', digits: 12, hint: 'Ixtiyoriy' },
-  { name: 'bankAccount', label: 'Hisob raqami', required: true, digits: 20 },
-  { name: 'mfo', label: 'MFO', required: true, digits: 5 },
+  { name: 'bankAccount', label: 'Hisob raqami', digits: 20, hint: LATER },
+  { name: 'mfo', label: 'MFO', digits: 5, hint: LATER },
 ]
 
 export function CompanyFormDialog({ open, onOpenChange, company }: Props) {
   const save = useSaveCompany(company?.id)
   const { register, handleSubmit, setError, formState } = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
-    defaultValues: company ? { ...company, vatRegCode: company.vatRegCode ?? '' } : empty,
+    defaultValues: company
+      ? {
+          ...company,
+          address: company.address ?? '',
+          vatRegCode: company.vatRegCode ?? '',
+          bankAccount: company.bankAccount ?? '',
+          mfo: company.mfo ?? '',
+        }
+      : empty,
   })
   const { errors } = formState
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await save.mutateAsync({ ...values, vatRegCode: values.vatRegCode || null })
+      await save.mutateAsync({
+        ...values,
+        address: values.address || null,
+        vatRegCode: values.vatRegCode || null,
+        bankAccount: values.bankAccount || null,
+        mfo: values.mfo || null,
+      })
       toast.success(company ? 'Firma yangilandi' : "Firma qo'shildi")
       onOpenChange(false)
     } catch (error) {

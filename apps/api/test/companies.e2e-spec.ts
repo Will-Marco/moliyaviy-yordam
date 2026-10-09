@@ -46,6 +46,28 @@ describe('Companies (FR-1.2)', () => {
     expect(res.body.vatRegCode).toBeNull();
   });
 
+  it('allows address, bank account and MFO to be filled in later (FR-1.2)', async () => {
+    const res = await agent.post('/api/companies').send({ name: 'BEST FOR GOOD FUTURE', tin: '307830275' }).expect(201);
+    expect(res.body).toMatchObject({ address: null, bankAccount: null, mfo: null, vatRegCode: null });
+
+    const filled = await agent
+      .patch(`/api/companies/${res.body.id}`)
+      .send({ address: 'Toshkent', bankAccount: '20208000100000000009', mfo: '01071' })
+      .expect(200);
+    expect(filled.body).toMatchObject({ address: 'Toshkent', bankAccount: '20208000100000000009', mfo: '01071' });
+
+    const cleared = await agent.patch(`/api/companies/${res.body.id}`).send({ bankAccount: null }).expect(200);
+    expect(cleared.body.bankAccount).toBeNull();
+  });
+
+  it('still validates requisites that are given', async () => {
+    const res = await agent
+      .post('/api/companies')
+      .send({ name: 'X', tin: '307830275', address: '', bankAccount: '123', mfo: '1' })
+      .expect(400);
+    expect(Object.keys(res.body.errors).sort()).toEqual(['address', 'bankAccount', 'mfo']);
+  });
+
   it('lists companies sorted by name', async () => {
     await agent.post('/api/companies').send({ ...validCompany, name: 'BETA', tin: '300000002' });
     await agent.post('/api/companies').send({ ...validCompany, name: 'ALFA', tin: '300000003' });

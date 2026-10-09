@@ -8,18 +8,19 @@ datasource db {
 }
 
 /// Firma — shartnomada beruvchi ham, oluvchi ham bo'la oladi (SRS FR-1.2).
+/// Manzil, hisob raqami, MFO keyin to'ldirilishi mumkin (Didox importi) — majburiy faqat nom va STIR.
 model Company {
   id          String   @id @default(uuid(7)) @db.Uuid
   name        String
-  address     String
+  address     String?
   /// STIR (INN), 9 raqam
   tin         String   @unique @db.VarChar(9)
   /// QQS to'lovchi registratsiya kodi, 12 raqam (ixtiyoriy)
   vatRegCode  String?  @map("vat_reg_code") @db.VarChar(12)
   /// Hisob raqami (р/с), 20 raqam
-  bankAccount String   @map("bank_account") @db.VarChar(20)
+  bankAccount String?  @map("bank_account") @db.VarChar(20)
   /// MFO, 5 raqam
-  mfo         String   @db.VarChar(5)
+  mfo         String?  @db.VarChar(5)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 

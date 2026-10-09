@@ -35,6 +35,24 @@ describe('CompanyFormDialog', () => {
     expect(calls[0].body).toMatchObject({ tin: '300000001', vatRegCode: null })
   })
 
+  it('saves a company with only a name and STIR; empty requisites go as null (FR-1.2)', async () => {
+    const { calls } = mockApi({ 'POST /api/companies': () => ({ status: 201, body: {} }) })
+    renderWithProviders(<CompanyFormDialog open onOpenChange={() => {}} />)
+    const dialog = screen.getByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText(/Nomi/), 'BEST FOR GOOD FUTURE')
+    await userEvent.type(within(dialog).getByLabelText(/STIR/), '307830275')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Saqlash' }))
+    await vi.waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0].body).toEqual({
+      name: 'BEST FOR GOOD FUTURE',
+      address: null,
+      tin: '307830275',
+      vatRegCode: null,
+      bankAccount: null,
+      mfo: null,
+    })
+  })
+
   it('shows a duplicate STIR conflict next to the STIR field', async () => {
     mockApi({
       'POST /api/companies': () => ({ status: 409, body: { message: 'Bu STIR bilan firma allaqachon mavjud' } }),
