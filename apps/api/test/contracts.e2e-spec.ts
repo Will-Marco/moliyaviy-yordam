@@ -61,6 +61,18 @@ describe('Contracts (Module 2)', () => {
     });
   });
 
+  it('rejects impossible dates and years outside 2000–2100 (FR-10.2)', async () => {
+    const res = await agent
+      .post('/api/contracts')
+      .send({ ...etalon, signedOn: '20266-01-01', startDate: '1999-12-31', endDate: '2101-01-01' })
+      .expect(400);
+    expect(res.body.errors).toMatchObject({
+      signedOn: ["Sana noto'g'ri"],
+      startDate: ["Yil 2000–2100 oralig'ida bo'lishi kerak"],
+      endDate: ["Yil 2000–2100 oralig'ida bo'lishi kerak"],
+    });
+  });
+
   it('keeps money and rates exact (no floating point)', async () => {
     const res = await agent
       .post('/api/contracts')

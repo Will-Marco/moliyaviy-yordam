@@ -9,8 +9,25 @@ export function isIsoDate(value: unknown): value is IsoDate {
   return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
 }
 
+/** FR-10.2: business dates lie in 2000–2100 — anything else is a typo (e.g. year 0026). */
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2100;
+
+/** Why a value is not an acceptable business date, or null if it is. */
+export function dateError(value: unknown): string | null {
+  if (!isIsoDate(value)) return "Sana noto'g'ri";
+  const year = Number(value.slice(0, 4));
+  return year < MIN_YEAR || year > MAX_YEAR ? `Yil ${MIN_YEAR}–${MAX_YEAR} oralig'ida bo'lishi kerak` : null;
+}
+
 export const IsIsoDate = (options?: ValidationOptions) =>
-  ValidateBy({ name: 'isIsoDate', validator: { validate: isIsoDate } }, { message: "Sana noto'g'ri", ...options });
+  ValidateBy(
+    {
+      name: 'isIsoDate',
+      validator: { validate: (value) => dateError(value) === null, defaultMessage: (args) => dateError(args?.value)! },
+    },
+    options,
+  );
 
 /** Postgres DATE ↔ JS Date at UTC midnight — never local time. */
 export const toDbDate = (date: IsoDate): Date => new Date(`${date}T00:00:00.000Z`);
