@@ -17,6 +17,15 @@ async function fill({ date = '2026-01-05', type = 'Berildi', amount = '60 000 00
 }
 
 describe('OperationFormDialog', () => {
+  it('refuses a date outside 2000–2100 before sending (FR-10.2)', async () => {
+    const { calls } = mockApi({})
+    renderWithProviders(<OperationFormDialog contract={etalon} open onOpenChange={() => {}} />)
+    await fill({ date: '1926-01-05' })
+    await userEvent.click(screen.getByRole('button', { name: 'Saqlash' }))
+    expect(await screen.findByText("Yil 2000–2100 oralig'ida bo'lishi kerak")).toBeInTheDocument()
+    expect(calls).toHaveLength(0)
+  })
+
   it('records a disbursement (FR-3.1)', async () => {
     const { calls } = mockApi({
       [`POST ${ops}`]: () => ({ status: 201, body: { operation: etalonOperations[0], warnings: [] } }),
@@ -26,7 +35,7 @@ describe('OperationFormDialog', () => {
     await fill()
     await userEvent.click(screen.getByRole('button', { name: 'Saqlash' }))
     await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
-    expect(calls[0].body).toEqual({ date: '2026-01-05', type: 'DISBURSEMENT', amount: '60000000.00', note: null })
+    expect(calls[0].body).toEqual({ date: '2026-01-05', type: 'DISBURSEMENT', amount: '60000000', note: null })
   })
 
   it('shows warnings and saves only after "Baribir saqlash" (FR-3.3)', async () => {
@@ -53,7 +62,7 @@ describe('OperationFormDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Baribir saqlash' }))
     await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
-    expect(calls[1].body).toMatchObject({ amount: '10000000001.00', confirmWarnings: true })
+    expect(calls[1].body).toMatchObject({ amount: '10000000001', confirmWarnings: true })
   })
 
   it('goes back to the form from the warnings', async () => {
@@ -72,7 +81,7 @@ describe('OperationFormDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Saqlash' }))
     await userEvent.click(await screen.findByRole('button', { name: "O'zgartirish" }))
     expect(screen.queryByText(/boshlanishidan/)).not.toBeInTheDocument()
-    expect(screen.getByLabelText(/Summa/)).toHaveValue('60\u00a0000\u00a0000,00')
+    expect(screen.getByLabelText(/Summa/)).toHaveValue('60\u00a0000\u00a0000')
   })
 
   it('validates the amount before sending', async () => {

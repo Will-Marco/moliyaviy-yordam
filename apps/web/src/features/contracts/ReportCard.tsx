@@ -1,13 +1,16 @@
 import { ChevronRight, FileDown } from 'lucide-react'
 import { Fragment, type ReactNode, useState } from 'react'
+import { NativeSelect } from '@/components/NativeSelect'
 import { QueryErrorState } from '@/components/QueryErrorState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDayMonth, formatDecimal, formatMoney, formatMonth, formatRate, isNegativeMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { type ReportMonth, useReport } from './report-api'
+import { ALL_YEARS, selectedYear } from './reportYears'
 
 const COLUMNS = 10
 
@@ -15,6 +18,12 @@ const COLUMNS = 10
 export function ReportCard({ contractId }: { contractId: string }) {
   const report = useReport(contractId)
   const [open, setOpen] = useState<Set<string>>(new Set())
+  const [pickedYear, setPickedYear] = useState<string | null>(null)
+  const months = report.data?.months ?? []
+  const years = [...new Set(months.map((m) => m.month.slice(0, 4)))]
+  const year = selectedYear(years, report.data?.asOf.slice(0, 4) ?? '', pickedYear)
+  const filtered = years.length > 1 && year !== ALL_YEARS
+  const shown = year === ALL_YEARS ? months : months.filter((m) => m.month.startsWith(year))
   const toggle = (month: string) =>
     setOpen((current) => {
       const next = new Set(current)
@@ -27,7 +36,20 @@ export function ReportCard({ contractId }: { contractId: string }) {
       <CardHeader className="p-4">
         <CardTitle className="text-base">Oylik hisobot</CardTitle>
         <CardDescription>Foiz har kun oxiridagi qoldiq bo'yicha hisoblanadi, oy yakuni tiyinga yaxlitlanadi.</CardDescription>
-        <CardAction>
+        <CardAction className="flex flex-wrap items-center gap-2">
+          {years.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="report-year">Yil</Label>
+              <NativeSelect id="report-year" value={year} onChange={(e) => setPickedYear(e.target.value)}>
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+                <option value={ALL_YEARS}>Barcha yillar</option>
+              </NativeSelect>
+            </div>
+          )}
           {/* Same-origin GET: the session cookie travels; the server builds the file from this report (FR-6.1). */}
           <Button asChild variant="outline" className="h-9">
             <a href={`/api/contracts/${contractId}/report.xlsx`} download>
@@ -71,13 +93,18 @@ export function ReportCard({ contractId }: { contractId: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {report.data.months.map((m) => (
+                {shown.map((m) => (
                   <MonthRows key={m.month} month={m} expanded={open.has(m.month)} onToggle={() => toggle(m.month)} />
                 ))}
               </TableBody>
             </Table>
           </div>
-          <dl className="grid gap-x-6 gap-y-2 border-t p-4 text-sm sm:grid-cols-2">
+          {filtered && (
+            <p className="text-muted-foreground border-t px-4 pt-3 text-xs">
+              Jami — butun shartnoma bo'yicha, bugungacha (tanlangan yil emas):
+            </p>
+          )}
+          <dl className={cn('grid gap-x-6 gap-y-2 p-4 text-sm sm:grid-cols-2', !filtered && 'border-t')}>
             <Total label="Bugungacha hisoblangan">{formatMoney(report.data.totals.interestAccrued)}</Total>
             <Total label="To'langan foiz">{formatMoney(report.data.totals.interestPaid)}</Total>
             <Total label="Foiz qarzi (bugungacha)">{formatMoney(report.data.totals.interestDebt)}</Total>

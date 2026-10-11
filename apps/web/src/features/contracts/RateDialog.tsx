@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { ApiError } from '@/lib/api'
 import { formatDate, parseRateInput, rateInRange } from '@/lib/format'
 import { describedBy } from '@/lib/form'
-import { isIsoDate, todayIso } from '@/lib/dates'
+import { DATE_BOUNDS, dateError, isIsoDate, todayIso } from '@/lib/dates'
 import { type Warning, warningsToConfirm } from '@/lib/warnings'
 import { type Contract, type Rate, type RateInput, useSaveRate } from './api'
 import { effectiveFromOf } from './rates'
@@ -76,7 +76,8 @@ export function RateDialog({ contract, open, onOpenChange, initial }: Props) {
       return setError('ratePercent', { message: 'Stavka 0 dan katta va 100 dan oshmasligi kerak' }, { shouldFocus: true })
     }
     if (initial) return submit({ ratePercent: rate })
-    if (!isIsoDate(values.changedOn)) return setError('changedOn', { message: "Sana noto'g'ri" }, { shouldFocus: true })
+    const badDate = dateError(values.changedOn)
+    if (badDate) return setError('changedOn', { message: badDate }, { shouldFocus: true })
     return submit({ ratePercent: rate, changedOn: values.changedOn })
   })
 
@@ -130,6 +131,7 @@ export function RateDialog({ contract, open, onOpenChange, initial }: Props) {
                 <Input
                   id={dateId}
                   type="date"
+                  {...DATE_BOUNDS}
                   aria-invalid={!!errors.changedOn}
                   aria-describedby={describedBy(dateId, errors.changedOn?.message) ?? (preview ? `${dateId}-preview` : undefined)}
                   {...register('changedOn', { required: 'Sana kiritilmagan' })}

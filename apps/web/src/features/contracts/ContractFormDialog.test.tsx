@@ -40,7 +40,7 @@ describe('ContractFormDialog', () => {
       signedOn: '2026-01-01',
       lenderId: companyA.id,
       borrowerId: companyB.id,
-      limitAmount: '10000000000.00',
+      limitAmount: '10000000000',
       startDate: '2026-01-01',
       endDate: '2027-07-31',
       ratePercent: '14',
@@ -53,15 +53,28 @@ describe('ContractFormDialog', () => {
     const dialog = screen.getByRole('dialog')
     await pick(/Beruvchi/, 'A', /A MCHJ/)
     await pick(/Oluvchi/, 'A', /A MCHJ/)
-    await userEvent.type(within(dialog).getByLabelText(/Summa \(limit\)/), '12abc')
+    await userEvent.type(within(dialog).getByLabelText(/Summa \(limit\)/), '0abc')
     await userEvent.type(within(dialog).getByLabelText(/Boshlanish/), '2026-05-01')
     await userEvent.type(within(dialog).getByLabelText(/Tugash/), '2026-04-01')
     await userEvent.type(within(dialog).getByLabelText(/Yillik stavka/), '120')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Saqlash' }))
     expect(await within(dialog).findByText("Beruvchi va oluvchi bir xil firma bo'lishi mumkin emas")).toBeInTheDocument()
     expect(within(dialog).getByText("Tugash sanasi boshlanish sanasidan keyin bo'lishi kerak")).toBeInTheDocument()
-    expect(within(dialog).getByText("Summa noto'g'ri: masalan 10 000 000 000")).toBeInTheDocument()
+    // Letters never reach the field (FR-10.1); a zero amount is still refused.
+    expect(within(dialog).getByLabelText(/Summa \(limit\)/)).toHaveValue('0')
+    expect(within(dialog).getByText("Summa 0 dan katta bo'lishi kerak")).toBeInTheDocument()
     expect(within(dialog).getByText("Stavka 0 dan katta va 100 dan oshmasligi kerak")).toBeInTheDocument()
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0)
+  })
+
+  it('refuses dates outside 2000–2100 on each field (FR-10.2)', async () => {
+    const { calls } = mockApi({ 'GET /api/companies': companies })
+    renderWithProviders(<ContractFormDialog open onOpenChange={() => {}} />)
+    const dialog = screen.getByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText(/Shartnoma sanasi/), '1999-12-31')
+    await userEvent.type(within(dialog).getByLabelText(/Boshlanish/), '2101-01-01')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Saqlash' }))
+    expect(await within(dialog).findAllByText("Yil 2000–2100 oralig'ida bo'lishi kerak")).toHaveLength(2)
     expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0)
   })
 

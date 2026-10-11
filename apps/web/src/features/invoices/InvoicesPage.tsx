@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { CopyButton } from '@/components/CopyButton'
+import { NativeSelect } from '@/components/NativeSelect'
 import { QueryErrorState } from '@/components/QueryErrorState'
 import {
   AlertDialog,
@@ -22,9 +23,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatDate, formatInstantDate, formatMoney, formatMonth } from '@/lib/format'
 import { type Invoice, useInvoices, useUnmarkDraft } from './api'
 import { MarkDraftDialog } from './MarkDraftDialog'
-
-const selectClass =
-  'border-input focus-visible:border-ring focus-visible:ring-ring/50 h-9 rounded-lg border bg-transparent px-2.5 text-sm outline-none focus-visible:ring-3'
 
 /** Module 7: invoices to prepare in Didox for a completed month — every field one click from the clipboard. */
 export function InvoicesPage() {
@@ -64,9 +62,8 @@ export function InvoicesPage() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="grid gap-1.5">
             <Label htmlFor="invoice-month">Oy</Label>
-            <select
+            <NativeSelect
               id="invoice-month"
-              className={selectClass}
               value={month ?? ''}
               onChange={(e) => setParam('month', e.target.value)}
             >
@@ -75,13 +72,12 @@ export function InvoicesPage() {
                   {formatMonth(m)}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="invoice-lender">Beruvchi</Label>
-            <select
+            <NativeSelect
               id="invoice-lender"
-              className={selectClass}
               value={lenderId}
               onChange={(e) => setParam('lender', e.target.value)}
             >
@@ -91,7 +87,7 @@ export function InvoicesPage() {
                   {l.name}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           {rows.length > 0 && (
             <p className="text-muted-foreground pb-2 text-sm" aria-live="polite">

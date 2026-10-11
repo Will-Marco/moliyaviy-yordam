@@ -3,6 +3,8 @@ import { LoaderCircle } from 'lucide-react'
 import { Controller, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { FormField } from '@/components/FormField'
+import { MoneyInput } from '@/components/MoneyInput'
+import { DATE_BOUNDS } from '@/lib/dates'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,7 +19,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { useCompanies } from '@/features/companies/api'
 import { ApiError } from '@/lib/api'
-import { formatMoney, formatMoneyInput, formatRate, parseMoneyInput, parseRateInput } from '@/lib/format'
+import { formatMoney, formatRate, parseMoneyInput, parseRateInput } from '@/lib/format'
 import { describedBy } from '@/lib/form'
 import { type Contract, type ContractInput, useSaveContract } from './api'
 import { CompanyPicker } from './CompanyPicker'
@@ -60,7 +62,7 @@ function initialValues(contract?: Contract): ContractFormValues {
 export function ContractFormDialog({ open, onOpenChange, contract }: Props) {
   const companies = useCompanies()
   const save = useSaveContract(contract?.id)
-  const { register, control, handleSubmit, setError, setValue, formState } = useForm<ContractFormValues>({
+  const { register, control, handleSubmit, setError, formState } = useForm<ContractFormValues>({
     resolver: zodResolver(contract ? editContractSchema : createContractSchema),
     defaultValues: initialValues(contract),
   })
@@ -144,32 +146,24 @@ export function ContractFormDialog({ open, onOpenChange, contract }: Props) {
               <Input autoComplete="off" {...number.inputProps} {...register('number')} />
             </FormField>
             <FormField id={signedOn.id} label="Shartnoma sanasi" required error={signedOn.error}>
-              <Input type="date" {...signedOn.inputProps} {...register('signedOn')} />
+              <Input type="date" {...DATE_BOUNDS} {...signedOn.inputProps} {...register('signedOn')} />
             </FormField>
             {party('lenderId', 'Beruvchi')}
             {party('borrowerId', 'Oluvchi')}
             <div className="sm:col-span-2">
               <FormField id={limit.id} label="Summa (limit), so'm" required error={limit.error}>
-                <Input
-                  inputMode="decimal"
-                  autoComplete="off"
+                <MoneyInput
                   placeholder="10 000 000 000"
-                  className="font-mono tabular-nums"
                   {...limit.inputProps}
-                  {...register('limitAmount', {
-                    onBlur: (event) => {
-                      const formatted = formatMoneyInput(event.target.value)
-                      if (formatted) setValue('limitAmount', formatted)
-                    },
-                  })}
+                  {...register('limitAmount')}
                 />
               </FormField>
             </div>
             <FormField id={start.id} label="Boshlanish sanasi" required error={start.error}>
-              <Input type="date" {...start.inputProps} {...register('startDate')} />
+              <Input type="date" {...DATE_BOUNDS} {...start.inputProps} {...register('startDate')} />
             </FormField>
             <FormField id={end.id} label="Tugash sanasi" required error={end.error}>
-              <Input type="date" {...end.inputProps} {...register('endDate')} />
+              <Input type="date" {...DATE_BOUNDS} {...end.inputProps} {...register('endDate')} />
             </FormField>
             {contract ? (
               <p className="text-muted-foreground text-sm sm:col-span-2">

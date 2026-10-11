@@ -62,15 +62,35 @@ export function rateInRange(value: string): boolean {
   return units > 0n && units <= 100n * 10_000n
 }
 
-/** "60000000" typed → "60 000 000,00" for display once the field loses focus; null if not an amount. */
-export function formatMoneyInput(input: string): string | null {
-  const amount = parseMoneyInput(input)
-  return amount === null ? null : formatMoney(amount)
-}
-
 /** A moment ("2026-09-30T20:00:00.000Z") → the accountants' calendar date in Tashkent ("01.10.2026"). */
 export function formatInstantDate(value: string): string {
   return new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric' }).format(
     new Date(value),
   )
+}
+
+/**
+ * FR-10.1: an amount as the accountant types it — digits grouped by thousands, one decimal comma, at most
+ * 2 decimals. "2000000" → "2 000 000", "1234.5" → "1 234,5". Exactly 3 digits after the last dot/comma
+ * ("1.500", "1.234.567") mean thousands — an amount never has 3 decimals, so nothing is silently cut off.
+ */
+export function formatMoneyTyping(input: string): string {
+  const parts = input.replace(/[^\d.,]/g, '').split(/[.,]/)
+  const last = parts.at(-1)!
+  const thousandsOnly = parts.length === 1 || last.length === 3
+  const whole = (thousandsOnly ? parts : parts.slice(0, -1)).join('').replace(/^0+(?=\d)/, '')
+  if (thousandsOnly) return group(whole)
+  return `${group(whole || '0')},${last.slice(0, 2)}`
+}
+
+/** Where the caret goes after reformatting: right after the same number of digits/commas as before. */
+export function caretAfterFormat(before: string, caret: number, after: string): number {
+  const significant = (s: string) => s.replace(/[^\d.,]/g, '').length
+  const wanted = significant(before.slice(0, caret))
+  if (wanted === 0) return 0
+  let seen = 0
+  for (let i = 0; i < after.length; i++) {
+    if (/[\d,]/.test(after[i]) && ++seen === wanted) return i + 1
+  }
+  return after.length
 }

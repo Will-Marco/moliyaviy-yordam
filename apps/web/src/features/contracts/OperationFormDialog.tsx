@@ -5,6 +5,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { FormField } from '@/components/FormField'
+import { MoneyInput } from '@/components/MoneyInput'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,8 +20,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
-import { formatMoney, formatMoneyInput, parseMoneyInput } from '@/lib/format'
-import { todayIso } from '@/lib/dates'
+import { formatMoney, parseMoneyInput } from '@/lib/format'
+import { DATE_BOUNDS, dateError, todayIso } from '@/lib/dates'
 import { describedBy } from '@/lib/form'
 import { cn } from '@/lib/utils'
 import { type Warning, warningsToConfirm } from '@/lib/warnings'
@@ -43,6 +44,8 @@ const schema = z
     note: z.string().max(500, "Izoh 500 belgidan oshmasligi kerak"),
   })
   .superRefine((values, ctx) => {
+    const badDate = values.date && dateError(values.date)
+    if (badDate) ctx.addIssue({ code: 'custom', path: ['date'], message: badDate })
     if (!values.amount) return
     const amount = parseMoneyInput(values.amount)
     const issue = (message: string) => ctx.addIssue({ code: 'custom', path: ['amount'], message })
@@ -64,7 +67,7 @@ export function OperationFormDialog({ contract, open, onOpenChange, operation }:
   const save = useSaveOperation(contract.id, operation?.id)
   const [warnings, setWarnings] = useState<Warning[] | null>(null)
   const [pending, setPending] = useState<OperationInput | null>(null)
-  const { register, control, handleSubmit, setError, setValue, formState } = useForm<Values>({
+  const { register, control, handleSubmit, setError, formState } = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: operation
       ? { date: operation.date, type: operation.type, amount: formatMoney(operation.amount), note: operation.note ?? '' }
@@ -153,21 +156,13 @@ export function OperationFormDialog({ contract, open, onOpenChange, operation }:
             </fieldset>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField id={id('date')} label="Sana" required error={errors.date?.message}>
-                <Input type="date" {...props('date')} {...register('date')} />
+                <Input type="date" {...DATE_BOUNDS} {...props('date')} {...register('date')} />
               </FormField>
               <FormField id={id('amount')} label="Summa, so'm" required error={errors.amount?.message}>
-                <Input
-                  inputMode="decimal"
-                  autoComplete="off"
+                <MoneyInput
                   placeholder="60 000 000"
-                  className="font-mono tabular-nums"
                   {...props('amount')}
-                  {...register('amount', {
-                    onBlur: (event) => {
-                      const formatted = formatMoneyInput(event.target.value)
-                      if (formatted) setValue('amount', formatted)
-                    },
-                  })}
+                  {...register('amount')}
                 />
               </FormField>
             </div>

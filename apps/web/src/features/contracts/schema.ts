@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { dateError } from '@/lib/dates'
 import { parseMoneyInput, parseRateInput, rateInRange } from '@/lib/format'
 
 // Mirrors apps/api/src/contracts/dto/contract.dto.ts and ContractsService.assertTerms.
@@ -20,6 +21,10 @@ function rules(values: Values, ctx: z.RefinementCtx) {
   const issue = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message })
   if (values.lenderId && values.lenderId === values.borrowerId) {
     issue('borrowerId', "Beruvchi va oluvchi bir xil firma bo'lishi mumkin emas")
+  }
+  for (const field of ['signedOn', 'startDate', 'endDate'] as const) {
+    const error = values[field] && dateError(values[field])
+    if (error) issue(field, error)
   }
   if (values.startDate && values.endDate && values.endDate <= values.startDate) {
     issue('endDate', "Tugash sanasi boshlanish sanasidan keyin bo'lishi kerak")

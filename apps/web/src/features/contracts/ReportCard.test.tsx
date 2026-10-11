@@ -22,6 +22,31 @@ describe('ReportCard (FR-4.1, FR-4.2)', () => {
     expect(mar).toHaveTextContent('15.03 gacha')
   })
 
+  it('filters the months by year, current year first (FR-10.3)', async () => {
+    const december = { ...etalonReport.months[0], month: '2025-12', from: '2025-12-01', to: '2025-12-31' }
+    const report = { ...etalonReport, months: [december, ...etalonReport.months] }
+    mockApi({ [`GET ${reportPath}`]: () => ({ status: 200, body: report }) })
+    renderWithProviders(<ReportCard contractId={etalon.id} />)
+    const table = await screen.findByRole('table', { name: 'Oylik hisobot' })
+    const months = () => within(table).getAllByRole('row').flatMap((r) => r.getAttribute('data-month') ?? [])
+    expect(screen.getByLabelText('Yil')).toHaveValue('2026')
+    expect(months()).toEqual(['2026-01', '2026-02', '2026-03'])
+    await userEvent.selectOptions(screen.getByLabelText('Yil'), '2025')
+    expect(months()).toEqual(['2025-12'])
+    await userEvent.selectOptions(screen.getByLabelText('Yil'), 'Barcha yillar')
+    expect(months()).toEqual(['2025-12', '2026-01', '2026-02', '2026-03'])
+    expect(screen.queryByText(/butun shartnoma bo'yicha/)).not.toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Yil'), '2025')
+    expect(screen.getByText(/butun shartnoma bo'yicha/)).toBeInTheDocument()
+  })
+
+  it('has no year filter while the report covers a single year', async () => {
+    mockApi({ [`GET ${reportPath}`]: () => ({ status: 200, body: etalonReport }) })
+    renderWithProviders(<ReportCard contractId={etalon.id} />)
+    await screen.findByRole('table', { name: 'Oylik hisobot' })
+    expect(screen.queryByLabelText('Yil')).not.toBeInTheDocument()
+  })
+
   it('offers the report as an Excel download (FR-6.1)', async () => {
     mockApi({ [`GET ${reportPath}`]: () => ({ status: 200, body: etalonReport }) })
     renderWithProviders(<ReportCard contractId={etalon.id} />)
