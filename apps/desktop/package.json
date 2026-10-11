@@ -1,0 +1,14 @@
+{
+  "name": "desktop",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Moliyaviy yordam — desktop shell (Electron). Boots the API in a child process on a local PGlite database.",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^34.0.0"
+  }
+}

@@ -9,6 +9,8 @@ export interface Env {
   JWT_SECRET: string;
   COOKIE_SECURE: boolean;
   PORT: number;
+  /** Built web UI directory the API serves (desktop, M9b). Empty → web runs separately (dev/server). */
+  WEB_ROOT: string;
   /** Reverse-proxy hops to trust for the client IP (Express `trust proxy`). */
   TRUST_PROXY: number;
 }
@@ -46,7 +48,8 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     AUTH_PASSWORD_HASH: str('AUTH_PASSWORD_HASH'),
     JWT_SECRET: str('JWT_SECRET'),
     COOKIE_SECURE: raw.COOKIE_SECURE !== 'false',
-    PORT: int('PORT', 3000, 1, 65535),
+    WEB_ROOT: typeof raw.WEB_ROOT === 'string' ? raw.WEB_ROOT : '',
+    PORT: int('PORT', 3000, 0, 65535),
     TRUST_PROXY: int('TRUST_PROXY', 0, 0, 10),
   };
 

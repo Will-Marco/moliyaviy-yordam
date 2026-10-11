@@ -35,6 +35,7 @@ describe('validateEnv', () => {
 
   it('validates PORT and TRUST_PROXY', () => {
     expect(() => validateEnv({ ...valid, PORT: '30OO' })).toThrow(/PORT/);
+    expect(validateEnv({ ...valid, PORT: '0' }).PORT).toBe(0); // 0 = ephemeral (desktop)
     expect(() => validateEnv({ ...valid, TRUST_PROXY: 'yes' })).toThrow(/TRUST_PROXY/);
     expect(validateEnv({ ...valid, TRUST_PROXY: '1' }).TRUST_PROXY).toBe(1);
     expect(validateEnv(valid).TRUST_PROXY).toBe(0);
