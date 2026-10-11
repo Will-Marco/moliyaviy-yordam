@@ -1,14 +1,4 @@
-import { NestFactory } from '@nestjs/core';
-import type { NestExpressApplication } from '@nestjs/platform-express';
-import { ConfigService } from '@nestjs/config';
-import { AppModule } from './app.module.js';
-import { configureApp } from './app.setup.js';
-import type { Env } from './config/env.js';
+import { bootstrap } from './server.js';
 
-async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  configureApp(app);
-  const config = app.get<ConfigService<Env, true>>(ConfigService);
-  await app.listen(config.get('PORT', { infer: true }));
-}
+// Executable entry (dev `nest start`, prod `node dist/main`). The desktop shell imports server.ts instead.
 await bootstrap();

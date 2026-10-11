@@ -8,6 +8,16 @@ const valid = {
 };
 
 describe('validateEnv', () => {
+  it('needs DATABASE_URL for the pg driver but not for pglite', () => {
+    expect(validateEnv({ ...valid, DB_DRIVER: 'pglite', DATABASE_URL: undefined, PGLITE_DATA_DIR: '/data/db' }).DB_DRIVER).toBe('pglite');
+    const { DATABASE_URL: _drop, ...noUrl } = valid;
+    expect(() => validateEnv({ ...noUrl, DB_DRIVER: 'pg' })).toThrow(/DATABASE_URL/);
+    expect(() => validateEnv({ ...valid, DB_DRIVER: 'mysql' })).toThrow(/DB_DRIVER/);
+  });
+  it('defaults the driver to pg', () => {
+    expect(validateEnv(valid).DB_DRIVER).toBe('pg');
+  });
+
   it('accepts a complete configuration with secure cookies by default', () => {
     const env = validateEnv(valid);
     expect(env.COOKIE_SECURE).toBe(true);

@@ -1,5 +1,9 @@
 export interface Env {
+  /** 'pg' — server PostgreSQL via DATABASE_URL; 'pglite' — local file database (desktop, M9a). */
+  DB_DRIVER: 'pg' | 'pglite';
   DATABASE_URL: string;
+  /** PGlite data directory; empty → in-memory (tests). Used only when DB_DRIVER='pglite'. */
+  PGLITE_DATA_DIR: string;
   AUTH_USERNAME: string;
   AUTH_PASSWORD_HASH: string;
   JWT_SECRET: string;
@@ -29,8 +33,15 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     return value;
   };
 
+  const driverRaw = raw.DB_DRIVER === undefined || raw.DB_DRIVER === '' ? 'pg' : raw.DB_DRIVER;
+  if (driverRaw !== 'pg' && driverRaw !== 'pglite') errors.push("DB_DRIVER must be 'pg' or 'pglite'");
+  const driver = driverRaw as 'pg' | 'pglite';
+  const dbUrl = driver === 'pg' ? str('DATABASE_URL') : typeof raw.DATABASE_URL === 'string' ? raw.DATABASE_URL : '';
+
   const env: Env = {
-    DATABASE_URL: str('DATABASE_URL'),
+    DB_DRIVER: driver,
+    DATABASE_URL: dbUrl,
+    PGLITE_DATA_DIR: typeof raw.PGLITE_DATA_DIR === 'string' ? raw.PGLITE_DATA_DIR : '',
     AUTH_USERNAME: str('AUTH_USERNAME'),
     AUTH_PASSWORD_HASH: str('AUTH_PASSWORD_HASH'),
     JWT_SECRET: str('JWT_SECRET'),
