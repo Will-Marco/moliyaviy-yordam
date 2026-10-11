@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 11 — Shartnomalar ro'yxati (**in-progress**); keyin 12; keyin 11, 12. M8 — token, M9 — server ma'lumotlari kutilmoqda
+**Joriy modul:** — (1–7, 10–12 qabul qilingan). Navbat: M8 — Didox partner token, M9 — server ma'lumotlari kutilmoqda
 **Oxirgi yangilanish:** 2026-10-07
 
 ## Modullar
@@ -21,8 +21,8 @@
 | 8 | Didox API — avtomatik qoralamalar | Oy 1-kuni ilova barcha firmalarga o'zi kirib, oy fakturalari qoralamalarini Didox'da yaratadi | complex | pending | ⏸ partner token (Sir so'raydi, mijoz nomidan); test: bo'sh raqam/sana, LgotaId | |
 | 9 | Serverga joylash | Barcha buxgalterlar server manzili orqali kiradi | standard | pending | inson qadamlari — `wizard` | |
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
-| 11 | Shartnomalar ro'yxati | Buxgalter shartnomalarni qidiradi, filtrlaydi, saralaydi; beruvchi/oluvchi alohida | standard | pending | SRS §5 M11 | |
-| 12 | Davr hisoboti va Excel | Buxgalter davr tanlab shartnomalar harakatini ko'radi va Excel'ga yuklaydi | complex | pending | SRS §5 M12; reja + plan-reviewer | |
+| 11 | Shartnomalar ro'yxati | Buxgalter shartnomalarni qidiradi, filtrlaydi, saralaydi; beruvchi/oluvchi alohida | standard | accepted | FR-11.1–11.4; web 153; brauzerda GAMMA → 2, DELTA AGRO → 2 | 2026-10-11 |
+| 12 | Davr hisoboti va Excel | Buxgalter davr tanlab shartnomalar harakatini ko'radi va Excel'ga yuklaydi | complex | accepted | FR-12.1–12.3; API unit 111 + e2e 110 (etalon yanvar–fevral, Excel qayta o'qiladi); brauzerda davr + Excel | 2026-10-11 |
 
 Status: `pending → in-progress → review → accepted`
 Hajm: `trivial | standard | complex`
@@ -44,6 +44,9 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-11 — M11 va M12 qabul qilindi — Sir
+- 2026-10-11 — M11+M12 tez yopiladi: oraliq gate'larsiz, bitta umumiy Acceptance Report (Sir). M12 complex bo'lsa ham alohida plan-reviewer o'tkazilmadi — o'rniga etalon e2e + code-review (high)
+- 2026-10-11 — M12: `GET /reports/period?from&to` (raqamlar), `POST /reports/period.xlsx` (ekrandagi shartnoma ID'lari, ekran tartibida); davr — butun oylar, joriy oy bugungacha; filtr/qidiruv/saralash — klientda, manzilda saqlanadi; qator bosilsa shartnoma ochiladi
 - 2026-10-11 — M10 qabul qilindi; summa maydondan chiqqanda `,00` qo'shilmaydi (yozish paytida formatlanadi); kasrdan keyin 3 raqam — minglik — Sir
 - 2026-10-09 — Yangi modullar 10–12 (Sir talablari): davr = butun oylar, "davr harakati" (ichida berildi/qaytarildi/foiz, oxiriga qoldiq/qarz); filtr — panel + ustun saralash; sana xatosi — mavjud bo'lmagan sana va 2000–2100 dan tashqari yil; davr Excel — ekrandagidek bitta varaq + jami — Sir
 - 2026-10-09 — FR-1.2: manzil, р/с, MFO ixtiyoriy (majburiy faqat nom + STIR); to'ldirilmagan firma "Rekvizitlar to'liq emas" belgisi bilan, Didox importi to'ldiradi. Sir bergan 92 firma ro'yxati dev bazaga nom + STIR bilan qo'shildi (nomlar ro'yxatdagidek) — Sir
