@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** — (1–7, 10–12 qabul qilingan). Navbat: M8 — Didox partner token, M9 — server ma'lumotlari kutilmoqda
+**Joriy modul:** 8 + 9 — **qayta rejalash** (Didox: yo'l B — brauzerni boshqarish; lokal Windows o'rnatish). Avval M8 reja
 **Oxirgi yangilanish:** 2026-10-07
 
 ## Modullar
@@ -18,8 +18,8 @@
 | 5 | Stavkani o'zgartirish | Buxgalter yangi stavka kiritadi, u qachondan amal qilishini ko'radi | standard | accepted | FR-5.1–5.5; API unit 64 + e2e 86, web 81; brauzerda 15.03→01.04, retroaktiv ogohlantirish, aprel 16% va o'chirish tekshirildi | 2026-10-07 |
 | 6 | Excel eksport | Buxgalter oylik hisobotni .xlsx qilib yuklab oladi | standard | accepted | FR-6.1–6.4; API unit 68 + e2e 91 (fayl qayta o'qilib tiyinigacha solishtiriladi), web 82; haqiqiy fayl dev serverdan yuklab tekshirildi | 2026-10-07 |
 | 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | accepted | FR-7.1–7.5; API unit 97 + e2e 101, web 95; brauzerda etalon yanvar, nusxalash, belgilash/409/olib tashlash | 2026-10-07 |
-| 8 | Didox API — avtomatik qoralamalar | Oy 1-kuni ilova barcha firmalarga o'zi kirib, oy fakturalari qoralamalarini Didox'da yaratadi | complex | pending | ⏸ partner token (Sir so'raydi, mijoz nomidan); test: bo'sh raqam/sana, LgotaId | |
-| 9 | Serverga joylash | Barcha buxgalterlar server manzili orqali kiradi | standard | pending | inson qadamlari — `wizard` | |
+| 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | pending | **yo'l B** (2026-10-11); real Didox oqimini o'rganish + reja + plan-reviewer | |
+| 9 | Windows'ga o'rnatish | Har buxgalter ilovani o'z kompyuteriga o'rnatadi | complex | pending | 2026-10-11: server o'rniga lokal; qadoqlash (baza, avtostart, yangilash) rejalanadi | |
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
 | 11 | Shartnomalar ro'yxati | Buxgalter shartnomalarni qidiradi, filtrlaydi, saralaydi; beruvchi/oluvchi alohida | standard | accepted | FR-11.1–11.4; web 153; brauzerda GAMMA → 2, DELTA AGRO → 2 | 2026-10-11 |
 | 12 | Davr hisoboti va Excel | Buxgalter davr tanlab shartnomalar harakatini ko'radi va Excel'ga yuklaydi | complex | accepted | FR-12.1–12.3; API unit 111 + e2e 110 (etalon yanvar–fevral, Excel qayta o'qiladi); brauzerda davr + Excel | 2026-10-11 |
@@ -44,6 +44,9 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — **Didox yo'li: B (brauzerni boshqarish)** — Sir. Buxgalter Didox'ga o'z brauzerida ERI bilan kiradi; ilova ochiq sessiyani boshqarib (forma/Excel) qoralama yaratadi. Didox partner tokenini kodidan sug'urib olish (C) **rad etildi** — uchinchi tomon kalitini o'zlashtirish (CONSTITUTION §14). Spike natijalari: docs/research/e-imzo.md, windows-packaging.md
+- 2026-10-11 — ERI kalitlari `.pfx` fayl; barcha buxgalter kompyuterlarida E-IMZO o'rnatilgan; Sir sinovni macOS'da qiladi — Sir
+- 2026-10-11 — **Yo'l o'zgardi:** Didox'ga rasmiy ulanib bo'lmaydi → ilova har buxgalter Windows kompyuteriga alohida o'rnatiladi; Didox'ga ERI (E-IMZO) bilan kirib, veb-ilovaning ichki API'si orqali qoralama yaratiladi (variant C; A — Excel import, B — brauzer avtomatlashtirish rad etildi). CONSTITUTION §12–16 qayta yozildi; xavflar ongli qabul qilindi — Sir
 - 2026-10-11 — M11 va M12 qabul qilindi — Sir
 - 2026-10-11 — M11+M12 tez yopiladi: oraliq gate'larsiz, bitta umumiy Acceptance Report (Sir). M12 complex bo'lsa ham alohida plan-reviewer o'tkazilmadi — o'rniga etalon e2e + code-review (high)
 - 2026-10-11 — M12: `GET /reports/period?from&to` (raqamlar), `POST /reports/period.xlsx` (ekrandagi shartnoma ID'lari, ekran tartibida); davr — butun oylar, joriy oy bugungacha; filtr/qidiruv/saralash — klientda, manzilda saqlanadi; qator bosilsa shartnoma ochiladi
@@ -95,6 +98,9 @@ Hajm: `trivial | standard | complex`
 - 2026-10-07 — Mijoz suhbati: faktura qatori doimiy (faqat oy va narx o'zgaradi); faktura raqami/sanasini buxgalter Didox'da qo'yadi; ilova faqat qoralama yaratadi — SRS §9.1–9.2
 
 ## Ochiq risk / texnik qarz
+- **Didox ichki API** (2026-10-11): akkaunt bloklanishi, Didox o'zgartirsa ogohlantirishsiz buzilish, foydalanish shartlariga ziddlik — Sir qabul qilgan. Har chaqiriq javobi tekshiriladi, kutilmagan javobda to'xtaladi
+- E-IMZO har kirishda ERI parolini o'z oynasida so'raydi → oy 1-kuni 06:00 to'liq avtomatik ishga tushish **bo'lmasligi** mumkin (spike'da tekshiriladi)
+- Har buxgalterda alohida baza → zaxira nusxa va ilovani yangilash har kompyuterda (M9)
 - M7: `552328.77` summa formati haqiqiy Didox formasida tekshirilmagan
 - Global query `retry` 400 xatolarni ham 2 marta qayta uradi (sekin xato ko'rsatish) — 4xx'da retry'ni o'chirish mumkin
 - Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; shadcn CLI (web dependencies'da — devDependencies'ga o'tkazish kerak); exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi

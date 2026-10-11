@@ -180,7 +180,10 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   (Didox ulanmagan firma uchun ham qo'lda kiritish oson bo'lsin).
 - *Acceptance:* etalon shartnoma uchun yanvar qatori 552 328,77 va to'g'ri qator nomi bilan chiqadi.
 
-### Modul 8: Didox API integratsiyasi — avtomatik qoralamalar
+### Modul 8: Didox — brauzerni boshqarib qoralamalar (yo'l B)
+> ⚠️ **2026-10-11: qayta yozilmoqda.** Partner token yo'q va Didox'ning tokenini sug'urib olish rad etildi (CONSTITUTION §14).
+> Tanlangan yo'l **B**: buxgalter Didox'ga o'z brauzerida ERI bilan kiradi, ilova shu sessiyani boshqarib forma/Excel orqali
+> qoralama yaratadi. FR'lar real Didox oqimi o'rganilgach yoziladi (reja + plan-reviewer).
 - FR-8.1 — **Didox akkauntlari** (alohida ro'yxat): login (STIR yoki PINFL), Didox akkaunt paroli,
   bog'langan beruvchi firmalar. Bitta akkaunt → **bir nechta firma** (bitta buxgalter ko'p firmani yuritadi).
   Parol **shifrlangan** saqlanadi, UI'da qayta ko'rsatilmaydi, log'ga yozilmaydi.
@@ -216,6 +219,7 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - *Blokerlar:* partner token (test) — Sir Didox'ga yozadi (mijoz nomidan); §9.2 ochiq savollar.
 
 ### Modul 9: Serverga joylash
+> ⚠️ **2026-10-11: o'zgardi** → har buxgalter Windows kompyuteriga alohida o'rnatish (umumiy server/baza yo'q).
 - FR-9.1 — Docker Compose (api + web + PostgreSQL + reverse proxy, HTTPS).
 - FR-9.2 — DB zaxira nusxasi (backup).
 - FR-9.3 — Prod partner token va shifrlash kaliti serverga xavfsiz o'rnatiladi (Sir qo'li bilan).
@@ -324,7 +328,10 @@ Spike natijasi — to'liq: [research/didox.md](research/didox.md) (2026-10-07; a
 - [ ] "Без НДС" uchun `LgotaId` qiymati hujjatda yo'q — buxgalter yaratgan namunaviy qoralamani API orqali o'qib olinadi.
 - [x] "Excel юклаш" — ommaviy API emas, faqat UI ichida; zaxira yo'l sifatida qoladi.
 
-**Tanlangan yo'l (Sir, 2026-10-07, yakuniy): partner API + firma Didox akkaunt paroli.**
+**2026-10-11 — yo'l o'zgardi (Sir):** rasmiy ulanib bo'lmaydi → lokal ilova, ERI (E-IMZO) bilan kirish, Didox ichki API.
+Quyidagi 2026-10-07 qarori endi amal qilmaydi.
+
+**Tanlangan yo'l (Sir, 2026-10-07) — BEKOR:** partner API + firma Didox akkaunt paroli.
 Serverda: partner token (`.env`) va har beruvchi firmaning Didox paroli (shifrlangan). ERI kaliti
 serverga **berilmaydi** — imzo faqat buxgalterda. Firma paroli — ERI (.pfx) paroli emas, Didox'da
 ro'yxatdan o'tishda o'rnatilgan akkaunt paroli ([research/didox-partner-token.md](research/didox-partner-token.md)).

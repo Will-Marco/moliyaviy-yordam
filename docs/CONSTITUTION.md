@@ -19,17 +19,24 @@
 10. Har CR qoidasi kamida bitta test bilan qoplanadi; SRS'dagi etalon misol (yanvar = 552 328,77) doim yashil.
 11. Ekran, Excel va faktura **bitta** yadro natijasidan oladi — raqam ikki joyda alohida hisoblanmaydi.
 
-## Didox (qat'iy chegaralar)
-12. Ilova **hech qachon** hujjatni imzolamaydi va yubormaydi — faqat qoralama yaratadi (`tosign`/`sign` chaqirilmaydi).
-13. ERI kaliti (.pfx) va uning paroli hech qachon so'ralmaydi, saqlanmaydi. Didox akkaunt paroli — faqat
-    shifrlangan, log'ga va UI'ga chiqmaydi.
-14. Faqat rasmiy partner API (`api-docs.didox.uz`). Cookie / web-sessiya / hujjatlashtirilmagan ichki API — taqiqlangan.
-15. Didox login xatosida avtomatik qayta urinish yo'q (25 urinish → akkaunt doimiy bloklanadi).
+## Didox (qat'iy chegaralar) — 2026-10-11 da Sir qarori bilan qayta yozildi (yo'l: B — brauzerni boshqarish)
+> Rasmiy partner token yo'q. Didox'ning o'z partner tokenini uning kodidan sug'urib olish **taqiqlangan**
+> (uchinchi tomon kalitini o'zlashtirish). Yo'l B: buxgalter Didox saytiga **o'z brauzerida, odatdagidek ERI bilan**
+> kiradi; ilova shu **ochiq, inson tomonidan kirilgan sessiyani** boshqaradi (forma to'ldirish / Excel yuklash → qoralama).
+12. Ilova **hech qachon** hujjatni imzolamaydi va yubormaydi — faqat qoralama yaratadi (`tosign`/`sign` yo'q, "Юбориш" bosilmaydi).
+13. ERI va uning paroli ilovaga **umuman tegmaydi**: kirishni buxgalter Didox'ning o'z sahifasida E-IMZO orqali qiladi.
+    Ilova .pfx faylini, ERI yoki Didox parolini so'ramaydi, ko'rmaydi, saqlamaydi.
+14. **Didox'ning partner tokeni yoki boshqa maxfiy kaliti ilova kodiga olinmaydi.** Ilova Didox API'sini to'g'ridan-to'g'ri
+    chaqirmaydi; faqat buxgalter kirgan **sahifa (DOM)** bilan ishlaydi — xuddi buxgalter o'zi bosganidek. Sahifa Didox
+    tokenini o'zi ishlatadi.
+15. Harakat **inson tezligida** (ketma-ket, parallel ommaviy so'rovsiz). Didox sahifasi kutilganidan farq qilsa —
+    to'xtash va buxgalterga xabar, "taxmin bilan davom etish" yo'q. Login xatosida avtomatik qayta urinish yo'q.
+16. Ilova buxgalter kompyuterida lokal ishlaydi; Didox sessiyasi kompyuterdan faqat Didox'ga chiqadi.
 
 ## Tech stack (qat'iy)
 - Backend: NestJS + Prisma + PostgreSQL
 - Frontend: React + Vite + TypeScript + shadcn/ui + Tailwind
-- Infra: Docker Compose
+- Infra: lokal o'rnatish (Windows, har buxgalterga alohida) — qadoqlash usuli M9 rejasida tanlanadi (2026-10-11)
 - Monorepo: `apps/api`, `apps/web`
 
 ## Kod uslubi / konvensiyalar
