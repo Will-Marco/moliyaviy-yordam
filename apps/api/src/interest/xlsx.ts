@@ -3,6 +3,9 @@ import type { IsoDate } from '../common/dates.js';
 import { formatDate, formatMonth } from '../common/format.js';
 import type { ContractView } from '../contracts/contract.view.js';
 import type { OperationView } from '../operations/operations.service.js';
+import { toTiyin } from './engine.js';
+import type { PeriodRowWithContract } from './period-report.service.js';
+import { money } from './report.js';
 import type { reportView } from './report.js';
 
 type Report = ReturnType<typeof reportView>;
@@ -139,4 +142,59 @@ function operationsSheet(sheet: ExcelJS.Worksheet, operations: OperationView[]) 
     for (let col = 2; col <= 5; col++) row.getCell(col).numFmt = MONEY_FORMAT;
   }
   sheet.columns.forEach((column, i) => (column.width = [12, 18, 18, 18, 18, 40][i]));
+}
+
+const MONEY_KEYS = ['disbursed', 'repaid', 'interest', 'interestPaid', 'closingBalance', 'interestDebt'] as const;
+
+/** Exact sum of API money strings — no floating point (CONSTITUTION §7). */
+const sumMoney = (values: string[]) => money(values.reduce((total, v) => total + toTiyin(v), 0n));
+
+/** FR-12.3: the period table as on screen — one sheet, the chosen contracts in screen order, a total row. */
+export async function buildPeriodWorkbook(report: { from: string; to: string; asOf: IsoDate; rows: PeriodRowWithContract[] }) {
+  const book = new ExcelJS.Workbook();
+  book.creator = 'Moliyaviy yordam';
+  const sheet = book.addWorksheet('Davr hisoboti');
+  const current = report.to === report.asOf.slice(0, 7);
+  const end = current ? `${formatMonth(report.to)} (${formatDate(report.asOf).slice(0, 5)} gacha)` : formatMonth(report.to);
+  sheet.addRow(['Shartnomalar — davr hisoboti']).font = { bold: true, size: 14 };
+  sheet.addRow([`Davr: ${formatMonth(report.from)} – ${end}`]);
+  sheet.addRow([]);
+  sheet.addRow([
+    'Shartnoma',
+    'Sana',
+    'Beruvchi',
+    'Beruvchi STIR',
+    'Oluvchi',
+    'Oluvchi STIR',
+    'Berildi',
+    'Qaytarildi',
+    'Hisoblangan foiz',
+    "To'langan foiz",
+    'Qoldiq (davr oxiri)',
+    'Foiz qarzi (davr oxiri)',
+  ]).font = { bold: true };
+  for (const r of report.rows) {
+    const { contract: c } = r;
+    const row = sheet.addRow([
+      c.number,
+      excelDate(c.signedOn),
+      c.lender.name,
+      c.lender.tin,
+      c.borrower.name,
+      c.borrower.tin,
+      ...MONEY_KEYS.map((key) => moneyCell(r[key])),
+    ]);
+    row.getCell(2).numFmt = DATE_FORMAT;
+    for (let col = 7; col <= 12; col++) row.getCell(col).numFmt = MONEY_FORMAT;
+  }
+  const total = sheet.addRow(['Jami', null, null, null, null, null, ...MONEY_KEYS.map((key) => moneyCell(sumMoney(report.rows.map((r) => r[key]))))]);
+  total.font = { bold: true };
+  for (let col = 7; col <= 12; col++) total.getCell(col).numFmt = MONEY_FORMAT;
+
+  sheet.getColumn(1).width = 14;
+  sheet.getColumn(2).width = 12;
+  for (const col of [3, 5]) sheet.getColumn(col).width = 32;
+  for (const col of [4, 6]) sheet.getColumn(col).width = 13;
+  for (let col = 7; col <= 12; col++) sheet.getColumn(col).width = 20;
+  return Buffer.from(await book.xlsx.writeBuffer());
 }
