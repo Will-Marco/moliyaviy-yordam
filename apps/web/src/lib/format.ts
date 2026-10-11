@@ -94,3 +94,19 @@ export function caretAfterFormat(before: string, caret: number, after: string): 
   }
   return after.length
 }
+
+/** An API decimal string as an integer of 10^-scale units: decimalUnits("-1.5", 2) → -150n. */
+export function decimalUnits(value: string, scale: number): bigint {
+  const negative = value.startsWith('-')
+  const [whole, fraction = ''] = value.replace('-', '').split('.')
+  const n = BigInt(whole) * 10n ** BigInt(scale) + BigInt(fraction.padEnd(scale, '0').slice(0, scale))
+  return negative ? -n : n
+}
+
+/** Exact sum of API money strings — for total rows (CONSTITUTION §7). */
+export function sumMoney(values: string[]): string {
+  const tiyin = values.reduce((total, v) => total + decimalUnits(v, 2), 0n)
+  const negative = tiyin < 0n
+  const digits = (negative ? -tiyin : tiyin).toString().padStart(3, '0')
+  return `${negative ? '-' : ''}${digits.slice(0, -2)}.${digits.slice(-2)}`
+}

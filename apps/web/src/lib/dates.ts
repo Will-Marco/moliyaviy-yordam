@@ -20,3 +20,7 @@ export function dateError(value: string): string | null {
 
 /** The accountant's calendar date (browser local) as yyyy-mm-dd — default for date fields. */
 export const todayIso = () => new Date().toLocaleDateString('en-CA')
+
+/** "Today" as the server sees it (Asia/Tashkent) — for limits the API checks, e.g. the current month. */
+export const tashkentToday = (now = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(now)

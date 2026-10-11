@@ -1,4 +1,4 @@
-import { caretAfterFormat, formatDate, formatInstantDate, formatMoney, formatMoneyTyping, formatRate, parseMoneyInput, parseRateInput } from './format'
+import { caretAfterFormat, formatDate, formatInstantDate, formatMoney, formatMoneyTyping, formatRate, parseMoneyInput, parseRateInput, sumMoney } from './format'
 
 const nb = ' '
 
@@ -78,5 +78,15 @@ describe('caretAfterFormat', () => {
     expect(caretAfterFormat('1234', 2, '1 234')).toBe(3)
     expect(caretAfterFormat('1234', 0, '1 234')).toBe(0)
     expect(caretAfterFormat('1234,5', 6, '1 234,5')).toBe(7)
+  })
+})
+
+describe('sumMoney', () => {
+  it('adds exactly, with negatives and no floating point', () => {
+    expect(sumMoney(['552328.77', '483287.67'])).toBe('1035616.44')
+    expect(sumMoney(['0.10', '0.20'])).toBe('0.30')
+    expect(sumMoney(['-5.00', '1.25'])).toBe('-3.75')
+    expect(sumMoney(['99999999999999999.99', '0.01'])).toBe('100000000000000000.00')
+    expect(sumMoney([])).toBe('0.00')
   })
 })
