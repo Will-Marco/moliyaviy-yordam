@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 9 — Serverga joylash (**pending** — M8 partner token kutmoqda)
+**Joriy modul:** 11 — Shartnomalar ro'yxati (**in-progress**); keyin 12; keyin 11, 12. M8 — token, M9 — server ma'lumotlari kutilmoqda
 **Oxirgi yangilanish:** 2026-10-07
 
 ## Modullar
@@ -20,6 +20,9 @@
 | 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | accepted | FR-7.1–7.5; API unit 97 + e2e 101, web 95; brauzerda etalon yanvar, nusxalash, belgilash/409/olib tashlash | 2026-10-07 |
 | 8 | Didox API — avtomatik qoralamalar | Oy 1-kuni ilova barcha firmalarga o'zi kirib, oy fakturalari qoralamalarini Didox'da yaratadi | complex | pending | ⏸ partner token (Sir so'raydi, mijoz nomidan); test: bo'sh raqam/sana, LgotaId | |
 | 9 | Serverga joylash | Barcha buxgalterlar server manzili orqali kiradi | standard | pending | inson qadamlari — `wizard` | |
+| 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
+| 11 | Shartnomalar ro'yxati | Buxgalter shartnomalarni qidiradi, filtrlaydi, saralaydi; beruvchi/oluvchi alohida | standard | pending | SRS §5 M11 | |
+| 12 | Davr hisoboti va Excel | Buxgalter davr tanlab shartnomalar harakatini ko'radi va Excel'ga yuklaydi | complex | pending | SRS §5 M12; reja + plan-reviewer | |
 
 Status: `pending → in-progress → review → accepted`
 Hajm: `trivial | standard | complex`
@@ -41,6 +44,8 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-11 — M10 qabul qilindi; summa maydondan chiqqanda `,00` qo'shilmaydi (yozish paytida formatlanadi); kasrdan keyin 3 raqam — minglik — Sir
+- 2026-10-09 — Yangi modullar 10–12 (Sir talablari): davr = butun oylar, "davr harakati" (ichida berildi/qaytarildi/foiz, oxiriga qoldiq/qarz); filtr — panel + ustun saralash; sana xatosi — mavjud bo'lmagan sana va 2000–2100 dan tashqari yil; davr Excel — ekrandagidek bitta varaq + jami — Sir
 - 2026-10-09 — FR-1.2: manzil, р/с, MFO ixtiyoriy (majburiy faqat nom + STIR); to'ldirilmagan firma "Rekvizitlar to'liq emas" belgisi bilan, Didox importi to'ldiradi. Sir bergan 92 firma ro'yxati dev bazaga nom + STIR bilan qo'shildi (nomlar ro'yxatdagidek) — Sir
 - 2026-10-07 — M7 qabul qilindi — Sir
 - 2026-10-07 — M7: `GET /invoices` (oy + barcha beruvchilar + qatorlar), `PUT/DELETE /invoices/:month/:contractId/draft`; qayta belgilash — 409 ALREADY_DRAFTED; faqat tugagan oy va foiz > 0; oy summasi yadroda oy oxirigacha hisoblanadi; nusxalash — Clipboard API + execCommand zaxirasi

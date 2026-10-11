@@ -221,6 +221,33 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - FR-9.3 — Prod partner token va shifrlash kaliti serverga xavfsiz o'rnatiladi (Sir qo'li bilan).
 - *Acceptance:* buxgalterlar server manzili orqali kirib ishlay oladi.
 
+### Modul 10: Kiritish qulayliklari (Sir, 2026-10-09)
+- FR-10.1 — Barcha summa maydonlari **yozilayotganda** formatlanadi: `2000000` → `2 000 000`, kasr — vergul
+  (`1 234,5`). Kursor joyi saqlanadi; nusxa joylanganda ham ishlaydi.
+- FR-10.2 — Sana tekshiruvi (barcha sana maydonlari: shartnoma, operatsiya, stavka): mavjud bo'lmagan sana
+  (yil 4 xonali emas, 31-fevral) va **2000–2100 oralig'idan tashqari yil** — maydon ostida xato. Server ham tekshiradi.
+- FR-10.3 — Oylik hisobot jadvalida **yil filtri** (default — joriy yil; "Barcha yillar" ham bor).
+- *Acceptance:* `2000000` yozilsa maydonda `2 000 000` ko'rinadi va `2000000.00` saqlanadi; `20266` yilli sana
+  saqlanmaydi; hisobotda 2025 tanlansa faqat 2025 oylari.
+
+### Modul 11: Shartnomalar ro'yxati — qidiruv, filtr, saralash (Sir, 2026-10-09)
+- FR-11.1 — Qidiruv: shartnoma raqami, beruvchi/oluvchi nomi yoki STIR bo'yicha.
+- FR-11.2 — Filtr paneli: Beruvchi, Oluvchi, imzo sanasi oralig'i. Filtrlar manzilda saqlanadi (havola bilan ulashsa bo'ladi).
+- FR-11.3 — Ustun sarlavhasini bosish — shu ustun bo'yicha saralash (o'sish/kamayish).
+- FR-11.4 — "Tomonlar" o'rniga **Beruvchi** va **Oluvchi** alohida ustunlar; nom ostida STIR raqami ("STIR" so'zisiz).
+- *Acceptance:* demo ma'lumotda "GAMMA" qidirilsa 2 ta shartnoma; Oluvchi = DELTA AGRO filtri 2 ta; foiz qarzi bo'yicha saralash.
+
+### Modul 12: Davr hisoboti va Excel (Sir, 2026-10-09)
+- FR-12.1 — Shartnomalar sahifasida **davr** tanlanadi: butun oylar (boshlanish oyi — tugash oyi), tezkor tanlov:
+  joriy oy, o'tgan oy, chorak, yil. Davr tanlanmasa — hozirgi ko'rinish (bugungi holat).
+- FR-12.2 — Davr tanlanganda har shartnoma uchun: davr ichida **berildi, qaytarildi, hisoblangan foiz,
+  to'langan foiz**; davr oxiriga **qoldiq va foiz qarzi**. Joriy oy davrga kirsa — bugungacha (CR-11).
+  Foiz = davr oylarining yaxlitlangan oylik foizlari yig'indisi (fakturalar bilan tiyinigacha mos, CONSTITUTION §11).
+- FR-12.3 — Excel: **ekrandagidek** — bitta varaq, joriy filtr/qidiruvdagi shartnomalar, shu ustunlar, pastda jami qator.
+  Bu FR-6.4 dagi "barcha shartnomalar eksporti" o'rnini bosadi.
+- *Acceptance:* etalon shartnoma, davr Yanvar–Fevral 2026: berildi 60 mln, qaytarildi 15 mln, foiz 1 035 616,44,
+  qoldiq 45 mln; Excel ekran bilan tiyinigacha mos.
+
 ## 6. Nofunktsional talablar
 - **Aniqlik:** pul va stavka hech qachon `float`'da hisoblanmaydi — DB'da `Decimal`, kodda decimal kutubxona
   yoki butun son (BigInt, tiyin) — foiz yadrosi BigInt'da.
