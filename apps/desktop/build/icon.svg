@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- App icon: the header's Landmark mark (lucide, ISC) on the design system primary, macOS 824px grid. -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#1E40AF"/>
+  <g transform="translate(252 240) scale(21.667)" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 18v-7"/>
+    <path d="M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z"/>
+    <path d="M14 18v-7"/>
+    <path d="M18 18v-7"/>
+    <path d="M3 22h18"/>
+    <path d="M6 18v-7"/>
+  </g>
+</svg>

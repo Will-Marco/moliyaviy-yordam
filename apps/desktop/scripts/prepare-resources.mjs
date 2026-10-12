@@ -1,10 +1,11 @@
 // Stages everything the packaged app needs under apps/desktop/.resources/{api,web,migrations}.
-// The API is deployed with its production node_modules (pnpm --prod --legacy) and then pruned of
-// build-only Prisma tooling that the Rust-free runtime does not need.
+// The API is deployed with its production node_modules (pnpm --prod --legacy) and then pruned to what it
+// can load at runtime (see runtime-packages.mjs) — the Rust-free Prisma runtime needs no CLI or engines.
 import { execSync } from 'node:child_process'
-import { cpSync, existsSync, readdirSync, rmSync } from 'node:fs'
+import { cpSync, readdirSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { runtimeEntries } from './runtime-packages.mjs'
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repo = resolve(desktop, '../..')
@@ -22,14 +23,24 @@ try {
   run('pnpm install --frozen-lockfile --prefer-offline')
 }
 
-// Drop build-only Prisma tooling and the TS compiler — not needed at runtime (Prisma 7 is Rust-free).
-const pnpmDir = join(out, 'api/node_modules/.pnpm')
-const DROP = ['prisma@', '@prisma+engines@', '@prisma+studio-core@', '@prisma+dev@', 'typescript@', 'effect@']
-if (existsSync(pnpmDir)) {
-  for (const entry of readdirSync(pnpmDir)) {
-    if (DROP.some((p) => entry.startsWith(p))) rmSync(join(pnpmDir, entry), { recursive: true, force: true })
+// Keep only what the API can load at runtime: follow its dependencies through the deployed node_modules,
+// skipping the Prisma CLI (build-time; @prisma/client lists it as a peer) and everything only it pulls in.
+const apiDir = join(out, 'api')
+const pnpmDir = join(apiDir, 'node_modules/.pnpm')
+const keep = runtimeEntries(apiDir)
+for (const entry of readdirSync(pnpmDir)) {
+  if (entry === 'node_modules' || entry === 'lock.yaml' || entry.startsWith('.')) continue
+  if (!keep.has(entry)) rmSync(join(pnpmDir, entry), { recursive: true, force: true })
+}
+// Prisma ships a query compiler per database; the generated client loads only the PostgreSQL one.
+for (const entry of readdirSync(pnpmDir).filter((e) => e.startsWith('@prisma+client@'))) {
+  const runtime = join(pnpmDir, entry, 'node_modules/@prisma/client/runtime')
+  for (const file of readdirSync(runtime)) {
+    const otherDb = /^query_compiler_.*\.(cockroachdb|mysql|sqlite|sqlserver)\./.test(file)
+    if (otherDb || file.endsWith('.map')) rmSync(join(runtime, file), { force: true })
   }
 }
+
 // Trim the deployed API of test/source clutter (dist is what runs).
 for (const junk of ['test', 'src', 'vitest.config.ts', 'vitest.config.e2e.ts', 'vitest.config.e2e.pglite.ts']) {
   rmSync(join(out, 'api', junk), { recursive: true, force: true })

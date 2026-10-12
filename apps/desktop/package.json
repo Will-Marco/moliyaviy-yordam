@@ -12,7 +12,8 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepackage": "node scripts/prepare-resources.mjs",
-    "pack:mac": "pnpm build && pnpm prepackage && electron-builder --mac --dir"
+    "pack:mac": "pnpm build && pnpm prepackage && electron-builder --mac --dir",
+    "pack:mac:dmg": "pnpm build && pnpm prepackage && electron-builder --mac dmg"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",

@@ -20,4 +20,4 @@ mac:
   identity: null
   category: public.app-category.finance
   target:
-    - dir
+    - dmg # pack:mac passes --dir for a quick unpacked build
