@@ -89,6 +89,26 @@ describe('Rate changes (Module 5)', () => {
     ]);
   });
 
+  it('warns before deleting a change that recalculates completed months, then deletes it (FR-5.3, FR-5.5)', async () => {
+    await setup('2026-05-10');
+    const created = await agent
+      .post(rates)
+      .send({ ratePercent: '16', changedOn: '2026-03-15', confirmWarnings: true }) // from April, already over
+      .expect(201);
+    const change = created.body.contract.rates.at(-1);
+    await agent.put(`/api/invoices/2026-04/${id}/draft`).send({}).expect(200);
+
+    const ask = await agent.delete(`${rates}/${change.id}`).expect(409);
+    expect(ask.body.warnings).toEqual([
+      { code: 'RETROACTIVE', message: 'Tugagan oylar qayta hisoblanadi: Aprel 2026' },
+      { code: 'DRAFTED_INVOICE_CHANGES', message: "Didox'da qoralama qilingan oylar summasi o'zgaradi: Aprel 2026" },
+    ]);
+    expect((await agent.get(`/api/contracts/${id}`)).body.rates).toHaveLength(2);
+
+    await agent.delete(`${rates}/${change.id}?confirmWarnings=true`).expect(204);
+    expect((await agent.get(`/api/contracts/${id}`)).body.rates).toHaveLength(1);
+  });
+
   it('requires the change to take effect after the initial rate (FR-5.1)', async () => {
     await setup('2026-03-20');
     for (const changedOn of ['2025-12-15', '2026-01-01']) {

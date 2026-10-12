@@ -99,7 +99,10 @@ export function useSaveRate(contractId: string, id?: string) {
 export function useDeleteRate(contractId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => apiFetch<void>(`/contracts/${contractId}/rates/${id}`, { method: 'DELETE' }),
+    mutationFn: ({ id, confirmWarnings = false }: { id: string; confirmWarnings?: boolean }) =>
+      apiFetch<void>(`/contracts/${contractId}/rates/${id}${confirmWarnings ? '?confirmWarnings=true' : ''}`, {
+        method: 'DELETE',
+      }),
     onSuccess: () => client.invalidateQueries({ queryKey: contractsKey }),
   })
 }

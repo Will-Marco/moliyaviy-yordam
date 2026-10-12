@@ -53,11 +53,15 @@ export class RatesService {
     return { contract: await this.contracts.get(contractId), warnings };
   }
 
-  async remove(contractId: string, rateId: string): Promise<void> {
+  /** FR-5.3 + FR-5.5: removing a change that already applied to completed months recalculates them — ask first. */
+  async remove(contractId: string, rateId: string, confirmWarnings = false): Promise<void> {
+    const { startDate } = await this.contractDates(contractId);
     const rate = await this.find(contractId, rateId);
     if (await this.isInitial(contractId, rate.id)) {
       throw new BadRequestException("Boshlang'ich stavkani o'chirib bo'lmaydi — qiymatini tuzating");
     }
+    const months = retroactiveMonths(fromDbDate(rate.effectiveFrom), startDate, this.clock.today());
+    this.confirm(months, await this.draftedMonths(contractId, months), confirmWarnings);
     await this.prisma.rateChange.delete({ where: { id: rate.id } });
   }
 

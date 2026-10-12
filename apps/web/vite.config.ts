@@ -9,7 +9,8 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   server: {
-    port: 5173,
+    // 5173 unless the launcher assigns another free port (another dev server may hold 5173).
+    port: Number(process.env.PORT) || 5173,
     // API and cookies stay same-origin in dev.
     proxy: { '/api': 'http://localhost:3000' },
   },

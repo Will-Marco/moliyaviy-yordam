@@ -1,16 +1,6 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { toast } from 'sonner'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { DeleteWithWarningsDialog } from '@/components/DeleteWithWarningsDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardHeader, CardTitle } from '@/components/ui/card'
@@ -104,31 +94,13 @@ export function RatesCard({ contract }: { contract: Contract }) {
         />
       )}
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Stavka o'zgarishini o'chirasizmi?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleting && `${describe(deleting)}. Shu sanadan keyingi foiz qayta hisoblanadi.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() =>
-                deleting &&
-                remove.mutate(deleting.id, {
-                  onSuccess: () => toast.success("Stavka o'zgarishi o'chirildi"),
-                  onError: (error) => toast.error(error.message),
-                })
-              }
-            >
-              O'chirish
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteWithWarningsDialog
+        title="Stavka o'zgarishini o'chirasizmi?"
+        description={deleting && `${describe(deleting)}. Shu sanadan keyingi foiz qayta hisoblanadi.`}
+        successMessage="Stavka o'zgarishi o'chirildi"
+        onDelete={(confirmWarnings) => remove.mutateAsync({ id: deleting!.id, confirmWarnings })}
+        onClose={() => setDeleting(null)}
+      />
     </Card>
   )
 }

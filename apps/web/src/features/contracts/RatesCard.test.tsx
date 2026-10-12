@@ -102,4 +102,26 @@ describe('RatesCard (Module 5)', () => {
     await userEvent.click(within(confirm).getByRole('button', { name: "O'chirish" }))
     await vi.waitFor(() => expect(calls).toHaveLength(1))
   })
+
+  it('shows which completed months a deletion recalculates and deletes only when confirmed (FR-5.3, FR-5.5)', async () => {
+    const { calls } = mockApi({
+      [`DELETE ${rates}/${change.id}`]: () => ({
+        status: 409,
+        body: {
+          code: 'CONFIRMATION_REQUIRED',
+          message: "Ogohlantirishlarni ko'rib chiqing",
+          warnings: [{ code: 'RETROACTIVE', message: 'Tugagan oylar qayta hisoblanadi: Aprel 2026' }],
+        },
+      }),
+      [`DELETE ${rates}/${change.id}?confirmWarnings=true`]: () => ({ status: 204 }),
+    })
+    renderWithProviders(<RatesCard contract={withChange} />)
+    await userEvent.click(screen.getByRole('button', { name: "O'chirish: 16 %, 01.04.2026 dan" }))
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: "O'chirish" }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(await within(dialog).findByText('Tugagan oylar qayta hisoblanadi: Aprel 2026')).toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: "Baribir o'chirish" }))
+    await vi.waitFor(() => expect(calls.map((c) => c.path).at(-1)).toContain('?confirmWarnings=true'))
+  })
 })

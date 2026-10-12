@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, HttpCode, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { CreateRateDto, UpdateRateDto } from './dto/rate.dto.js';
 import { RatesService } from './rates.service.js';
 
@@ -24,7 +24,11 @@ export class RatesController {
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('contractId', uuid) contractId: string, @Param('id', uuid) id: string) {
-    return this.rates.remove(contractId, id);
+  remove(
+    @Param('contractId', uuid) contractId: string,
+    @Param('id', uuid) id: string,
+    @Query('confirmWarnings') confirmWarnings?: string,
+  ) {
+    return this.rates.remove(contractId, id, confirmWarnings === 'true');
   }
 }

@@ -45,6 +45,7 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — Stavka o'zgarishini o'chirish ham tekshiriladi (RETROACTIVE + DRAFTED_INVOICE_CHANGES, `?confirmWarnings=true`); web'da umumiy `DeleteWithWarningsDialog` (operatsiyalar va stavkalar). Brauzerda № 12/25 da tekshirildi (o'chirilmadi). Web dev porti `PORT` dan (launch.json autoPort)
 - 2026-10-12 — **O'chirish ogohlantirishi + DRAFTED_INVOICE_CHANGES** (Sir: ikkalasi): `DELETE …/operations/:id` manfiy qoldiq / ortiqcha foiz to'lovi bo'lsa 409 → oynada ogohlantirish → `?confirmWarnings=true`; qo'shish/tahrirlash/o'chirish qoralama qilingan oy foizini o'zgartirsa ogohlantirish. Brauzerda tekshirildi (dev ma'lumot o'chirilmadi). SRS FR-3.2, FR-3.7
 - 2026-10-12 — **Kunlik zaxira** (Sir: faqat lokal, 14 kun + har oydan bittasi 1 yil, tiklash qo'lda): API `BackupService` (ishga tushganda + har soat, `daily-YYYY-MM-DD.tgz`, `.partial`→rename, migratsiya snapshot'lariga tegmaydi); sarlavhada "Zaxira" (desktop); `apps/api/scripts/restore-backup.mjs` + docs/runbooks/restore-backup.md (tiklash end-to-end tekshirildi). Topilma: paketda `productName` yo'q edi → userData `…/desktop` (dev bilan bir xil) — `productName: Moliyaviy yordam` qo'shildi
 - 2026-10-12 — Texnik qarz yopildi: sahifalar lazy chunk (kirish bundle 714→552 kB; qolgani freymvork); 4xx xatolar qayta urinilmaydi; Excel yuklash fetch orqali — sessiya tugasa fayl emas, login (brauzerda tekshirildi). Umumiy `lib/download.ts` (M6 va M12)
@@ -136,7 +137,6 @@ Hajm: `trivial | standard | complex`
 - M7/M8: summa formati (`552328.77`, mingliklar) haqiqiy Didox formasidagi kiritishda tekshirilmagan
 - Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi
 - M4: ro'yxat har so'rovda har shartnoma uchun to'liq yadroni ishlatadi — yuzlab shartnomada yetarli; ko'paysa yengil "faqat jamilar" rejimi yoki kesh
-- Stavka o'zgarishini **o'chirish** tugagan oylarni qayta hisoblaydi, lekin ogohlantirmaydi (RETROACTIVE/DRAFTED faqat qo'shish/tuzatishda)
 - M1 FR-1.3: o'zbek (kirill) tilidagi Didox eksport yorliqlari haqiqiy fayl bilan tekshirilmagan — o'zbekcha eksport namunasi kerak
 - M1: logout JWT'ni bekor qilmaydi (12 soat amal qiladi) — bitta umumiy login uchun qabul qilingan; kerak bo'lsa token versiyasi bilan yopiladi
 - M1: Create/Update company DTO qoidalari takrorlangan — keyingi DTO'lar ko'payganda umumiy helper
