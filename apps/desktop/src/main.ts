@@ -2,9 +2,14 @@ import { type ChildProcess, fork } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron'
-import { registerIpc } from './bridge/ipc.js'
+import { createKeyReader, registerIpc, sendProgress } from './bridge/ipc.js'
 import { isSameOrigin } from './bridge/trust.js'
 import { type AppConfig, isConfigured, loadConfig, saveCredentials } from './config.js'
+import { autotypePreflight, typeEimzoPassword } from './didox/autotype/index.js'
+import { createDidoxRunner, type DidoxRunner } from './didox/run.js'
+import { login } from './didox/steps/login.js'
+import { logout } from './didox/steps/logout.js'
+import { openDidoxWindow } from './didox/view.js'
 import { createEriStore } from './secrets/eri-store.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -23,6 +28,10 @@ let appWin: BrowserWindow | null = null
 let setupWin: BrowserWindow | null = null
 let ipcRegistered = false
 let quitting = false
+let didox: DidoxRunner | null = null
+/** Set once the quit waited for a Didox run; the second before-quit goes through. */
+let quitAfterDidox = false
+const QUIT_WAIT_MS = 5_000
 
 /** Boot the API in a child process (PGlite, ephemeral port) with this install's credentials. */
 function startApi(config: AppConfig): Promise<string> {
@@ -84,6 +93,8 @@ function appWindow(baseUrl: string): BrowserWindow {
     void shell.openExternal(url)
     return { action: 'deny' }
   })
+  // Nobody would see the run's result: stop driving Didox.
+  win.on('closed', () => didox?.cancel())
   void win.loadURL(baseUrl)
   return win
 }
@@ -100,7 +111,17 @@ async function launchApp(): Promise<void> {
   appWin = appWindow(baseUrl)
   if (!ipcRegistered) {
     const eri = createEriStore({ file: join(userData(), 'eri-secrets.json'), safeStorage })
-    registerIpc(() => appWin, new URL(baseUrl).origin, join(userData(), 'backups'), eri)
+    didox = createDidoxRunner({
+      listKeys: createKeyReader(),
+      eri,
+      preflight: autotypePreflight,
+      openWindow: ({ signal }) => openDidoxWindow({ diagnosticsDir: join(userData(), 'didox-diagnostics'), signal }),
+      login,
+      logout,
+      typePassword: typeEimzoPassword,
+      onProgress: sendProgress(() => appWin),
+    })
+    registerIpc(() => appWin, new URL(baseUrl).origin, join(userData(), 'backups'), eri, didox)
     ipcRegistered = true
   }
 }
@@ -142,29 +163,43 @@ function registerSetupIpc(): void {
   })
 }
 
+const open = () => (isConfigured(userData()) ? launchApp() : setupWindow())
+const fatal = (error: unknown) => {
+  dialog.showErrorBox('Moliyaviy yordam', `Ilovani ishga tushirib bo'lmadi: ${error instanceof Error ? error.message : String(error)}`)
+  app.quit()
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
+  // Focus the app (or setup) window — never the Didox window, which only the app drives.
   app.on('second-instance', () => {
-    const [win] = BrowserWindow.getAllWindows()
-    if (win) {
-      if (win.isMinimized()) win.restore()
-      win.focus()
-    }
+    const win = [appWin, setupWin].find((w) => w && !w.isDestroyed())
+    if (!win) return void Promise.resolve(open()).catch(fatal)
+    if (win.isMinimized()) win.restore()
+    win.focus()
   })
 
-  const open = () => (isConfigured(userData()) ? launchApp() : setupWindow())
-  const fatal = (error: unknown) => {
-    dialog.showErrorBox('Moliyaviy yordam', `Ilovani ishga tushirib bo'lmadi: ${error instanceof Error ? error.message : String(error)}`)
-    app.quit()
-  }
   app.whenReady().then(open).catch(fatal)
+  // The Didox window may still be open; what matters is whether the app window is.
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) Promise.resolve(open()).catch(fatal)
+    const shown = [appWin, setupWin].some((w) => w && !w.isDestroyed())
+    if (!shown) Promise.resolve(open()).catch(fatal)
   })
   app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
-  app.on('before-quit', () => {
+  app.on('before-quit', (event) => {
     quitting = true
+    // Let a running Didox check end cleanly (cancel, clear session, close its window) — at most 5 s.
+    if (!didox?.busy() || quitAfterDidox) return
+    event.preventDefault()
+    quitAfterDidox = true
+    didox.cancel()
+    const started = Date.now()
+    const wait = setInterval(() => {
+      if (didox?.busy() && Date.now() - started < QUIT_WAIT_MS) return
+      clearInterval(wait)
+      app.quit()
+    }, 100)
   })
   app.on('quit', () => api?.kill())
 }

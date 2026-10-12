@@ -1,5 +1,6 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { DidoxCheckResult, DidoxProgress } from '@/lib/desktop'
 import { mockApi, renderWithProviders } from '@/test/utils'
 import { CompaniesPage } from './CompaniesPage'
 
@@ -167,6 +168,147 @@ describe('CompaniesPage', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: "Parolni o'chirish" }))
       expect(eri.removePassword).toHaveBeenCalledWith('300000001')
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    })
+  })
+
+  describe('Didox login check (desktop)', () => {
+    const okKey = { status: 'ok', org: 'alfa', title: 'direktor', validTo: '2028-01-21T12:04:52' }
+    const beta = { ...alfa, id: '0192f000-0000-7000-8000-000000000002', name: 'BETA', tin: '300000002' }
+    const gamma = { ...alfa, id: '0192f000-0000-7000-8000-000000000003', name: 'GAMMA', tin: '300000003' }
+
+    /** Desktop bridge with a Didox runner whose result the test settles; progress is pushed with `emit`. */
+    const desktopWithDidox = () => {
+      let settle!: (r: DidoxCheckResult) => void
+      let listener: ((p: DidoxProgress) => void) | null = null
+      const eri = {
+        listKeys: vi.fn(async () => ({
+          eimzo: 'ok',
+          keys: { '300000001': okKey, '300000002': okKey, '300000003': { ...okKey, status: 'expired' } },
+          passwords: { '300000001': 'set', '300000002': 'missing', '300000003': 'set' },
+        })),
+      }
+      const didox = {
+        checkLogin: vi.fn(() => new Promise<DidoxCheckResult>((ok) => (settle = ok))),
+        cancel: vi.fn(async () => undefined),
+        onProgress: vi.fn((cb: (p: DidoxProgress) => void) => {
+          listener = cb
+          return () => (listener = null)
+        }),
+      }
+      vi.stubGlobal('desktop', { platform: 'darwin', eri, didox })
+      mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa, beta, gamma] }) })
+      const emit = (p: Omit<DidoxProgress, 'firmTin'>, firmTin = '300000001') => act(() => listener?.({ firmTin, ...p }))
+      const finish = (r: DidoxCheckResult) => act(() => settle(r))
+      return { eri, didox, emit, finish }
+    }
+    const checkButton = (name: string) => screen.findByRole('button', { name: `Kirishni tekshirish: ${name}` })
+    const openCheck = async () => {
+      await waitFor(async () => expect(await checkButton(alfa.name)).toBeEnabled())
+      await userEvent.click(await checkButton(alfa.name))
+      return screen.findByRole('dialog')
+    }
+
+    it('is not offered by desktop builds without the Didox bridge', async () => {
+      vi.stubGlobal('desktop', { platform: 'darwin', eri: { listKeys: async () => ({ eimzo: 'ok', keys: {}, passwords: {} }) } })
+      mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa] }) })
+      renderWithProviders(<CompaniesPage />)
+      await screen.findByText('"ALFA SAVDO" MCHJ')
+      expect(screen.queryByRole('button', { name: /Kirishni tekshirish/ })).not.toBeInTheDocument()
+    })
+
+    it('is enabled only with a valid key and a saved password', async () => {
+      desktopWithDidox()
+      renderWithProviders(<CompaniesPage />)
+      await waitFor(async () => expect(await checkButton(alfa.name)).toBeEnabled())
+      expect(await checkButton('BETA')).toBeDisabled() // no password
+      expect(await checkButton('GAMMA')).toBeDisabled() // expired key
+    })
+
+    it('is disabled outside macOS, saying why', async () => {
+      desktopWithDidox()
+      vi.stubGlobal('desktop', { ...window.desktop!, platform: 'win32' })
+      renderWithProviders(<CompaniesPage />)
+      const button = await checkButton(alfa.name)
+      expect(await within(button.closest('tr')!).findByText('Parol bor')).toBeInTheDocument() // key data loaded
+      expect(button).toBeDisabled()
+      expect(button).toHaveAttribute('title', "Hozircha faqat macOS'da ishlaydi")
+    })
+
+    it('tells what to do about a wrong keyboard layout', async () => {
+      const { eri, finish } = desktopWithDidox()
+      renderWithProviders(<CompaniesPage />)
+      const dialog = await openCheck()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Boshlash' }))
+      await finish({ ok: false, code: 'KEYBOARD_LAYOUT', message: "Klaviaturani ABC/US (lotin) tartibiga o'tkazing" })
+      const alert = await within(dialog).findByRole('alert')
+      expect(alert).toHaveTextContent(/ABC yoki US/)
+      expect(alert).not.toHaveTextContent(/qayta urinmaydi/)
+      expect(eri.listKeys).toHaveBeenCalled()
+    })
+
+    it('treats an interrupted typing like a rejected password', async () => {
+      const { finish } = desktopWithDidox()
+      renderWithProviders(<CompaniesPage />)
+      const dialog = await openCheck()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Boshlash' }))
+      await finish({ ok: false, code: 'AUTOTYPE_INTERRUPTED', message: 'Parolni yozish tasdiqlanmadi' })
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(/qayta urinmaydi/)
+    })
+
+    it('shows the steps as they run and the success, then refreshes the password status', async () => {
+      const { eri, didox, emit, finish } = desktopWithDidox()
+      renderWithProviders(<CompaniesPage />)
+      const dialog = await openCheck()
+      expect(within(dialog).getByText(/Hech narsa imzolanmaydi/)).toBeInTheDocument()
+      expect(didox.checkLogin).not.toHaveBeenCalled() // nothing starts before the accountant confirms
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Boshlash' }))
+      expect(didox.checkLogin).toHaveBeenCalledWith('300000001')
+      expect(within(dialog).queryByRole('button', { name: 'Yopish' })).not.toBeInTheDocument()
+
+      await emit({ step: 'eimzo', status: 'done' })
+      await emit({ step: 'pickKey', status: 'running' })
+      await emit({ step: 'pickKey', status: 'running' }, '300000002') // another firm's event is ignored
+      const steps = within(dialog).getByRole('list', { name: 'Qadamlar' })
+      expect(within(steps).getAllByRole('listitem')).toHaveLength(2)
+      expect(within(steps).getByText('Kalitni tanlash')).toBeInTheDocument()
+      await emit({ step: 'pickKey', status: 'done' })
+      expect(within(steps).getAllByRole('listitem')).toHaveLength(2) // updated in place
+
+      const before = eri.listKeys.mock.calls.length
+      await finish({ ok: true })
+      expect(await within(dialog).findByText(/Kirish ishladi/)).toBeInTheDocument()
+      await waitFor(() => expect(eri.listKeys.mock.calls.length).toBeGreaterThan(before))
+      await userEvent.click(within(dialog).getAllByRole('button', { name: 'Yopish' })[0]!)
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    })
+
+    it('explains a rejected password in Uzbek', async () => {
+      const { eri, finish } = desktopWithDidox()
+      renderWithProviders(<CompaniesPage />)
+      const dialog = await openCheck()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Boshlash' }))
+      const before = eri.listKeys.mock.calls.length
+      await finish({ ok: false, code: 'WRONG_PASSWORD', message: 'E-IMZO parolni qabul qilmadi', screenshot: '/diag/a.png' })
+      const alert = await within(dialog).findByRole('alert')
+      expect(alert).toHaveTextContent('E-IMZO parolni qabul qilmadi')
+      expect(alert).toHaveTextContent(/qayta urinmaydi/)
+      expect(alert).toHaveTextContent('/diag/a.png')
+      await waitFor(() => expect(eri.listKeys.mock.calls.length).toBeGreaterThan(before)) // now shows "rad etilgan"
+    })
+
+    it('cancels a running check', async () => {
+      const { didox, finish } = desktopWithDidox()
+      renderWithProviders(<CompaniesPage />)
+      const dialog = await openCheck()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Boshlash' }))
+      await userEvent.keyboard('{Escape}') // cannot be dismissed while Didox is being driven
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Bekor qilish' }))
+      expect(didox.cancel).toHaveBeenCalledOnce()
+      await finish({ ok: false, code: 'CANCELLED', message: 'Bekor qilindi' })
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent('Bekor qilindi')
     })
   })
 

@@ -345,3 +345,11 @@ M8a (SRS + TS skelet + kalit/parol) → **B4 spike** (Electron'da login, Sir bil
 - **M8d:** 06:00 da avtomatik kirish yo'q → oy 1-kuni bildirishnoma "Didox qoralamalari kutmoqda"; buxgalter bosgach firmalar
   ketma-ket, har birida parolni o'zi kiritadi.
 - Tartib: **B4 spike** (Electron oynasida real login, Sir paroli bilan) → **M8c spike ro'yxati** (v2 M8 bo'limi, 1–6) → M8c TDD.
+
+---
+## v4 — v2 doirasi qaytarildi (2026-10-12, Sir)
+- Sir: **ilova parolni o'zi yozadi** (v2). v3 dagi "Claude qurmaydi" cheklovi bekor: FR-8.2 parol ombori va B3 autotype
+  shu repo'da quriladi. Qurish PM uslubida (parallel agentlar).
+- Bajarildi: `src/secrets/eri-store.ts` (safeStorage, kalit seriyasiga bog'langan, `rejected`, 0600, ketma-ket yozish) +
+  `eri:set-password`/`eri:remove-password` IPC + Firmalar'da "ERI parol" ustuni va dialog.
+- M8b shartnomasi: `src/didox/contract.ts` (Page, StepError, ArmAutotype, FORBIDDEN_LABEL).

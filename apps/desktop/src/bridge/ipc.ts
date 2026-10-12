@@ -5,6 +5,8 @@ import { WebSocket } from 'ws'
 import { parseAlias } from '../eimzo/alias.js'
 import { createEimzoClient, EimzoError } from '../eimzo/client.js'
 import { type KeyStatus, matchKeys } from '../eimzo/match.js'
+import type { ProgressEvent } from '../didox/contract.js'
+import type { CheckLoginResult } from '../didox/run.js'
 import type { EriStore, PasswordStatus } from '../secrets/eri-store.js'
 import { isTrustedSender } from './trust.js'
 
@@ -39,10 +41,38 @@ async function lastBackup(dir: string): Promise<string | null> {
   return newest ? (await stat(join(dir, newest))).mtime.toISOString() : null
 }
 
-/** `getAppWindow` returns the current app window (macOS can recreate it), so the guard follows it. */
-export function registerIpc(getAppWindow: () => BrowserWindow | null, origin: string, backupsDir: string, eri: EriStore): void {
+/** Firm STIR -> the E-IMZO key it would log in with, read live from local E-IMZO (throws EimzoError when it is down). */
+export function createKeyReader(): (tins: string[]) => Promise<Map<string, KeyStatus>> {
   const eimzo = createEimzoClient({ url: EIMZO_URL, WebSocket })
-  const readKeys = async (tins: string[]) => matchKeys((await eimzo.listCertificates()).map((c) => parseAlias(c.alias)), tins, tashkentNow())
+  return async (tins) => matchKeys((await eimzo.listCertificates()).map((c) => parseAlias(c.alias)), tins, tashkentNow())
+}
+
+/** What the IPC layer needs from the Didox runner (didox/run.ts). */
+export interface DidoxIpc {
+  checkLogin(tin: string): Promise<CheckLoginResult>
+  cancel(): void
+}
+
+/** The runner's `onProgress`: forwards each step to the app window as `didox:progress` (if it is open). */
+export function sendProgress(getAppWindow: () => BrowserWindow | null): (e: ProgressEvent) => void {
+  return (e) => {
+    const win = getAppWindow()
+    if (win && !win.isDestroyed()) win.webContents.send('didox:progress', e)
+  }
+}
+
+/**
+ * `getAppWindow` returns the current app window (macOS can recreate it), so the guard follows it.
+ * `didox` is optional: without it `didox:check-login` answers UNAVAILABLE instead of hanging the renderer.
+ */
+export function registerIpc(
+  getAppWindow: () => BrowserWindow | null,
+  origin: string,
+  backupsDir: string,
+  eri: EriStore,
+  didox?: DidoxIpc,
+): void {
+  const readKeys = createKeyReader()
   const serialOf = (m: KeyStatus | undefined) => (m && m.status !== 'missing' ? m.key.serial : null)
 
   const guarded =
@@ -109,6 +139,21 @@ export function registerIpc(getAppWindow: () => BrowserWindow | null, origin: st
       await mkdir(backupsDir, { recursive: true }) // before the first backup the folder may not exist yet
       const error = await shell.openPath(backupsDir)
       if (error) throw new Error(error)
+    }),
+  )
+
+  ipcMain.handle(
+    'didox:check-login',
+    guarded(async (tin: unknown): Promise<CheckLoginResult> => {
+      if (typeof tin !== 'string' || !TIN.test(tin)) throw new Error('Invalid STIR')
+      if (!didox) return { ok: false, code: 'UNAVAILABLE', message: "Didox bilan ishlash bu versiyada yo'q" }
+      return didox.checkLogin(tin)
+    }),
+  )
+  ipcMain.handle(
+    'didox:cancel',
+    guarded(async (): Promise<void> => {
+      didox?.cancel()
     }),
   )
 }

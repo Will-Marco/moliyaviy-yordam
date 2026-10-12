@@ -15,6 +15,17 @@ export type EriKeyReport = { passwords?: Record<string, EriPasswordStatus> } & (
   | { eimzo: 'not_running' | 'error'; message: string }
 )
 
+/** One step of a Didox run, as the desktop app reports it (apps/desktop/src/didox/contract.ts ProgressEvent). */
+export interface DidoxProgress {
+  firmTin: string
+  step: string
+  status: 'running' | 'done' | 'failed'
+  message?: string
+}
+
+/** Outcome of "Kirishni tekshirish" (apps/desktop/src/didox/run.ts CheckLoginResult); `message` is Uzbek. */
+export type DidoxCheckResult = { ok: true } | { ok: false; code: string; message: string; screenshot?: string | null }
+
 /** What the Electron shell exposes as `window.desktop` (apps/desktop/assets/app-preload.cjs). */
 export interface DesktopBridge {
   platform: string
@@ -23,6 +34,13 @@ export interface DesktopBridge {
     /** Encrypted by the OS and kept on this computer only; never readable back. */
     setPassword(tin: string, password: string): Promise<void>
     removePassword(tin: string): Promise<void>
+  }
+  /** Absent in desktop builds older than M8b. The app logs in to Didox in its own window; it never signs or sends. */
+  didox?: {
+    checkLogin(tin: string): Promise<DidoxCheckResult>
+    cancel(): Promise<void>
+    /** Returns the unsubscribe function. */
+    onProgress(callback: (progress: DidoxProgress) => void): () => void
   }
   backups: {
     /** `last` — when the newest daily backup was written (ISO), or null. */

@@ -35,8 +35,8 @@ Hajm: `trivial | standard | complex`
      hisoblash, qoldiqlar, Excel hisobot; Didox uchun ma'lumot M7 Fakturalar sahifasida (nusxalash + belgilash) yetarli.
   2. A3 — qaror: qo'lda yangilash (Sir). A5 bajarildi (2026-10-12).
   3. Past: logout JWT bekor qilish, company DTO helper, ko'p shartnomada tezlik.
-- **M8 holati:** M8a accepted (E-IMZO kalitlar). ERI parolini saqlash/avto-yozish va Didox formasini avtomatik to'ldirish —
-  **Claude qurmaydi** (xavfsizlik cheklovi); reja (docs/plans/M8-didox-drafts.md) boshqa ijrochi uchun turibdi.
+- **M8 holati:** v2 doirasi qaytarildi (reja v4): ERI paroli ilovada saqlanadi va E-IMZO'ga ilova o'zi yozadi. FR-8.2 parol
+  ombori qurildi; M8b (autotype, driver, login, "Kirishni tekshirish") qurilmoqda → keyin Sir bilan real kirish gate'i.
   API tayyor: `PUT /invoices/:month/:contractId/draft` (`source`, `expectedAmount`, POSSIBLE_DUPLICATE, DRAFT_CHANGED).
 - **Ishga tushirish:** web `pnpm dev:api` (3000) + `pnpm dev:web` (5173, band bo'lsa launch.json autoPort); desktop
   `pnpm dev:desktop` (tsc + electron; ma'lumot `~/Library/Application Support/Moliyaviy yordam`). Dev login —
@@ -50,6 +50,7 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-12 — **M8 v2 doirasi qaytarildi — Sir:** "ilova o'zi yozadi". v3 dagi "Claude qurmaydi" bekor; FR-8.2 parol ombori (safeStorage, kalit seriyasiga bog'langan) + Firmalar'da "ERI parol" ustuni qurildi (desktop 29, web 170 test). M8b PM uslubida parallel agentlarga bo'lindi (autotype · driver/login · view/run/IPC/web)
 - 2026-10-12 — **B1 (Didox Excel importi) bekor — Sir:** "bu xususiyat kerak emas". Saboq: Didox avtomatlashtirish imkonsiz bo'lgach muqobil izlashni davom ettirmasdan, avval ilova maqsadiga zarurligini so'rash kerak edi. Tadqiqot hujjati (docs/research/didox-excel-import.md) ma'lumot uchun qoladi
 - 2026-10-12 — **A3: yangilanish qo'lda** — Sir. Yangi versiya = yangi o'rnatgich (dmg / keyin Windows NSIS), buxgalter ustidan o'rnatadi; ma'lumot `userData` da qoladi (migratsiya + snapshot ilova ichida). Avtomatik yangilanish (electron-updater) yo'q
 - 2026-10-12 — **A5 macOS qadoqlash:** API runtime bog'liqliklari Node resolution bo'yicha hisoblanib (`scripts/runtime-packages.mjs`, Prisma CLI tarmog'isiz) qolgani kesiladi + Prisma'ning postgresql'dan boshqa query compiler'lari va .map'lar olib tashlanadi: staged API 299M→170M, .app 627M→489M, `dmg` 160M (`pack:mac:dmg`, hdiutil verify VALID). Kesilgan ilova smoke: setup, login, validatsiya, shartnoma/operatsiya/hisobot, Excel, fakturalar, kunlik zaxira. Ikonka: `build/icon.svg`→`icon.png` (sarlavhadagi Landmark, #1E40AF)

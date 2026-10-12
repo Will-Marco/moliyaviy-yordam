@@ -1,4 +1,4 @@
-import { Building2, FileUp, KeyRound, LockKeyhole, Pencil, Plus } from 'lucide-react'
+import { Building2, FileUp, KeyRound, LockKeyhole, LogIn, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { QueryErrorState } from '@/components/QueryErrorState'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useEriKeys } from '@/features/eri/api'
+import { CheckLoginDialog } from '@/features/eri/CheckLoginDialog'
 import { EriKeyCell } from '@/features/eri/EriKeyCell'
 import { EriPasswordCell } from '@/features/eri/EriPasswordCell'
 import { EriPasswordDialog } from '@/features/eri/EriPasswordDialog'
@@ -27,6 +28,18 @@ export function CompaniesPage() {
   const keys = eri.data?.eimzo === 'ok' ? eri.data.keys : null
   const passwords = eri.data?.passwords
   const [passwordFor, setPasswordFor] = useState<Company | null>(null)
+  const [checkFor, setCheckFor] = useState<Company | null>(null)
+  // Older desktop builds have no Didox bridge: no column then.
+  const canCheck = !!desktop?.didox
+  // The E-IMZO typist exists only for macOS so far (Windows after its spike, M8d).
+  const checkBlocker = (tin: string) =>
+    desktop?.platform !== 'darwin'
+      ? "Hozircha faqat macOS'da ishlaydi"
+      : keys?.[tin]?.status !== 'ok'
+        ? 'Amaldagi ERI kaliti kerak'
+        : passwords?.[tin] !== 'set'
+          ? 'Avval ERI parolini kiriting'
+          : null
 
   return (
     <section className="grid gap-4" aria-labelledby="companies-title">
@@ -91,6 +104,7 @@ export function CompaniesPage() {
                 <TableHead>MFO</TableHead>
                 {desktop && <TableHead>ERI kalit</TableHead>}
                 {desktop && <TableHead>ERI parol</TableHead>}
+                {canCheck && <TableHead>Didox</TableHead>}
                 <TableHead className="w-12">
                   <span className="sr-only">Amallar</span>
                 </TableHead>
@@ -134,6 +148,21 @@ export function CompaniesPage() {
                       </div>
                     </TableCell>
                   )}
+                  {canCheck && (
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Kirishni tekshirish: ${company.name}`}
+                        title={checkBlocker(company.tin) ?? undefined}
+                        disabled={!!checkBlocker(company.tin)}
+                        onClick={() => setCheckFor(company)}
+                      >
+                        <LogIn aria-hidden="true" />
+                        Kirishni tekshirish
+                      </Button>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -160,6 +189,8 @@ export function CompaniesPage() {
           onOpenChange={(open) => !open && setPasswordFor(null)}
         />
       )}
+
+      {checkFor && <CheckLoginDialog company={checkFor} onOpenChange={(open) => !open && setCheckFor(null)} />}
 
       {dialog.open && (
         <CompanyFormDialog

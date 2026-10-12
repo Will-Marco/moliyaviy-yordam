@@ -31,3 +31,13 @@ export function useRemoveEriPassword() {
     onSuccess: () => client.invalidateQueries({ queryKey: eriKeysKey }),
   })
 }
+
+/** "Kirishni tekshirish": logs in to Didox as the firm and out again. The password may end up `rejected`, so refresh. */
+export function useCheckDidoxLogin() {
+  const desktop = useDesktop()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (tin: string) => desktop!.didox!.checkLogin(tin),
+    onSettled: () => client.invalidateQueries({ queryKey: eriKeysKey }),
+  })
+}
