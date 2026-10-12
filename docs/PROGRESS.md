@@ -45,6 +45,7 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — **First-run parol** (desktop qatlamida, API o'zgarmadi): birinchi ishga tushishda Electron setup oynasi login+parol so'raydi → argon2id hash + tasodifiy JWT sir `userData/config.json` ga yoziladi (0600) → API shu env bilan ko'tariladi. Tarmoq endpointi yo'q (hijack yo'q). Tiklash: `config.json` o'chirilsa qayta setup (ma'lumot `userData/db` da qoladi). Headless: config save/verify, login to'g'ri→200+cookie, xato→401 tasdiqlandi
 - 2026-10-12 — M9b o'zak qabul qilindi; prioritet: M8 (Sir Didox sessiyasini xaritalashi kerak) > first-run parol (solo) > electron-builder — Sir "prioritet bo'yicha"
 - 2026-10-12 — **M9b o'zak qurildi:** `apps/desktop` Electron ilovasi API'ni child-process'da (ELECTRON_RUN_AS_NODE, PGlite, efemer PORT=0, userData/db) ko'taradi va xavfsiz oynada (contextIsolation+sandbox, external link bloki) ochadi; Nest statik web'ni SPA fallback bilan beradi (WEB_ROOT); `server-entry.ts` port'ni parent'ga xabar qiladi; single-instance. macOS'da yuklanish + bitta portda /, /contracts(SPA), /api(401), asset(200) tasdiqlandi. Electron 34, express dep qo'shildi; pnpm-workspace allowBuilds: electron. Unit 124. Qoldi: electron-builder qadoqlash+signing, first-run parol oqimi, tray/avtostart(M8), Windows durability/smoke gate
 - 2026-10-12 — M9a qabul qilindi — Sir
