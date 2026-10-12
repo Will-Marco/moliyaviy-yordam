@@ -158,8 +158,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   boshlang'ich stavka sanasidan (shartnoma boshlanishi) **keyin** bo'lishi shart.
 - FR-5.2 — Stavkalar tarixi shartnoma sahifasida (amal qiladi, kiritilgan sana, stavka).
 - FR-5.3 — Boshlang'ich stavkadan boshqa istalgan o'zgarishni **o'chirish** (tasdiq bilan). Tahrir yo'q —
-  O'chirish tugagan oylarga ta'sir qilsa — FR-5.5 dagi ogohlantirish (va qoralama qilingan oylar, FR-3.7), "Baribir o'chirish" bilan (2026-10-12).
-  noto'g'risi o'chirilib, to'g'risi qayta kiritiladi.
+  noto'g'risi o'chirilib, to'g'risi qayta kiritiladi. O'chirish tugagan oylarga ta'sir qilsa — FR-5.5 dagi ogohlantirish
+  (va qoralama qilingan oylar, FR-3.7), "Baribir o'chirish" bilan (2026-10-12).
 - FR-5.4 — Boshlang'ich stavkaning faqat **qiymatini** tuzatish (sanasi o'zgarmaydi).
 - FR-5.5 — Ogohlantirish (bloklamaydi, "Baribir saqlash"): amal qilish sanasi **tugagan oyga** tushsa yoki
   boshlang'ich stavka tuzatilsa — qaysi tugagan oylar qayta hisoblanishi ko'rsatiladi (faktura yuborilgan bo'lishi mumkin).
