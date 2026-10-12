@@ -1,10 +1,11 @@
 import { type ChildProcess, fork } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron'
 import { registerIpc } from './bridge/ipc.js'
 import { isSameOrigin } from './bridge/trust.js'
 import { type AppConfig, isConfigured, loadConfig, saveCredentials } from './config.js'
+import { createEriStore } from './secrets/eri-store.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 // Files tsc does not emit (setup page, preloads) live next to dist/ in assets/.
@@ -98,7 +99,8 @@ async function launchApp(): Promise<void> {
   if (appWin && !appWin.isDestroyed()) return void appWin.focus()
   appWin = appWindow(baseUrl)
   if (!ipcRegistered) {
-    registerIpc(() => appWin, new URL(baseUrl).origin, join(userData(), 'backups'))
+    const eri = createEriStore({ file: join(userData(), 'eri-secrets.json'), safeStorage })
+    registerIpc(() => appWin, new URL(baseUrl).origin, join(userData(), 'backups'), eri)
     ipcRegistered = true
   }
 }

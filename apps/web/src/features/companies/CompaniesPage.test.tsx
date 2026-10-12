@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockApi, renderWithProviders } from '@/test/utils'
 import { CompaniesPage } from './CompaniesPage'
@@ -81,6 +81,93 @@ describe('CompaniesPage', () => {
     mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa] }) })
     renderWithProviders(<CompaniesPage />)
     expect(await screen.findByText(/ERI kalitlarini o'qib bo'lmadi/)).toBeInTheDocument()
+  })
+
+  describe('ERI password (desktop)', () => {
+    const okKey = { status: 'ok', org: 'alfa', title: 'direktor', validTo: '2028-01-21T12:04:52' }
+    const desktopWith = (passwords: Record<string, string>, extra: Record<string, unknown> = {}) => {
+      const eri = {
+        listKeys: vi.fn(async () => ({ eimzo: 'ok', keys: { '300000001': okKey }, passwords })),
+        setPassword: vi.fn(async () => undefined),
+        removePassword: vi.fn(async () => undefined),
+        ...extra,
+      }
+      vi.stubGlobal('desktop', { platform: 'darwin', eri })
+      mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa] }) })
+      return eri
+    }
+    const alfaRow = async () => (await screen.findByText('"ALFA SAVDO" MCHJ')).closest('tr')!
+
+    it('shows whether a password is saved, rejected or must be entered again', async () => {
+      const beta = { ...alfa, id: '0192f000-0000-7000-8000-000000000002', name: 'BETA', tin: '300000002' }
+      const gamma = { ...alfa, id: '0192f000-0000-7000-8000-000000000003', name: 'GAMMA', tin: '300000003' }
+      const delta = { ...alfa, id: '0192f000-0000-7000-8000-000000000004', name: 'DELTA', tin: '300000004' }
+      vi.stubGlobal('desktop', {
+        platform: 'darwin',
+        eri: {
+          listKeys: async () => ({
+            eimzo: 'ok',
+            keys: {},
+            passwords: { '300000001': 'set', '300000002': 'missing', '300000003': 'rejected', '300000004': 'key_changed' },
+          }),
+        },
+      })
+      mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa, beta, gamma, delta] }) })
+      renderWithProviders(<CompaniesPage />)
+
+      const row = async (name: string) => (await screen.findByText(name)).closest('tr')!
+      expect(await within(await row('"ALFA SAVDO" MCHJ')).findByText('Parol bor')).toBeInTheDocument()
+      expect(within(await row('BETA')).getByText("Parol yo'q")).toBeInTheDocument()
+      expect(within(await row('GAMMA')).getByText("E'tibor kerak: parol rad etilgan")).toBeInTheDocument()
+      expect(within(await row('DELTA')).getByText('Kalit yangilangan')).toBeInTheDocument()
+    })
+
+    it('saves a password without ever showing it again', async () => {
+      const eri = desktopWith({ '300000001': 'missing' })
+      renderWithProviders(<CompaniesPage />)
+      await userEvent.click(await within(await alfaRow()).findByRole('button', { name: `ERI paroli: ${alfa.name}` }))
+      const dialog = await screen.findByRole('dialog')
+      const field = within(dialog).getByLabelText('ERI kaliti paroli')
+      expect(field).toHaveAttribute('type', 'password')
+      expect(within(dialog).getByText(/faqat shu kompyuterda/)).toBeInTheDocument()
+
+      await userEvent.type(field, 'Maxfiy-1')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Saqlash' }))
+
+      expect(eri.setPassword).toHaveBeenCalledWith('300000001', 'Maxfiy-1')
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(eri.listKeys).toHaveBeenCalledTimes(2) // refreshed after saving
+    })
+
+    it('does not save an empty password', async () => {
+      const eri = desktopWith({ '300000001': 'missing' })
+      renderWithProviders(<CompaniesPage />)
+      await userEvent.click(await within(await alfaRow()).findByRole('button', { name: `ERI paroli: ${alfa.name}` }))
+      const dialog = await screen.findByRole('dialog')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Saqlash' }))
+      expect(await within(dialog).findByText('Parolni kiriting')).toBeInTheDocument()
+      expect(eri.setPassword).not.toHaveBeenCalled()
+    })
+
+    it('says why the password could not be saved', async () => {
+      desktopWith({ '300000001': 'missing' }, { setPassword: async () => Promise.reject(new Error("Bu kompyuterda parolni shifrlab saqlab bo'lmaydi")) })
+      renderWithProviders(<CompaniesPage />)
+      await userEvent.click(await within(await alfaRow()).findByRole('button', { name: `ERI paroli: ${alfa.name}` }))
+      const dialog = await screen.findByRole('dialog')
+      await userEvent.type(within(dialog).getByLabelText('ERI kaliti paroli'), 'x')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Saqlash' }))
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent('shifrlab saqlab')
+    })
+
+    it('removes a saved password', async () => {
+      const eri = desktopWith({ '300000001': 'set' })
+      renderWithProviders(<CompaniesPage />)
+      await userEvent.click(await within(await alfaRow()).findByRole('button', { name: `ERI paroli: ${alfa.name}` }))
+      const dialog = await screen.findByRole('dialog')
+      await userEvent.click(within(dialog).getByRole('button', { name: "Parolni o'chirish" }))
+      expect(eri.removePassword).toHaveBeenCalledWith('300000001')
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    })
   })
 
   it('shows an empty state with a call to action', async () => {

@@ -1,4 +1,4 @@
-import { Building2, FileUp, KeyRound, Pencil, Plus } from 'lucide-react'
+import { Building2, FileUp, KeyRound, LockKeyhole, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { QueryErrorState } from '@/components/QueryErrorState'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useEriKeys } from '@/features/eri/api'
 import { EriKeyCell } from '@/features/eri/EriKeyCell'
+import { EriPasswordCell } from '@/features/eri/EriPasswordCell'
+import { EriPasswordDialog } from '@/features/eri/EriPasswordDialog'
 import { useDesktop } from '@/lib/desktop'
 import { type Company, missingRequisites, useCompanies } from './api'
 import { CompanyFormDialog } from './CompanyFormDialog'
@@ -23,6 +25,8 @@ export function CompaniesPage() {
   const desktop = useDesktop()
   const eri = useEriKeys(companies.data?.map((c) => c.tin) ?? [])
   const keys = eri.data?.eimzo === 'ok' ? eri.data.keys : null
+  const passwords = eri.data?.passwords
+  const [passwordFor, setPasswordFor] = useState<Company | null>(null)
 
   return (
     <section className="grid gap-4" aria-labelledby="companies-title">
@@ -86,6 +90,7 @@ export function CompaniesPage() {
                 <TableHead>Hisob raqami</TableHead>
                 <TableHead>MFO</TableHead>
                 {desktop && <TableHead>ERI kalit</TableHead>}
+                {desktop && <TableHead>ERI parol</TableHead>}
                 <TableHead className="w-12">
                   <span className="sr-only">Amallar</span>
                 </TableHead>
@@ -114,6 +119,21 @@ export function CompaniesPage() {
                       <EriKeyCell eriKey={keys?.[company.tin]} />
                     </TableCell>
                   )}
+                  {desktop && (
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <EriPasswordCell status={passwords?.[company.tin]} />
+                        <Button
+                          variant="ghost"
+                          size="icon-lg"
+                          aria-label={`ERI paroli: ${company.name}`}
+                          onClick={() => setPasswordFor(company)}
+                        >
+                          <LockKeyhole aria-hidden="true" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -132,6 +152,14 @@ export function CompaniesPage() {
       )}
 
       {importOpen && <ImportCompaniesDialog open onOpenChange={setImportOpen} />}
+
+      {passwordFor && (
+        <EriPasswordDialog
+          company={passwordFor}
+          status={passwords?.[passwordFor.tin]}
+          onOpenChange={(open) => !open && setPasswordFor(null)}
+        />
+      )}
 
       {dialog.open && (
         <CompanyFormDialog
