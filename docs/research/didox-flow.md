@@ -107,6 +107,11 @@ summa 1.00, izoh "SINOV - o'chiriladi". "Имзолаш"ga tegilmadi.
 - `/documents/{ID}/1` ni **to'g'ridan-to'g'ri URL** bilan ochish bo'sh "Хато" berdi; ro'yxatdan bosib ochish ishladi.
 - Qoralama sahifasi tugmalari: Ўзгартириш, **Нусха олиш**, ⛔ Имзолаш, Ўчириш. O'chirish — custom modal "Амални тасдиқланг"
   → "Ўчириш" → holat **"ҚОРАЛАМА ЎЧИРИЛДИ"** (yumshoq o'chirish, hujjat ko'rinib turadi).
+- **Qoralama ro'yxati (`/documents/new/draft`, xaritalandi):** `?tab=all&page=1&limit=20&partner=<STIR>` — kontragent STIR
+  bo'yicha **URL orqali filtr** ("СТИР бўйича қидириш" maydoni shuni qo'yadi). Jadval MUI; ustunlar: [1] xavf, [2] holat
+  (`.doc-status--white` faol qoralama, `.doc-status--red` o'chirilgan — **o'chirilganlar ham "Барчаси"da qoladi**), [3] tur,
+  [4] kontragent nom + STIR, [5] hujjat № va sana, [6] shartnoma № va sana, [7] ҚҚСсиз summa, [8] ҚҚС bilan, [9] ҚҚС. Har katak
+  `<a href="/documents/{32hex}/1">`. "Яратилган" tabi (`tab=created`) bo'sh chiqdi — ishlatilmaydi.
 - Chrome kengaytmasining tarmoq kuzatuvi Didox XHR'larini ko'rsatmadi — API so'rovlari xaritalanmadi (B yo'lida kerak emas).
 
 ## 3. Ochiq savollar

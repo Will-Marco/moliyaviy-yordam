@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 8 — Didox xaritalash deyarli tugadi (login, E-IMZO, forma, sinov qoralamasi) → keyingi: M8 reja (complex: plan + plan-reviewer)
+**Joriy modul:** 8 — **reja yozildi** (docs/plans/M8-didox-drafts.md, Fable) → plan-reviewer (Sonnet) → Sir gate → qurish M8a→M8d (Opus)
 **Oxirgi yangilanish:** 2026-10-12
 
 ## Modullar
@@ -45,6 +45,8 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — **M8 reja v2** — plan-reviewer (Sonnet) APPROVE_WITH_CHANGES: 4 blocker (precheck false-positive — 31 kunlik oylar bir xil summa; dublikat spirali → write-ahead + karantin; parol noto'g'ri oynaga — fokus identifikatsiyasi; Electron'da real login spike) + 9 major qabul qilindi; `didox_runs` → userData JSON; Windows spike M8b ga. Sir qarori kutilmoqda: 06:00 "09:00 gacha tayyor" va'dasi shartli bo'ladi; Windows PC
+- 2026-10-12 — **M8 reja** (Fable): docs/plans/M8-didox-drafts.md — M8a kalit/parol, M8b avto-kirish, M8c qoralamalar, M8d jadval (Sir: jadval birinchi versiyada; Didox oynasi ko'rinadi; barcha firmalar + tanlash). Topilma: Electron 34 = Node 20, global WebSocket yo'q → `ws`; qoralama ro'yxati `?partner=<STIR>` bilan filtrlanadi, o'chirilganlar `.doc-status--red`
 - 2026-10-12 — **E-IMZO avto-parol spike YASHIL** (macOS): Didox "Кириш" → E-IMZO oynasi → skript parolni Keychain'dan o'qib o'zi yozdi → kirildi (Sir tasdiqladi). Windows'da SendInput (Unicode) bilan qayta sinaladi. didox-flow.md §1b
 - 2026-10-12 — **Didox forma xaritalandi + sinov qoralamasi** (Sir ruxsati; yaratildi → o'chirildi): raqam/sanasiz saqlanadi; kontragent STIR'dan, MXIK'dan birlik/ҚҚСсиз/imtiyoz 102898 avtomatik; ID — Қоралама ro'yxatidan (UUIDv1); kelib chiqishi qo'lda "Хизмат кўрсатиш". docs/research/didox-flow.md §2–2a
 - 2026-10-12 — **Avtomatik kirish: ERI parollari ilovada** (Sir; xavf ongli qabul qilindi — parol+`.pfx` bir joyda → imzolash texnik mumkin). Hash emas — OS shifri (`safeStorage`: DPAPI/Keychain); parol faqat E-IMZO parol oynasiga yoziladi (E-IMZO API parol qabul qilmaydi — apidoc). CONSTITUTION §13 qayta yozildi. Keyingi qadam: macOS spike — E-IMZO oynasiga parolni avtomatik yozish
@@ -119,7 +121,6 @@ Hajm: `trivial | standard | complex`
 
 ## Ochiq risk / texnik qarz
 - M9b qadoqlash: `pnpm --prod deploy` repo'dagi `node_modules/.pnpm-workspace-state-v1.json` ga `"dev": false` yozadi → keyingi har `pnpm run` "install --production" qilib yiqiladi (commit hook ham). Vaqtincha: `pnpm install --frozen-lockfile`. Tuzatish: qadoqlash skriptidan keyin holatni tiklash yoki deploy'ni alohida papkada qilish
-- PGlite testlari (`backup.spec`, `prisma.service.spec`) to'liq `pnpm test` ostida ba'zan 5 s timeout'ga uriladi (alohida 1.5 s) — test timeout'ini oshirish kerak
 - **Didox ichki API** (2026-10-11): akkaunt bloklanishi, Didox o'zgartirsa ogohlantirishsiz buzilish, foydalanish shartlariga ziddlik — Sir qabul qilgan. Har chaqiriq javobi tekshiriladi, kutilmagan javobda to'xtaladi
 - E-IMZO har kirishda ERI parolini o'z oynasida so'raydi → oy 1-kuni 06:00 to'liq avtomatik ishga tushish **bo'lmasligi** mumkin (spike'da tekshiriladi)
 - Har buxgalterda alohida baza → zaxira nusxa va ilovani yangilash har kompyuterda (M9)
