@@ -114,6 +114,19 @@ summa 1.00, izoh "SINOV - o'chiriladi". "Имзолаш"ga tegilmadi.
   `<a href="/documents/{32hex}/1">`. "Яратилган" tabi (`tab=created`) bo'sh chiqdi — ishlatilmaydi.
 - Chrome kengaytmasining tarmoq kuzatuvi Didox XHR'larini ko'rsatmadi — API so'rovlari xaritalanmadi (B yo'lida kerak emas).
 
+## 2b. B4 spike — Electron oynasida real login (2026-10-12, YASHIL)
+- Electron 34.5.8 (Chromium 132), alohida in-memory partition, `contextIsolation`+`sandbox`, preload yo'q. UA'da
+  `Electron/34.5.8` bor — Didox bloklamadi.
+- Sir kalitni tanladi, "Кириш" → E-IMZO oynasi → parolni **o'zi** kiritdi → `/documents/new`. Sertifikat xatosi yo'q
+  (Didox sahifasi E-IMZO bilan o'zi gaplashdi), ruxsat so'rovi yo'q.
+- **Kirilgan firma STIR'i:** sarlavhada `.company-inn > div` matni `303 471 702` ko'rinishida (bo'shliqlar bilan) →
+  `verifyFirm` shu elementni o'qiydi, bo'shliqlarni olib solishtiradi.
+- **Imzolash/yuborish endpoint'lari** (Didox bundle `index_*.js` matnidan, hech narsa bosilmadi): `documents/{id}/sign`,
+  `documents/{id}/tosign`, `documents/{id}/send`, `documents/import/{id}/send`, `documents/offer/sign`,
+  `documents/uzcard_offer/sign`; boshqa lokal imzolovchilar: `http://localhost:6210/crypto/sign`, `ws://127.0.0.1:44480/sign`.
+  → Didox oynasi `webRequest` bilan shu yo'llarni **bloklaydi** (FR-8.9); lokal xostlardan faqat E-IMZO (64443/64646) ruxsat.
+  E-IMZO'ni o'zi bloklanmaydi (login uchun kerak) — hujjat imzosi baribir yuqoridagi POST'siz bajarilmaydi.
+
 ## 3. Ochiq savollar
 1. ~~Raqam/sanasiz saqlash~~ — ha (§2a). 2. ~~Kontragent avto-to'ldirish~~ — ha. 3. ~~Ўлчов бирлиги~~ — "xizmat (so'm)".
 4. ~~Qoralama ID~~ — Қоралама ro'yxatidan (§2a).
