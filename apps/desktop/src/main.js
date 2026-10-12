@@ -5,9 +5,11 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { isConfigured, loadConfig, saveCredentials } from './config.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const apiEntry = resolve(here, '../../api/dist/server-entry.js')
-const webRoot = resolve(here, '../../web/dist')
-const migrationsDir = resolve(here, '../../api/prisma/migrations')
+// Dev: read from the monorepo. Packaged: everything is staged under the app's Resources (see electron-builder.yml).
+const res = app.isPackaged ? process.resourcesPath : null
+const apiEntry = res ? join(res, 'api/dist/server-entry.js') : resolve(here, '../../api/dist/server-entry.js')
+const webRoot = res ? join(res, 'web') : resolve(here, '../../web/dist')
+const migrationsDir = res ? join(res, 'migrations') : resolve(here, '../../api/prisma/migrations')
 const userData = () => app.getPath('userData')
 
 let api = null

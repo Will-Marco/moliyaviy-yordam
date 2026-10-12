@@ -11,9 +11,9 @@ function run(path: string, method = 'GET') {
 
 describe('spaFallback (M9b)', () => {
   it('serves index.html for app routes', () => {
-    expect(run('/contracts').sent).toMatch(/index\.html$/);
-    expect(run('/').sent).toMatch(/index\.html$/);
-    expect(run('/invoices/2026-09').sent).toMatch(/index\.html$/);
+    expect(run('/contracts').sent).toBe('index.html');
+    expect(run('/').sent).toBe('index.html');
+    expect(run('/invoices/2026-09').sent).toBe('index.html');
   });
   it('never shadows the API', () => {
     expect(run('/api/companies')).toEqual({ sent: null, nexted: true });

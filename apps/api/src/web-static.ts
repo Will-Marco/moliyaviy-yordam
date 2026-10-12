@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -10,7 +9,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 export function spaFallback(webRoot: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.includes('.')) {
-      res.sendFile(join(webRoot, 'index.html'));
+      // `root` lets express resolve a relative webRoot safely (no "path must be absolute").
+      res.sendFile('index.html', { root: webRoot });
     } else {
       next();
     }
