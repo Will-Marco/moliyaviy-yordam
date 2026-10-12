@@ -20,7 +20,7 @@
 | 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | accepted | FR-7.1–7.5; API unit 97 + e2e 101, web 95; brauzerda etalon yanvar, nusxalash, belgilash/409/olib tashlash | 2026-10-07 |
 | 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | in-progress | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni; parol ombori qurilmagan); M8c navbatda | |
 | 9a | Lokal PGlite baza | Ilova serversiz lokal fayl-bazada ishlaydi | standard | accepted | PGlite adapter, dastur ichi migratsiya (ledger+rollback+snapshot), persistensiya; e2e PGlite'da ham 110 yashil | 2026-10-12 |
-| 9b | Electron qobig'i | Ilova desktop dastur sifatida ochiladi (Didox oynasi, static web) | complex | o'zak accepted | Electron main child-process Nest (efemer port, PGlite), Nest static web+SPA, xavfsiz window, single-instance; qoldi: electron-builder, first-run parol, Windows gate, tray/avtostart(M8) | |
+| 9b | Electron qobig'i | Ilova desktop dastur sifatida ochiladi | complex | o'zak accepted | Electron 44, child-process Nest (PGlite), first-run parol, macOS qadoqlash (dir), kunlik zaxira, `productName`; **qoldi:** Windows NSIS + gate (A1/A2), yangilanish yo'li (A3), dmg/ikona (A5), imzolash | |
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
 | 11 | Shartnomalar ro'yxati | Buxgalter shartnomalarni qidiradi, filtrlaydi, saralaydi; beruvchi/oluvchi alohida | standard | accepted | FR-11.1–11.4; web 153; brauzerda GAMMA → 2, DELTA AGRO → 2 | 2026-10-11 |
 | 12 | Davr hisoboti va Excel | Buxgalter davr tanlab shartnomalar harakatini ko'radi va Excel'ga yuklaydi | complex | accepted | FR-12.1–12.3; API unit 111 + e2e 110 (etalon yanvar–fevral, Excel qayta o'qiladi); brauzerda davr + Excel | 2026-10-11 |
@@ -28,21 +28,27 @@
 Status: `pending → in-progress → review → accepted`
 Hajm: `trivial | standard | complex`
 
-## Keyingi sessiya uchun (2026-10-07 dagi to'xtash nuqtasi)
-- **Navbat:** M8 (Didox API) partner token kutmoqda → taklif: **Modul 9** (serverga joylash, `wizard`) — Sir'dan server
-  ma'lumotlari (OS, domen, kim boshqaradi) kerak. Token kelsa M8 birinchi.
-- M8 uchun tayyor: `invoice_drafts` (contractId × month, amount, didoxDocumentId, draftedAt) — M8 shu jadvalga yozadi;
-  `InvoicesService.list` / `monthInterest` (`apps/api/src/invoices/`) — qaysi fakturalar `tayyor` ekanini beradi.
-- **Ishga tushirish:** `pnpm dev:api` (3000) va `pnpm dev:web` (5173, `/api` proxy). PostgreSQL lokal:
-  `moliyaviy_yordam_dev`, testlar — `moliyaviy_yordam_test`. Dev login — `apps/api/.env` 2-qatordagi izohda.
-  Dev bazada etalon shartnoma (№ 1, ALFA SAVDO → BETA TEXNO, 05.01 — 60 mln, 20.01 — 15 mln, 14%).
-- **Testlar:** `pnpm test` (unit, api+web), `pnpm test:e2e` (api, `TEST_TODAY` = 2026-10-07, `createTestApp({ today })`).
-  Supertest: `agent.post()` argumentlari ichida `await` ishlatmang — ID'larni oldin oling.
-  Prisma 7: `migrate dev` client'ni yangilamaydi — keyin `npx prisma generate`.
-- **Uslub:** TDD (RED → GREEN), har modulda `code-review` (high) + `ReportFindings`, brauzerda tekshiruv,
-  commit — inglizcha Conventional Commits, `Co-Authored-By` siz; modul qabul qilingach `main` ga push.
-- **Sir'dan kutilayotganlar:** Didox partner token (mijoz nomidan) — M8 bloker; o'zbek tilidagi Didox faktura
-  eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
+## Keyingi sessiya uchun (2026-10-12 dagi to'xtash nuqtasi)
+- **Reja (Sir, 2026-10-12): Windows'ga bog'liq ishlar keyinga** (A1 NSIS o'rnatgich, A2 Windows gate — Windows PC
+  bo'lganda). Navbat prioritet bo'yicha:
+  1. **B1 — Didox "Excel юклаш" importi** (taklif; M8 formasini avtomatlashtirish Claude qura olmaydi): ilova beruvchi firma ×
+     oy uchun `tayyor` fakturalarni Didox import shabloni formatida Excel qiladi → buxgalter Didox'da o'zi yuklaydi.
+     **Bloker:** Sir Didox'ga kirib, shablonni birga o'rganamiz (yuklab olish — Sir ruxsati bilan).
+  2. A3 — yangilanishlarni tarqatish yo'li (Sir qarori), A5 — macOS dmg/ikona/hajm.
+  3. Past: logout JWT bekor qilish, company DTO helper, ko'p shartnomada tezlik.
+- **M8 holati:** M8a accepted (E-IMZO kalitlar). ERI parolini saqlash/avto-yozish va Didox formasini avtomatik to'ldirish —
+  **Claude qurmaydi** (xavfsizlik cheklovi); reja (docs/plans/M8-didox-drafts.md) boshqa ijrochi uchun turibdi.
+  API tayyor: `PUT /invoices/:month/:contractId/draft` (`source`, `expectedAmount`, POSSIBLE_DUPLICATE, DRAFT_CHANGED).
+- **Ishga tushirish:** web `pnpm dev:api` (3000) + `pnpm dev:web` (5173, band bo'lsa launch.json autoPort); desktop
+  `pnpm dev:desktop` (tsc + electron; ma'lumot `~/Library/Application Support/Moliyaviy yordam`). Dev login —
+  `apps/api/.env` 2-qatordagi izohda. Qadoqlash: `pnpm --filter desktop pack:mac` (dev holati endi buzilmaydi).
+- **Testlar:** `pnpm test` (api+web+desktop unit), `pnpm test:e2e` va `pnpm --filter api test:e2e:pglite`.
+  Supertest: `agent.post()` argumentlari ichida `await` ishlatmang. Prisma 7: `migrate dev` dan keyin `npx prisma generate`.
+  `formatTiyin`/`formatMoney` mingliklarni NBSP (`\u00a0`) bilan ajratadi — test matnlarida hisobga oling.
+- **Uslub:** TDD, seam'lar Sir bilan kelishiladi; har ishdan keyin `code-review` (high) + `ReportFindings`, brauzerda
+  tekshiruv; commit inglizcha, `Co-Authored-By` siz; tayyor ishlar `main` ga push.
+- **Sir'dan kutilayotganlar:** Didox sessiyasi (B1 shablon); o'zbekcha Didox eksport namunasi (FR-1.3); Windows PC (A2);
+  ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
 - 2026-10-12 — `pnpm audit --prod`: 4 ta (mysql2 ×2, deepmerge-ts, uuid — hammasi tranzitiv) → pnpm `overrides` bilan yamalgan versiyalar; audit toza; unit/e2e (pg+PGlite, Excel), prisma validate, qadoqlash staging tekshirildi
