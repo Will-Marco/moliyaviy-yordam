@@ -21,9 +21,12 @@ describe('createQueryClient', () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(2)
   })
 
-  it('does not retry 401s', () => {
+  it('retries only failures that may pass on a second try (network, 5xx), never a 4xx answer', () => {
     const retry = createQueryClient({ onUnauthorized: () => {} }).getDefaultOptions().queries?.retry
-    expect(typeof retry === 'function' && retry(0, new ApiError(401, 'x'))).toBe(false)
-    expect(typeof retry === 'function' && retry(0, new ApiError(500, 'x'))).toBe(true)
+    const retries = (error: unknown, count = 0) => typeof retry === 'function' && retry(count, error as Error)
+    for (const status of [400, 401, 403, 404, 409, 422]) expect(retries(new ApiError(status, 'x'))).toBe(false)
+    expect(retries(new ApiError(500, 'x'))).toBe(true)
+    expect(retries(new ApiError(0, 'x'))).toBe(true) // network failure
+    expect(retries(new ApiError(503, 'x'), 2)).toBe(false) // at most two retries
   })
 })
