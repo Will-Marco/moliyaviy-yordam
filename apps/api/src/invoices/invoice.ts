@@ -2,6 +2,7 @@ import { IsoDate, lastDayOfMonth, previousMonth } from '../common/dates.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { computeInterest, toTiyin } from '../interest/engine.js';
 import { ContractForInterest, engineInput, money } from '../interest/report.js';
+import type { DraftSource } from './dto/invoice.dto.js';
 
 /*
  * Module 7: one invoice = one contract × one completed month, one line (FR-7.2, SRS §9.1).
@@ -35,6 +36,7 @@ export interface StoredDraft {
   amount: Prisma.Decimal;
   didoxDocumentId: string | null;
   draftedAt: Date;
+  /** Database value; the column's CHECK keeps it to DraftSource. */
   source: string;
 }
 
@@ -42,7 +44,7 @@ export interface InvoiceRow {
   lineName: string;
   amount: string;
   /** Null — `tayyor`; otherwise `qoralama yaratildi` (FR-7.4). */
-  draft: { amount: string; didoxDocumentId: string | null; draftedAt: string; amountChanged: boolean; source: string } | null;
+  draft: { amount: string; didoxDocumentId: string | null; draftedAt: string; amountChanged: boolean; source: DraftSource } | null;
 }
 
 /**
@@ -69,7 +71,7 @@ export function invoiceRow(month: string, interest: bigint, draft: StoredDraft |
       didoxDocumentId: draft.didoxDocumentId,
       draftedAt: draft.draftedAt.toISOString(),
       amountChanged: toTiyin(draft.amount) !== interest,
-      source: draft.source,
+      source: draft.source as DraftSource,
     },
   };
 }

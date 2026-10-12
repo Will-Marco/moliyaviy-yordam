@@ -1,4 +1,5 @@
 import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength, ValidateBy, ValidateIf } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { IsMoney } from '../../common/decimal.js';
 import { Trim } from '../../common/validation.js';
 
@@ -19,6 +20,7 @@ export type DraftSource = (typeof DRAFT_SOURCES)[number];
 export class MarkDraftDto {
   // Free text when marked by hand; required and exact when the app read it from Didox.
   @ValidateIf((dto: MarkDraftDto, value) => value != null || dto.source === 'didox')
+  @Transform(({ value, obj }) => ((obj as MarkDraftDto).source === 'didox' && typeof value === 'string' ? value.toUpperCase() : value))
   @Trim()
   @IsString({ message: 'Didox ID kiritilmagan' })
   @MaxLength(100, { message: 'Didox ID 100 belgidan oshmasin' })
@@ -29,8 +31,8 @@ export class MarkDraftDto {
   @IsIn(DRAFT_SOURCES, { message: "Manba noto'g'ri" })
   source?: DraftSource;
 
-  /** The amount the caller put into Didox; the mark is refused if the month's interest is no longer that (FR-8.4). */
-  @IsOptional()
+  /** The amount the app put into Didox (required for it); refused if the month's interest is no longer that (FR-8.4). */
+  @ValidateIf((dto: MarkDraftDto, value) => value != null || dto.source === 'didox')
   @IsMoney()
   expectedAmount?: string;
 

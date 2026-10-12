@@ -78,32 +78,49 @@ export class InvoicesService {
     }
 
     const existing = contract.invoiceDrafts[0];
-    // The app may complete a hand mark that has no Didox ID with the one it read from Didox (no duplicate is made).
-    const attachesId = dto.source === 'didox' && existing?.didoxDocumentId === null;
-    if (existing && !dto.confirmWarnings && !attachesId) {
-      const id = existing.didoxDocumentId ? `, Didox ID: ${existing.didoxDocumentId}` : '';
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'CONFIRMATION_REQUIRED',
-        message: "Ogohlantirishlarni ko'rib chiqing",
-        warnings: [
-          { code: 'ALREADY_DRAFTED', message: `Qoralama allaqachon yaratilgan (${formatDate(tashkentDate(existing.draftedAt))}${id})` },
-        ],
-      });
+    if (existing && !dto.confirmWarnings) {
+      const when = formatDate(tashkentDate(existing.draftedAt));
+      // A hand mark without an ID plus a draft the app just saved usually means two drafts now exist in Didox.
+      const warning =
+        dto.source === 'didox' && existing.didoxDocumentId === null
+          ? { code: 'POSSIBLE_DUPLICATE', message: `Bu oy ${when} da qo'lda belgilangan — Didox'da ikkita qoralama bo'lishi mumkin, tekshiring` }
+          : {
+              code: 'ALREADY_DRAFTED',
+              message: `Qoralama allaqachon yaratilgan (${when}${existing.didoxDocumentId ? `, Didox ID: ${existing.didoxDocumentId}` : ''})`,
+            };
+      throw new ConflictException({ statusCode: 409, code: 'CONFIRMATION_REQUIRED', message: "Ogohlantirishlarni ko'rib chiqing", warnings: [warning] });
     }
 
+    // Re-marking without a new ID keeps the recorded one (and who made it): the link to the Didox document is not lost.
+    const keepsId = !dto.didoxDocumentId && !!existing?.didoxDocumentId;
     const data = {
       amount: money(interest),
-      didoxDocumentId: dto.didoxDocumentId || null,
+      didoxDocumentId: dto.didoxDocumentId || existing?.didoxDocumentId || null,
       draftedAt: new Date(),
-      source: dto.source ?? 'manual',
+      source: keepsId ? existing!.source : (dto.source ?? 'manual'),
     };
-    const draft = await this.prisma.invoiceDraft.upsert({
-      where: { contractId_month: { contractId, month } },
-      create: { contractId, month, ...data },
-      update: data,
-    });
+    const draft = await this.write(contractId, month, existing, data);
     return this.view(contract, month, interest, draft)!;
+  }
+
+  /**
+   * Writes only over the state the decision above was made on: a mark created or changed meanwhile (another click,
+   * the desktop app) fails with 409 instead of being silently overwritten.
+   */
+  private async write(contractId: string, month: string, seen: StoredDraft & { id: string; updatedAt: Date } | undefined, data: Omit<Prisma.InvoiceDraftCreateManyInput, 'contractId' | 'month'>) {
+    const changed = () =>
+      new ConflictException({ statusCode: 409, code: 'DRAFT_CHANGED', message: "Bu faktura belgisi shu payt o'zgardi — sahifani yangilab qayta urining" });
+    if (!seen) {
+      try {
+        return await this.prisma.invoiceDraft.create({ data: { contractId, month, ...data } });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw changed();
+        throw error;
+      }
+    }
+    const { count } = await this.prisma.invoiceDraft.updateMany({ where: { id: seen.id, updatedAt: seen.updatedAt }, data });
+    if (!count) throw changed();
+    return this.prisma.invoiceDraft.findUniqueOrThrow({ where: { id: seen.id } });
   }
 
   async unmarkDraft(month: string, contractId: string): Promise<void> {
