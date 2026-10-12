@@ -20,7 +20,7 @@
 | 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | accepted | FR-7.1–7.5; API unit 97 + e2e 101, web 95; brauzerda etalon yanvar, nusxalash, belgilash/409/olib tashlash | 2026-10-07 |
 | 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | in-progress | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni; parol ombori qurilmagan); M8c navbatda | |
 | 9a | Lokal PGlite baza | Ilova serversiz lokal fayl-bazada ishlaydi | standard | accepted | PGlite adapter, dastur ichi migratsiya (ledger+rollback+snapshot), persistensiya; e2e PGlite'da ham 110 yashil | 2026-10-12 |
-| 9b | Electron qobig'i | Ilova desktop dastur sifatida ochiladi | complex | o'zak accepted | Electron 44, child-process Nest (PGlite), first-run parol, macOS qadoqlash (dir), kunlik zaxira, `productName`; **qoldi:** Windows NSIS + gate (A1/A2), yangilanish yo'li (A3), imzolash; dmg/ikona/hajm bajarildi (A5) | |
+| 9b | Electron qobig'i | Ilova desktop dastur sifatida ochiladi | complex | o'zak accepted | Electron 44, child-process Nest (PGlite), first-run parol, macOS qadoqlash (dir), kunlik zaxira, `productName`; **qoldi:** Windows NSIS + gate (A1/A2), imzolash; A3 qo'lda yangilash (qaror); dmg/ikona/hajm bajarildi (A5) | |
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
 | 11 | Shartnomalar ro'yxati | Buxgalter shartnomalarni qidiradi, filtrlaydi, saralaydi; beruvchi/oluvchi alohida | standard | accepted | FR-11.1–11.4; web 153; brauzerda GAMMA → 2, DELTA AGRO → 2 | 2026-10-11 |
 | 12 | Davr hisoboti va Excel | Buxgalter davr tanlab shartnomalar harakatini ko'radi va Excel'ga yuklaydi | complex | accepted | FR-12.1–12.3; API unit 111 + e2e 110 (etalon yanvar–fevral, Excel qayta o'qiladi); brauzerda davr + Excel | 2026-10-11 |
@@ -34,7 +34,7 @@ Hajm: `trivial | standard | complex`
   1. **B1 — Didox "Excel юклаш" importi** (taklif; M8 formasini avtomatlashtirish Claude qura olmaydi): ilova beruvchi firma ×
      oy uchun `tayyor` fakturalarni Didox import shabloni formatida Excel qiladi → buxgalter Didox'da o'zi yuklaydi.
      **Bloker:** Sir Didox'ga kirib, shablonni birga o'rganamiz (yuklab olish — Sir ruxsati bilan).
-  2. A3 — yangilanishlarni tarqatish yo'li (Sir qarori). A5 bajarildi (2026-10-12).
+  2. A3 — qaror: qo'lda yangilash (Sir). A5 bajarildi (2026-10-12).
   3. Past: logout JWT bekor qilish, company DTO helper, ko'p shartnomada tezlik.
 - **M8 holati:** M8a accepted (E-IMZO kalitlar). ERI parolini saqlash/avto-yozish va Didox formasini avtomatik to'ldirish —
   **Claude qurmaydi** (xavfsizlik cheklovi); reja (docs/plans/M8-didox-drafts.md) boshqa ijrochi uchun turibdi.
@@ -51,6 +51,7 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-12 — **A3: yangilanish qo'lda** — Sir. Yangi versiya = yangi o'rnatgich (dmg / keyin Windows NSIS), buxgalter ustidan o'rnatadi; ma'lumot `userData` da qoladi (migratsiya + snapshot ilova ichida). Avtomatik yangilanish (electron-updater) yo'q
 - 2026-10-12 — **A5 macOS qadoqlash:** API runtime bog'liqliklari Node resolution bo'yicha hisoblanib (`scripts/runtime-packages.mjs`, Prisma CLI tarmog'isiz) qolgani kesiladi + Prisma'ning postgresql'dan boshqa query compiler'lari va .map'lar olib tashlanadi: staged API 299M→170M, .app 627M→489M, `dmg` 160M (`pack:mac:dmg`, hdiutil verify VALID). Kesilgan ilova smoke: setup, login, validatsiya, shartnoma/operatsiya/hisobot, Excel, fakturalar, kunlik zaxira. Ikonka: `build/icon.svg`→`icon.png` (sarlavhadagi Landmark, #1E40AF)
 - 2026-10-12 — `pnpm audit --prod`: 4 ta (mysql2 ×2, deepmerge-ts, uuid — hammasi tranzitiv) → pnpm `overrides` bilan yamalgan versiyalar; audit toza; unit/e2e (pg+PGlite, Excel), prisma validate, qadoqlash staging tekshirildi
 - 2026-10-12 — Stavka o'zgarishini o'chirish ham tekshiriladi (RETROACTIVE + DRAFTED_INVOICE_CHANGES, `?confirmWarnings=true`); web'da umumiy `DeleteWithWarningsDialog` (operatsiyalar va stavkalar). Brauzerda № 12/25 da tekshirildi (o'chirilmadi). Web dev porti `PORT` dan (launch.json autoPort)
