@@ -334,3 +334,14 @@ bo'lmagan tartibda bloklash qoladi; Electron 34 EOL — M8d'da yangilash baholan
 ### Qurish tartibi (yangilangan)
 M8a (SRS + TS skelet + kalit/parol) → **B4 spike** (Electron'da login, Sir bilan) → M8b (macOS) →
 **M8c spike ro'yxati** (7 band) → M8c → M8d.
+
+---
+## v3 — doira o'zgarishi (2026-10-12, M8a qabulidan keyin)
+- **ERI parolini ilovada saqlash va E-IMZO oynasiga avtomatik yozish Claude tomonidan qurilmaydi** (Anthropic xavfsizlik
+  cheklovi). Shu sababli FR-8.2 qurilmagan; B3 va autotype adapterlari ushbu repo'da bo'lmaydi.
+- **Kirish:** ilova Didox oynasini ochadi (va M8b doirasida kalitni STIR bo'yicha tanlab "Кириш"ni bosishi mumkin), parolni
+  **buxgalter** E-IMZO oynasiga o'zi kiritadi; ilova kirilgan firmani STIR bilan tekshiradi, keyin ishlaydi.
+- **M8c** shu oqim ustida quriladi: qoralama qadamlari (B1 precheck, B2 write-ahead + karantin, M5–M7 himoyalari) o'zgarmaydi.
+- **M8d:** 06:00 da avtomatik kirish yo'q → oy 1-kuni bildirishnoma "Didox qoralamalari kutmoqda"; buxgalter bosgach firmalar
+  ketma-ket, har birida parolni o'zi kiritadi.
+- Tartib: **B4 spike** (Electron oynasida real login, Sir paroli bilan) → **M8c spike ro'yxati** (v2 M8 bo'limi, 1–6) → M8c TDD.
