@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 8 — **reja yozildi** (docs/plans/M8-didox-drafts.md, Fable) → plan-reviewer (Sonnet) → Sir gate → qurish M8a→M8d (Opus)
+**Joriy modul:** 8a — ERI kalitlar va parollar (reja tasdiqlangan: docs/plans/M8-didox-drafts.md v2; qurish Opus'da, TDD)
 **Oxirgi yangilanish:** 2026-10-12
 
 ## Modullar
@@ -45,6 +45,7 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — **M8 reja tasdiqlandi — Sir.** Qurish Opus sessiyada M8a dan (SRS M8 qayta yozish → desktop TS skelet → `alias.spec.ts`)
 - 2026-10-12 — Sir: **06:00 shartli + bildirishnoma** (qulf ochiq, E-IMZO, kalit, idle bo'lsa o'zi; bo'lmasa bildirishnoma + catch-up; "09:00 gacha" SRS'dan olib tashlanadi); **Windows PC M8c dan keyin** → Windows gate M8d da. M8 rejasi gate'ga tayyor
 - 2026-10-12 — **M8 reja v2** — plan-reviewer (Sonnet) APPROVE_WITH_CHANGES: 4 blocker (precheck false-positive — 31 kunlik oylar bir xil summa; dublikat spirali → write-ahead + karantin; parol noto'g'ri oynaga — fokus identifikatsiyasi; Electron'da real login spike) + 9 major qabul qilindi; `didox_runs` → userData JSON; Windows spike M8b ga. Sir qarorlari keyingi qatorda
 - 2026-10-12 — **M8 reja** (Fable): docs/plans/M8-didox-drafts.md — M8a kalit/parol, M8b avto-kirish, M8c qoralamalar, M8d jadval (Sir: jadval birinchi versiyada; Didox oynasi ko'rinadi; barcha firmalar + tanlash). Topilma: Electron 34 = Node 20, global WebSocket yo'q → `ws`; qoralama ro'yxati `?partner=<STIR>` bilan filtrlanadi, o'chirilganlar `.doc-status--red`
