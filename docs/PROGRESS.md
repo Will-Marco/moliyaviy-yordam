@@ -132,7 +132,7 @@ Hajm: `trivial | standard | complex`
 - E-IMZO har kirishda ERI parolini o'z oynasida so'raydi → oy 1-kuni 06:00 to'liq avtomatik ishga tushish **bo'lmasligi** mumkin (spike'da tekshiriladi)
 - Har buxgalterda alohida baza → zaxira nusxa va ilovani yangilash har kompyuterda (M9)
 - M7: `552328.77` summa formati haqiqiy Didox formasida tekshirilmagan
-- Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; shadcn CLI (web dependencies'da — devDependencies'ga o'tkazish kerak); exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi
+- Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi
 - M4: ro'yxat har so'rovda har shartnoma uchun to'liq yadroni ishlatadi — yuzlab shartnomada yetarli; ko'paysa yengil "faqat jamilar" rejimi yoki kesh
 - M4: operatsiyani o'chirish ogohlantirishsiz (tasdiq oynasi bor) — o'chirish foiz to'lovini ortiqcha qilib qo'yishi mumkin
 - M1 FR-1.3: o'zbek (kirill) tilidagi Didox eksport yorliqlari haqiqiy fayl bilan tekshirilmagan — o'zbekcha eksport namunasi kerak
