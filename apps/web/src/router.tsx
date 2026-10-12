@@ -2,11 +2,8 @@ import { createBrowserRouter, Navigate } from 'react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
-import { CompaniesPage } from '@/features/companies/CompaniesPage'
-import { ContractPage } from '@/features/contracts/ContractPage'
-import { ContractsPage } from '@/features/contracts/ContractsPage'
-import { InvoicesPage } from '@/features/invoices/InvoicesPage'
 
+// Pages load on first visit (one chunk each); login and the app shell stay in the entry bundle.
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
@@ -16,14 +13,25 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, element: <Navigate to="/contracts" replace /> },
-          { path: '/contracts', element: <ContractsPage /> },
-          { path: '/contracts/:id', element: <ContractPage /> },
-          { path: '/invoices', element: <InvoicesPage /> },
-          { path: '/companies', element: <CompaniesPage /> },
+          {
+            path: '/contracts',
+            lazy: async () => ({ Component: (await import('@/features/contracts/ContractsPage')).ContractsPage }),
+          },
+          {
+            path: '/contracts/:id',
+            lazy: async () => ({ Component: (await import('@/features/contracts/ContractPage')).ContractPage }),
+          },
+          {
+            path: '/invoices',
+            lazy: async () => ({ Component: (await import('@/features/invoices/InvoicesPage')).InvoicesPage }),
+          },
+          {
+            path: '/companies',
+            lazy: async () => ({ Component: (await import('@/features/companies/CompaniesPage')).CompaniesPage }),
+          },
         ],
       },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ])
-
