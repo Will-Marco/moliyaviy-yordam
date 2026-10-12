@@ -193,7 +193,12 @@ describe('Operations (Module 3)', () => {
     const [disbursement] = (await agent.get(ops)).body;
 
     const ask = await agent.delete(`${ops}/${disbursement.id}`).expect(409);
-    expect(ask.body.warnings.map((w: { code: string }) => w.code)).toEqual(['INTEREST_OVERPAID']);
+    expect(ask.body.warnings).toEqual([
+      {
+        code: 'INTEREST_OVERPAID',
+        message: "10.02.2026 dagi foiz to'lovi uchun shu sanagacha foiz qarzi qolmaydi — 500\u00a0000,00 so'm ortiqcha",
+      },
+    ]);
   });
 
   it('keeps operations scoped to their contract', async () => {

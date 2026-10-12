@@ -136,7 +136,7 @@ Hajm: `trivial | standard | complex`
 - M7/M8: summa formati (`552328.77`, mingliklar) haqiqiy Didox formasidagi kiritishda tekshirilmagan
 - Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi
 - M4: ro'yxat har so'rovda har shartnoma uchun to'liq yadroni ishlatadi — yuzlab shartnomada yetarli; ko'paysa yengil "faqat jamilar" rejimi yoki kesh
-- INTEREST_OVERPAID xabari "foiz qarzidan (−97 808,22 so'm) ko'p" — mavjud foiz manfiy bo'lganda matn chalkash (kichik matn tuzatish)
+- Stavka o'zgarishini **o'chirish** tugagan oylarni qayta hisoblaydi, lekin ogohlantirmaydi (RETROACTIVE/DRAFTED faqat qo'shish/tuzatishda)
 - M1 FR-1.3: o'zbek (kirill) tilidagi Didox eksport yorliqlari haqiqiy fayl bilan tekshirilmagan — o'zbekcha eksport namunasi kerak
 - M1: logout JWT'ni bekor qilmaydi (12 soat amal qiladi) — bitta umumiy login uchun qabul qilingan; kerak bo'lsa token versiyasi bilan yopiladi
 - M1: Create/Update company DTO qoidalari takrorlangan — keyingi DTO'lar ko'payganda umumiy helper

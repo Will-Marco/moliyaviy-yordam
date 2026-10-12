@@ -65,6 +65,30 @@ describe('OperationFormDialog', () => {
     expect(calls[1].body).toMatchObject({ amount: '10000000001', confirmWarnings: true })
   })
 
+  it('shows which drafted invoice the change would alter, among other warnings (FR-3.7)', async () => {
+    mockApi({
+      [`POST ${ops}`]: () => ({
+        status: 409,
+        body: {
+          code: 'CONFIRMATION_REQUIRED',
+          message: "Ogohlantirishlarni ko'rib chiqing",
+          warnings: [
+            { code: 'FUTURE_DATE', message: 'Sana kelajakda (05.01.2027)' },
+            {
+              code: 'DRAFTED_INVOICE_CHANGES',
+              message: "Yanvar 2026 fakturasi Didox'da qoralama qilingan (552 328,77 so'm) — foiz 555 013,70 so'm bo'ladi",
+            },
+          ],
+        },
+      }),
+    })
+    renderWithProviders(<OperationFormDialog contract={etalon} open onOpenChange={vi.fn()} />)
+    await fill()
+    await userEvent.click(screen.getByRole('button', { name: 'Saqlash' }))
+    expect(await screen.findByText(/Yanvar 2026 fakturasi Didox'da qoralama qilingan/)).toBeInTheDocument()
+    expect(screen.getByText(/Sana kelajakda/)).toBeInTheDocument()
+  })
+
   it('goes back to the form from the warnings', async () => {
     mockApi({
       [`POST ${ops}`]: () => ({

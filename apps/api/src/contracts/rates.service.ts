@@ -9,7 +9,7 @@ import { CreateRateDto, UpdateRateDto } from './dto/rate.dto.js';
 import { effectiveFromOf, retroactiveMonths } from './rates.js';
 
 export interface RateWarning {
-  code: 'RETROACTIVE';
+  code: 'RETROACTIVE' | 'DRAFTED_INVOICE_CHANGES';
   message: string;
 }
 
@@ -28,7 +28,8 @@ export class RatesService {
     if (effectiveFrom <= startDate) {
       throw fieldErrors({ changedOn: "Stavka o'zgarishi shartnoma boshlanishidan keyin amal qilishi kerak" });
     }
-    const warnings = this.confirm(retroactiveMonths(effectiveFrom, startDate, this.clock.today()), dto.confirmWarnings);
+    const months = retroactiveMonths(effectiveFrom, startDate, this.clock.today());
+    const warnings = this.confirm(months, await this.draftedMonths(contractId, months), dto.confirmWarnings);
     await this.prisma.rateChange.create({
       data: {
         contractId,
@@ -46,7 +47,8 @@ export class RatesService {
     if (!(await this.isInitial(contractId, rate.id))) {
       throw new BadRequestException("Faqat boshlang'ich stavka tuzatiladi — bu o'zgarishni o'chirib, qayta kiriting");
     }
-    const warnings = this.confirm(retroactiveMonths(startDate, startDate, this.clock.today()), dto.confirmWarnings);
+    const months = retroactiveMonths(startDate, startDate, this.clock.today());
+    const warnings = this.confirm(months, await this.draftedMonths(contractId, months), dto.confirmWarnings);
     await this.prisma.rateChange.update({ where: { id: rate.id }, data: { ratePercent: dto.ratePercent } });
     return { contract: await this.contracts.get(contractId), warnings };
   }
@@ -59,11 +61,28 @@ export class RatesService {
     await this.prisma.rateChange.delete({ where: { id: rate.id } });
   }
 
+  /** FR-3.7: drafted invoices are for completed months, so the ones a retroactive change alters lie in its range. */
+  private async draftedMonths(contractId: string, months: { from: string; to: string } | null): Promise<string[]> {
+    if (!months) return [];
+    const drafts = await this.prisma.invoiceDraft.findMany({
+      where: { contractId, month: { gte: months.from, lte: months.to } },
+      select: { month: true },
+      orderBy: { month: 'asc' },
+    });
+    return drafts.map((d) => d.month);
+  }
+
   /** FR-5.5: recalculating completed months needs the accountant's confirmation. */
-  private confirm(months: { from: string; to: string } | null, confirmed = false): RateWarning[] {
+  private confirm(months: { from: string; to: string } | null, drafted: string[], confirmed = false): RateWarning[] {
     if (!months) return [];
     const range = months.from === months.to ? formatMonth(months.from) : `${formatMonth(months.from)} – ${formatMonth(months.to)}`;
     const warnings: RateWarning[] = [{ code: 'RETROACTIVE', message: `Tugagan oylar qayta hisoblanadi: ${range}` }];
+    if (drafted.length) {
+      warnings.push({
+        code: 'DRAFTED_INVOICE_CHANGES',
+        message: `Didox'da qoralama qilingan oylar summasi o'zgaradi: ${drafted.map(formatMonth).join(', ')}`,
+      });
+    }
     if (!confirmed) {
       throw new ConflictException({
         statusCode: 409,

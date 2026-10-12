@@ -78,6 +78,17 @@ describe('Rate changes (Module 5)', () => {
     expect(april).toMatchObject({ rates: ['16'], interest: '591780.82' }); // 45M × 16% × 30 / 365
   });
 
+  it('names the months already drafted in Didox that a retroactive change would alter (FR-3.7)', async () => {
+    await setup('2026-05-10');
+    await agent.put(`/api/invoices/2026-04/${id}/draft`).send({}).expect(200);
+
+    const ask = await agent.post(rates).send({ ratePercent: '16', changedOn: '2026-03-15' }).expect(409);
+    expect(ask.body.warnings).toEqual([
+      { code: 'RETROACTIVE', message: 'Tugagan oylar qayta hisoblanadi: Aprel 2026' },
+      { code: 'DRAFTED_INVOICE_CHANGES', message: "Didox'da qoralama qilingan oylar summasi o'zgaradi: Aprel 2026" },
+    ]);
+  });
+
   it('requires the change to take effect after the initial rate (FR-5.1)', async () => {
     await setup('2026-03-20');
     for (const changedOn of ['2025-12-15', '2026-01-01']) {

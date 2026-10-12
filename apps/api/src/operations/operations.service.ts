@@ -43,7 +43,7 @@ export class OperationsService {
   }
 
   async create(contractId: string, dto: CreateOperationDto) {
-    const loaded = await this.load(contractId);
+    const loaded = await this.load(contractId, { drafts: true });
     const { rows } = loaded;
     const candidate: Row = {
       id: NEW,
@@ -60,7 +60,7 @@ export class OperationsService {
   }
 
   async update(contractId: string, id: string, dto: UpdateOperationDto) {
-    const loaded = await this.load(contractId);
+    const loaded = await this.load(contractId, { drafts: true });
     const { rows } = loaded;
     const current = rows.find((row) => row.id === id);
     if (!current) throw new NotFoundException('Operatsiya topilmadi');
@@ -87,7 +87,7 @@ export class OperationsService {
 
   /** FR-3.2: a deletion is checked like an edit — a negative balance or an overpaid interest payment asks first. */
   async remove(contractId: string, id: string, confirmWarnings = false): Promise<void> {
-    const loaded = await this.load(contractId);
+    const loaded = await this.load(contractId, { drafts: true });
     const removed = loaded.rows.find((row) => row.id === id);
     if (!removed) throw new NotFoundException('Operatsiya topilmadi');
     const after = loaded.rows.filter((row) => row.id !== id);
@@ -176,13 +176,15 @@ export class OperationsService {
         const earlier = excessBefore.get(id);
         return !earlier || excess > earlier.excess;
       })
-      .map(([id, { row, available }]) => ({
-        code: 'INTEREST_OVERPAID' as const,
-        message:
-          id === candidate.id
-            ? `Foiz to'lovi shu sanagacha hisoblangan foiz qarzidan (${formatTiyin(available)} so'm) ko'p`
-            : `${formatDate(row.date)} dagi foiz to'lovi shu sanagacha hisoblangan foiz qarzidan (${formatTiyin(available)} so'm) ko'p bo'lib qoladi`,
-      }));
+      .map(([id, { row, available, excess }]) => {
+        const subject = id === candidate.id ? "Foiz to'lovi" : `${formatDate(row.date)} dagi foiz to'lovi`;
+        // With nothing left to pay by that date, "more than (−97 808,22)" means nothing to anyone: show the excess.
+        const message =
+          available > 0n
+            ? `${subject} shu sanagacha hisoblangan foiz qarzidan (${formatTiyin(available)} so'm) ko'p${id === candidate.id ? '' : ' bo\'lib qoladi'}`
+            : `${subject} uchun shu sanagacha foiz qarzi ${id === candidate.id ? "yo'q" : 'qolmaydi'} — ${formatTiyin(excess)} so'm ortiqcha`;
+        return { code: 'INTEREST_OVERPAID' as const, message };
+      });
   }
 
   private paymentExcesses(loaded: Loaded, rows: Row[]) {
@@ -202,7 +204,8 @@ export class OperationsService {
     return result;
   }
 
-  private async load(contractId: string) {
+  /** `drafts` — the contract's invoice drafts, needed only when a change is checked (FR-3.7), not to list rows. */
+  private async load(contractId: string, { drafts = false } = {}) {
     const contract = await this.prisma.contract.findUnique({
       where: { id: contractId },
       select: {
@@ -211,7 +214,6 @@ export class OperationsService {
         endDate: true,
         rateChanges: { orderBy: [{ effectiveFrom: 'asc' }, { createdAt: 'asc' }] },
         operations: { orderBy: [{ date: 'asc' }, { createdAt: 'asc' }] },
-        invoiceDrafts: { select: { month: true, amount: true } },
       },
     });
     if (!contract) throw new NotFoundException('Shartnoma topilmadi');
@@ -230,7 +232,9 @@ export class OperationsService {
       },
       interestBasis: { startDate: contract.startDate, rateChanges: contract.rateChanges },
       rows,
-      drafts: contract.invoiceDrafts,
+      drafts: drafts
+        ? await this.prisma.invoiceDraft.findMany({ where: { contractId }, select: { month: true, amount: true } })
+        : [],
     };
   }
 

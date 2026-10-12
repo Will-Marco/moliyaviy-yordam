@@ -121,8 +121,9 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - FR-3.2 — Operatsiyani tahrirlash va o'chirish (o'chirish — tasdiq bilan). Hisob har doim qayta hisoblanadi (CR-9).
   O'chirish ham tahrir kabi tekshiriladi (2026-10-12): manfiy qoldiq yoki ortiqcha foiz to'lovi paydo bo'lsa, o'chirish
   oynasida ogohlantirish va "Baribir o'chirish" (FR-3.3 qoidasi — bloklamaydi).
-- FR-3.7 — Qo'shish, tahrirlash yoki o'chirish **Didox'da qoralama qilingan oy** foizini o'zgartirsa — ogohlantirish
-  (`DRAFTED_INVOICE_CHANGES`: oy, qoralamadagi va yangi summa); bloklamaydi (2026-10-12, Sir).
+- FR-3.7 — Operatsiyani qo'shish, tahrirlash yoki o'chirish **Didox'da qoralama qilingan oy** foizini o'zgartirsa — ogohlantirish
+  (`DRAFTED_INVOICE_CHANGES`: oy, qoralamadagi va yangi summa); retroaktiv stavka o'zgarishi (FR-5.5) ham shu oylarni
+  nomlaydi. Bloklamaydi (2026-10-12, Sir).
 - FR-3.3 — Ogohlantirishlar (**bloklamaydi**). "Saqlash" bosilganda forma ichida ko'rsatiladi; buxgalter
   **"Baribir saqlash"** bilan tasdiqlaydi. Ogohlantirish bo'lmasa — darhol saqlanadi:
   - jami berilgan > limit (qanchaga oshishi bilan);
