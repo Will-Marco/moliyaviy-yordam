@@ -14,7 +14,14 @@ export interface LedgerOperation {
 }
 
 export interface Warning {
-  code: 'LIMIT_EXCEEDED' | 'NEGATIVE_BALANCE' | 'BEFORE_START' | 'AFTER_END' | 'FUTURE_DATE' | 'INTEREST_OVERPAID';
+  code:
+    | 'LIMIT_EXCEEDED'
+    | 'NEGATIVE_BALANCE'
+    | 'BEFORE_START'
+    | 'AFTER_END'
+    | 'FUTURE_DATE'
+    | 'INTEREST_OVERPAID'
+    | 'DRAFTED_INVOICE_CHANGES';
   message: string;
 }
 
@@ -84,14 +91,7 @@ export function operationWarnings(
     }
   }
 
-  const low = lowestBalance(after);
-  const previousLow = lowestBalance(before)?.balance ?? ZERO;
-  if (low && low.balance.isNegative() && low.balance.lt(previousLow)) {
-    warnings.push({
-      code: 'NEGATIVE_BALANCE',
-      message: `${formatDate(low.date)} da asosiy qarz qoldig'i manfiy bo'ladi: ${formatMoney(low.balance)} so'm`,
-    });
-  }
+  warnings.push(...negativeBalanceWarnings(before, after));
 
   if (candidate.date < contract.startDate && !sameDateAndType) {
     warnings.push({
@@ -108,4 +108,17 @@ export function operationWarnings(
   }
 
   return warnings;
+}
+
+/** CR-10: a change (edit, add or delete) that pushes the lowest principal balance below zero, or further below. */
+export function negativeBalanceWarnings(before: LedgerOperation[], after: LedgerOperation[]): Warning[] {
+  const low = lowestBalance(after);
+  const previousLow = lowestBalance(before)?.balance ?? ZERO;
+  if (!low || !low.balance.isNegative() || !low.balance.lt(previousLow)) return [];
+  return [
+    {
+      code: 'NEGATIVE_BALANCE',
+      message: `${formatDate(low.date)} da asosiy qarz qoldig'i manfiy bo'ladi: ${formatMoney(low.balance)} so'm`,
+    },
+  ];
 }

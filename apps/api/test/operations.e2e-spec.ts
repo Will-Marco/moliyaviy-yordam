@@ -152,9 +152,48 @@ describe('Operations (Module 3)', () => {
     const shrink = await agent.patch(`${ops}/${first.id}`).send({ amount: '10000000' }).expect(409);
     expect(shrink.body.warnings[0].code).toBe('NEGATIVE_BALANCE');
 
-    await agent.delete(`${ops}/${first.id}`).expect(204);
+    const repayment = (await agent.get(ops)).body.at(-1);
+    await agent.delete(`${ops}/${repayment.id}`).expect(204); // harmless: deleted at once
     expect((await agent.get(ops)).body).toHaveLength(1);
-    await agent.delete(`${ops}/${first.id}`).expect(404);
+    await agent.delete(`${ops}/${repayment.id}`).expect(404);
+  });
+
+  it('asks before deleting an operation that leaves a negative balance, then deletes it (FR-3.2)', async () => {
+    await etalon();
+    const [disbursement] = (await agent.get(ops)).body;
+
+    const ask = await agent.delete(`${ops}/${disbursement.id}`).expect(409);
+    expect(ask.body).toMatchObject({ code: 'CONFIRMATION_REQUIRED', warnings: [{ code: 'NEGATIVE_BALANCE' }] });
+    expect((await agent.get(ops)).body).toHaveLength(2);
+
+    await agent.delete(`${ops}/${disbursement.id}?confirmWarnings=true`).expect(204);
+    expect((await agent.get(ops)).body).toHaveLength(1);
+  });
+
+  it('warns when a change would alter the interest of a month already drafted in Didox', async () => {
+    await etalon();
+    await agent.put(`/api/invoices/2026-01/${contractId}/draft`).send({}).expect(200); // January drafted: 552 328,77
+
+    const add = await agent.post(ops).send({ date: '2026-01-25', type: 'DISBURSEMENT', amount: '1000000' }).expect(409);
+    const drafted = add.body.warnings.find((w: { code: string }) => w.code === 'DRAFTED_INVOICE_CHANGES');
+    expect(drafted.message).toContain('Yanvar 2026');
+    expect(drafted.message).toMatch(/552\s328,77/);
+
+    const repayment = (await agent.get(ops)).body.at(-1);
+    const del = await agent.delete(`${ops}/${repayment.id}`).expect(409);
+    expect(del.body.warnings.map((w: { code: string }) => w.code)).toContain('DRAFTED_INVOICE_CHANGES');
+
+    // A change that leaves January's interest as drafted asks nothing.
+    await agent.post(ops).send({ date: '2026-09-10', type: 'PRINCIPAL_REPAYMENT', amount: '1000000' }).expect(201);
+  });
+
+  it('asks before a deletion leaves an interest payment above the interest due (FR-4.5)', async () => {
+    await agent.post(ops).send({ date: '2026-01-05', type: 'DISBURSEMENT', amount: '60000000' }).expect(201);
+    await agent.post(ops).send({ date: '2026-02-10', type: 'INTEREST_PAYMENT', amount: '500000' }).expect(201);
+    const [disbursement] = (await agent.get(ops)).body;
+
+    const ask = await agent.delete(`${ops}/${disbursement.id}`).expect(409);
+    expect(ask.body.warnings.map((w: { code: string }) => w.code)).toEqual(['INTEREST_OVERPAID']);
   });
 
   it('keeps operations scoped to their contract', async () => {

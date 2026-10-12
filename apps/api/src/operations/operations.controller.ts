@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { CreateOperationDto, UpdateOperationDto } from './dto/operation.dto.js';
 import { OperationsService } from './operations.service.js';
 
@@ -29,7 +29,11 @@ export class OperationsController {
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('contractId', uuid) contractId: string, @Param('id', uuid) id: string) {
-    return this.operations.remove(contractId, id);
+  remove(
+    @Param('contractId', uuid) contractId: string,
+    @Param('id', uuid) id: string,
+    @Query('confirmWarnings') confirmWarnings?: string,
+  ) {
+    return this.operations.remove(contractId, id, confirmWarnings === 'true');
   }
 }

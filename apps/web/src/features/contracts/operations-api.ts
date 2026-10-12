@@ -55,7 +55,10 @@ export function useSaveOperation(contractId: string, id?: string) {
 export function useDeleteOperation(contractId: string) {
   const invalidate = useInvalidateContract()
   return useMutation({
-    mutationFn: (id: string) => apiFetch<void>(`/contracts/${contractId}/operations/${id}`, { method: 'DELETE' }),
+    mutationFn: ({ id, confirmWarnings = false }: { id: string; confirmWarnings?: boolean }) =>
+      apiFetch<void>(`/contracts/${contractId}/operations/${id}${confirmWarnings ? '?confirmWarnings=true' : ''}`, {
+        method: 'DELETE',
+      }),
     onSuccess: invalidate,
   })
 }

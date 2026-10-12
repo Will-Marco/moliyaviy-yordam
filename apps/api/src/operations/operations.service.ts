@@ -2,13 +2,13 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Clock } from '../common/clock.js';
 import { fromDbDate, IsoDate, toDbDate } from '../common/dates.js';
 import { moneyString } from '../common/decimal.js';
-import { formatDate, formatTiyin } from '../common/format.js';
+import { formatDate, formatMonth, formatTiyin } from '../common/format.js';
 import { computeInterest, toTiyin } from '../interest/engine.js';
 import { engineInput } from '../interest/report.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateOperationDto, UpdateOperationDto } from './dto/operation.dto.js';
-import { LedgerOperation, OperationType, operationWarnings, Warning, withBalances } from './ledger.js';
+import { LedgerOperation, negativeBalanceWarnings, OperationType, operationWarnings, Warning, withBalances } from './ledger.js';
 
 export interface OperationView {
   id: string;
@@ -85,7 +85,20 @@ export class OperationsService {
     return { operation: await this.viewOf(contractId, id), warnings };
   }
 
-  async remove(contractId: string, id: string): Promise<void> {
+  /** FR-3.2: a deletion is checked like an edit — a negative balance or an overpaid interest payment asks first. */
+  async remove(contractId: string, id: string, confirmWarnings = false): Promise<void> {
+    const loaded = await this.load(contractId);
+    const removed = loaded.rows.find((row) => row.id === id);
+    if (!removed) throw new NotFoundException('Operatsiya topilmadi');
+    const after = loaded.rows.filter((row) => row.id !== id);
+    this.confirm(
+      [
+        ...negativeBalanceWarnings(loaded.rows, after),
+        ...this.overpaidPayments(loaded, after, removed, removed),
+        ...this.draftedMonthWarnings(loaded, after),
+      ],
+      confirmWarnings,
+    );
     const { count } = await this.prisma.operation.deleteMany({ where: { id, contractId } });
     if (!count) throw new NotFoundException('Operatsiya topilmadi');
   }
@@ -94,17 +107,15 @@ export class OperationsService {
   private check(loaded: Loaded, after: Row[], candidate: Row, confirmed = false): Warning[] {
     const { contract, rows: before } = loaded;
     const previous = before.find((row) => row.id === candidate.id);
-    const warnings = [
-      ...operationWarnings(contract, before, after, candidate),
-      ...this.dateAndInterestWarnings(loaded, after, candidate, previous),
-    ];
+    return this.confirm(
+      [...operationWarnings(contract, before, after, candidate), ...this.dateAndInterestWarnings(loaded, after, candidate, previous)],
+      confirmed,
+    );
+  }
+
+  private confirm(warnings: Warning[], confirmed: boolean): Warning[] {
     if (warnings.length && !confirmed) {
-      throw new ConflictException({
-        statusCode: 409,
-        code: 'CONFIRMATION_REQUIRED',
-        message: "Ogohlantirishlarni ko'rib chiqing",
-        warnings,
-      });
+      throw new ConflictException({ statusCode: 409, code: 'CONFIRMATION_REQUIRED', message: "Ogohlantirishlarni ko'rib chiqing", warnings });
     }
     return warnings;
   }
@@ -120,7 +131,31 @@ export class OperationsService {
     }
 
     warnings.push(...this.overpaidPayments(loaded, after, candidate, previous));
+    warnings.push(...this.draftedMonthWarnings(loaded, after));
     return warnings;
+  }
+
+  /**
+   * M8: a month already drafted in Didox whose interest the change would alter — the draft would no longer match.
+   * Compares the month's rounded interest before and after the change; the stored draft amount is shown for reference.
+   */
+  private draftedMonthWarnings(loaded: Loaded, after: Row[]): Warning[] {
+    if (!loaded.drafts.length) return [];
+    const monthly = (rows: Row[]) =>
+      new Map(
+        computeInterest(engineInput({ ...loaded.interestBasis, operations: rows.map(asStored) }, this.clock.today())).months.map(
+          (m) => [m.month, m.interest],
+        ),
+      );
+    const before = monthly(loaded.rows);
+    const changed = monthly(after);
+    return loaded.drafts
+      .filter((d) => (before.get(d.month) ?? 0n) !== (changed.get(d.month) ?? 0n))
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .map((d) => ({
+        code: 'DRAFTED_INVOICE_CHANGES' as const,
+        message: `${formatMonth(d.month)} fakturasi Didox'da qoralama qilingan (${formatTiyin(toTiyin(d.amount))} so'm) — foiz ${formatTiyin(changed.get(d.month) ?? 0n)} so'm bo'ladi`,
+      }));
   }
 
   /**
@@ -176,6 +211,7 @@ export class OperationsService {
         endDate: true,
         rateChanges: { orderBy: [{ effectiveFrom: 'asc' }, { createdAt: 'asc' }] },
         operations: { orderBy: [{ date: 'asc' }, { createdAt: 'asc' }] },
+        invoiceDrafts: { select: { month: true, amount: true } },
       },
     });
     if (!contract) throw new NotFoundException('Shartnoma topilmadi');
@@ -194,6 +230,7 @@ export class OperationsService {
       },
       interestBasis: { startDate: contract.startDate, rateChanges: contract.rateChanges },
       rows,
+      drafts: contract.invoiceDrafts,
     };
   }
 

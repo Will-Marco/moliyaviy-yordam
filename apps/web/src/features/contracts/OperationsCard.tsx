@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { LoaderCircle, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { QueryErrorState } from '@/components/QueryErrorState'
@@ -12,12 +12,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate, formatMoney, isNegativeMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { type Warning, warningsToConfirm } from '@/lib/warnings'
 import type { Contract } from './api'
 import { type Operation, OPERATION_TYPES, useDeleteOperation, useOperations } from './operations-api'
 import { OperationFormDialog } from './OperationFormDialog'
@@ -33,6 +35,31 @@ export function OperationsCard({ contract }: { contract: Contract }) {
   const remove = useDeleteOperation(contract.id)
   const [form, setForm] = useState<FormState>({ open: false })
   const [deleting, setDeleting] = useState<Operation | null>(null)
+  // FR-3.2: what the deletion would break, returned by the server on the first attempt.
+  const [deleteWarnings, setDeleteWarnings] = useState<Warning[] | null>(null)
+  const closeDelete = () => {
+    setDeleting(null)
+    setDeleteWarnings(null)
+  }
+  const confirmDelete = (confirmWarnings: boolean) =>
+    deleting &&
+    remove.mutate(
+      { id: deleting.id, confirmWarnings },
+      {
+        onSuccess: () => {
+          toast.success("Operatsiya o'chirildi")
+          closeDelete()
+        },
+        onError: (error) => {
+          const warnings = warningsToConfirm(error)
+          if (warnings) setDeleteWarnings(warnings)
+          else {
+            toast.error(error.message)
+            closeDelete()
+          }
+        },
+      },
+    )
 
   const amountIn = (op: Operation, type: Operation['type']) =>
     op.type === type ? formatMoney(op.amount) : <span className="text-muted-foreground">—</span>
@@ -138,7 +165,7 @@ export function OperationsCard({ contract }: { contract: Contract }) {
         />
       )}
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
+      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && closeDelete()}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Operatsiyani o'chirasizmi?</AlertDialogTitle>
@@ -146,19 +173,31 @@ export function OperationsCard({ contract }: { contract: Contract }) {
               {deleting && `${typeLabel(deleting)}: ${label(deleting)}. Qoldiq va foiz qayta hisoblanadi.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteWarnings && (
+            <Alert className="border-amber-300 bg-amber-50 text-amber-900">
+              <TriangleAlert aria-hidden="true" />
+              <AlertTitle>Diqqat</AlertTitle>
+              <AlertDescription className="text-amber-900">
+                <ul className="list-disc pl-4">
+                  {deleteWarnings.map((w) => (
+                    <li key={w.code + w.message}>{w.message}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Bekor qilish</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() =>
-                deleting &&
-                remove.mutate(deleting.id, {
-                  onSuccess: () => toast.success("Operatsiya o'chirildi"),
-                  onError: (error) => toast.error(error.message),
-                })
-              }
+              disabled={remove.isPending}
+              onClick={(event) => {
+                event.preventDefault() // stay open: the server may answer with warnings to confirm
+                confirmDelete(!!deleteWarnings)
+              }}
             >
-              O'chirish
+              {remove.isPending && <LoaderCircle className="animate-spin" aria-hidden="true" />}
+              {deleteWarnings ? "Baribir o'chirish" : "O'chirish"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

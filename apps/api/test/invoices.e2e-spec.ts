@@ -161,7 +161,10 @@ describe('Monthly invoice list (Module 7)', () => {
 
   it('flags a draft whose month was recalculated afterwards', async () => {
     await agent.put(draft('2026-01')).send({}).expect(200);
-    await agent.post(ops).send({ date: '2026-01-25', type: 'DISBURSEMENT', amount: '1000000' }).expect(201);
+    await agent
+      .post(ops)
+      .send({ date: '2026-01-25', type: 'DISBURSEMENT', amount: '1000000', confirmWarnings: true }) // M8: drafted month warns
+      .expect(201);
     const res = await agent.get('/api/invoices?month=2026-01').expect(200);
     expect(res.body.rows[0].amount).not.toBe('552328.77');
     expect(res.body.rows[0].draft).toMatchObject({ amount: '552328.77', amountChanged: true });

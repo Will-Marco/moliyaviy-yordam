@@ -61,6 +61,35 @@ describe('ContractPage (FR-2.6)', () => {
     await vi.waitFor(() => expect(calls.some((c) => c.method === 'DELETE')).toBe(true))
   })
 
+  it('shows what a deletion would break and deletes only when confirmed (FR-3.2)', async () => {
+    const op = etalonOperations[0]
+    const { calls } = mockApi({
+      [`GET /api/contracts/${etalon.id}`]: () => ({ status: 200, body: etalon }),
+      [`GET ${opsPath}`]: () => ({ status: 200, body: etalonOperations }),
+      [`DELETE ${opsPath}/${op.id}`]: () => ({
+        status: 409,
+        body: {
+          code: 'CONFIRMATION_REQUIRED',
+          message: "Ogohlantirishlarni ko'rib chiqing",
+          warnings: [{ code: 'NEGATIVE_BALANCE', message: "20.01.2026 da asosiy qarz qoldig'i manfiy bo'ladi: -15 000 000,00 so'm" }],
+        },
+      }),
+      [`DELETE ${opsPath}/${op.id}?confirmWarnings=true`]: () => ({ status: 204 }),
+      [`GET ${reportPath}`]: report,
+    })
+    renderWithProviders(<ContractPage />, { route: `/contracts/${etalon.id}`, path: '/contracts/:id' })
+    await userEvent.click(await screen.findByRole('button', { name: /^O'chirish: 05\.01\.2026/ }))
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: "O'chirish" }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(await within(dialog).findByText(/qoldig'i manfiy bo'ladi/)).toBeInTheDocument()
+    expect(calls.filter((c) => c.method === 'DELETE')).toHaveLength(1)
+    await userEvent.click(within(dialog).getByRole('button', { name: "Baribir o'chirish" }))
+    await vi.waitFor(() =>
+      expect(calls.some((c) => c.method === 'DELETE' && c.path.endsWith(`${op.id}?confirmWarnings=true`))).toBe(true),
+    )
+  })
+
   it('reports a missing contract', async () => {
     mockApi({
       [`GET /api/contracts/${etalon.id}`]: () => ({ status: 404, body: { message: 'Shartnoma topilmadi' } }),

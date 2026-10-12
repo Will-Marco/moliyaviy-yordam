@@ -119,6 +119,10 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 ### Modul 3: Operatsiyalar
 - FR-3.1 — Operatsiya kiritish: sana, turi (`berildi` / `asosiy qarz qaytarildi` / `foiz to'landi`), summa (> 0), izoh.
 - FR-3.2 — Operatsiyani tahrirlash va o'chirish (o'chirish — tasdiq bilan). Hisob har doim qayta hisoblanadi (CR-9).
+  O'chirish ham tahrir kabi tekshiriladi (2026-10-12): manfiy qoldiq yoki ortiqcha foiz to'lovi paydo bo'lsa, o'chirish
+  oynasida ogohlantirish va "Baribir o'chirish" (FR-3.3 qoidasi — bloklamaydi).
+- FR-3.7 — Qo'shish, tahrirlash yoki o'chirish **Didox'da qoralama qilingan oy** foizini o'zgartirsa — ogohlantirish
+  (`DRAFTED_INVOICE_CHANGES`: oy, qoralamadagi va yangi summa); bloklamaydi (2026-10-12, Sir).
 - FR-3.3 — Ogohlantirishlar (**bloklamaydi**). "Saqlash" bosilganda forma ichida ko'rsatiladi; buxgalter
   **"Baribir saqlash"** bilan tasdiqlaydi. Ogohlantirish bo'lmasa — darhol saqlanadi:
   - jami berilgan > limit (qanchaga oshishi bilan);
