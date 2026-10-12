@@ -21,11 +21,18 @@
 
 ## Didox (qat'iy chegaralar) — 2026-10-11 da Sir qarori bilan qayta yozildi (yo'l: B — brauzerni boshqarish)
 > Rasmiy partner token yo'q. Didox'ning o'z partner tokenini uning kodidan sug'urib olish **taqiqlangan**
-> (uchinchi tomon kalitini o'zlashtirish). Yo'l B: buxgalter Didox saytiga **o'z brauzerida, odatdagidek ERI bilan**
-> kiradi; ilova shu **ochiq, inson tomonidan kirilgan sessiyani** boshqaradi (forma to'ldirish / Excel yuklash → qoralama).
+> (uchinchi tomon kalitini o'zlashtirish). Yo'l B: ilova Didox saytini **o'z oynasida** ochadi, Didox'ning o'z login
+> sahifasi orqali ERI (E-IMZO) bilan kiradi va shu sessiyani boshqaradi (forma to'ldirish / Excel yuklash → qoralama).
+> 2026-10-12: kirish **avtomatik** — Sir qarori (§13).
 12. Ilova **hech qachon** hujjatni imzolamaydi va yubormaydi — faqat qoralama yaratadi (`tosign`/`sign` yo'q, "Юбориш" bosilmaydi).
-13. ERI va uning paroli ilovaga **umuman tegmaydi**: kirishni buxgalter Didox'ning o'z sahifasida E-IMZO orqali qiladi.
-    Ilova .pfx faylini, ERI yoki Didox parolini so'ramaydi, ko'rmaydi, saqlamaydi.
+13. **ERI paroli ilovada saqlanadi — faqat avtomatik kirish uchun** (2026-10-12, Sir qarori; imzolash xavfi ongli qabul
+    qilingan: parol + `.pfx` bir kompyuterda → texnik jihatdan imzolash mumkin bo'ladi, §12 kod intizomi bilan ushlanadi).
+    - Parol faqat **OS shifri** bilan saqlanadi (Electron `safeStorage`: Windows DPAPI / macOS Keychain) — ochiq matn diskda,
+      log'da, xato xabarida, tarmoqda, UI'da (kiritilgandan keyin) **hech qachon** yo'q. Hash emas: parol qayta ochilishi shart.
+    - Parol faqat bitta joyda ishlatiladi: Didox login paytida **E-IMZO'ning o'z parol oynasiga** yoziladi. Ilova E-IMZO'ning
+      imzolovchi funksiyalarini (`create_pkcs7` va h.k.) o'zi **chaqirmaydi**; E-IMZO'dan faqat kalit ro'yxatini o'qiydi.
+    - `.pfx` fayli E-IMZO'da qoladi — ilova uni o'qimaydi, ko'chirmaydi. "Запомнить на 6 час." belgisi qo'yilmaydi.
+    - Parol xato bo'lsa — to'xtash, firmani "parol xato" deb belgilash, **qayta urinish yo'q** (§15).
 14. **Didox'ning partner tokeni yoki boshqa maxfiy kaliti ilova kodiga olinmaydi.** Ilova Didox API'sini to'g'ridan-to'g'ri
     chaqirmaydi; faqat buxgalter kirgan **sahifa (DOM)** bilan ishlaydi — xuddi buxgalter o'zi bosganidek. Sahifa Didox
     tokenini o'zi ishlatadi.

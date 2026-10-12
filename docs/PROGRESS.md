@@ -3,8 +3,8 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 8 + 9 — **qayta rejalash** (Didox: yo'l B — brauzerni boshqarish; lokal Windows o'rnatish). Avval M8 reja
-**Oxirgi yangilanish:** 2026-10-07
+**Joriy modul:** 8 — Didox xaritalash deyarli tugadi (login, E-IMZO, forma, sinov qoralamasi) → keyingi: M8 reja (complex: plan + plan-reviewer)
+**Oxirgi yangilanish:** 2026-10-12
 
 ## Modullar
 > Har modul = bitta vertical slice = bitta **user-visible harakat**.
@@ -45,6 +45,12 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — **E-IMZO avto-parol spike YASHIL** (macOS): Didox "Кириш" → E-IMZO oynasi → skript parolni Keychain'dan o'qib o'zi yozdi → kirildi (Sir tasdiqladi). Windows'da SendInput (Unicode) bilan qayta sinaladi. didox-flow.md §1b
+- 2026-10-12 — **Didox forma xaritalandi + sinov qoralamasi** (Sir ruxsati; yaratildi → o'chirildi): raqam/sanasiz saqlanadi; kontragent STIR'dan, MXIK'dan birlik/ҚҚСсиз/imtiyoz 102898 avtomatik; ID — Қоралама ro'yxatidan (UUIDv1); kelib chiqishi qo'lda "Хизмат кўрсатиш". docs/research/didox-flow.md §2–2a
+- 2026-10-12 — **Avtomatik kirish: ERI parollari ilovada** (Sir; xavf ongli qabul qilindi — parol+`.pfx` bir joyda → imzolash texnik mumkin). Hash emas — OS shifri (`safeStorage`: DPAPI/Keychain); parol faqat E-IMZO parol oynasiga yoziladi (E-IMZO API parol qabul qilmaydi — apidoc). CONSTITUTION §13 qayta yozildi. Keyingi qadam: macOS spike — E-IMZO oynasiga parolni avtomatik yozish
+- 2026-10-12 — **E-IMZO to'g'ridan-to'g'ri** (Sir yo'llanmasi): Node `WebSocket` 64646/64443 ga API-KEY va Origin'siz ulanib `version` + `pfx.list_all_certificates` oldi (v6.4.7). Ilova kalit ro'yxatini E-IMZO'dan oladi, STIR (`1.2.860.3.16.1.1`) bo'yicha firmaga bog'laydi; Didox login'da shu kalitni bosadi. didox-flow.md §1a
+- 2026-10-12 — **Kalitni ilova tanlaydi** (Sir): buxgalterda bir nechta firma; u ilovada firmani tanlaydi → ilova Didox login'da kalitni STIR bo'yicha topib kiradi → buxgalter faqat E-IMZO parolini kiritadi → qoralamalar. docs/research/didox-flow.md §1
+- 2026-10-12 — Didox xaritalash boshlandi (Sir Chrome'i, read-only): login `/documents/new`→`/login_with_signature`; ERI kalit qidiriladigan ro'yxatdan; **har firma alohida ERI kaliti** (firma tanlash=kalit tanlash, Sir) → to'liq avtonom emas; docs/research/didox-flow.md
 - 2026-10-12 — **macOS paket (electron-builder)**: `.resources/{api,web,migrations}` ga staging — `pnpm --prod deploy --legacy` + build-only Prisma tooling (CLI, engines, studio, dev, typescript, effect) tozalanadi (479M→~297M); `main.js` paketlangan yo'llar (`process.resourcesPath`); native `.node` asarUnpack; imzosiz (`mac.identity: null` — Apple Developer ID yo'q, Gatekeeper ogohlantiradi). `.app` (572M, arm64) yig'ildi; paketlangan API resurslaridan login→200, / va /contracts→200 (Prisma/pglite/argon2 paketdan ishlaydi). `spaFallback` `{ root }` bilan mustahkamlandi. pglite+adapter runtime dependency'ga ko'chdi
 - 2026-10-12 — Qoldi (9b qadoqlash): dmg target (hozir dir), ikona (default Electron), hajm optimizatsiya (ikki pglite nusxasi, es-toolkit), code signing/notarization (Sir Apple ID bilan), Windows NSIS + durability gate
 - 2026-10-12 — **First-run parol** (desktop qatlamida, API o'zgarmadi): birinchi ishga tushishda Electron setup oynasi login+parol so'raydi → argon2id hash + tasodifiy JWT sir `userData/config.json` ga yoziladi (0600) → API shu env bilan ko'tariladi. Tarmoq endpointi yo'q (hijack yo'q). Tiklash: `config.json` o'chirilsa qayta setup (ma'lumot `userData/db` da qoladi). Headless: config save/verify, login to'g'ri→200+cookie, xato→401 tasdiqlandi
@@ -112,6 +118,8 @@ Hajm: `trivial | standard | complex`
 - 2026-10-07 — Mijoz suhbati: faktura qatori doimiy (faqat oy va narx o'zgaradi); faktura raqami/sanasini buxgalter Didox'da qo'yadi; ilova faqat qoralama yaratadi — SRS §9.1–9.2
 
 ## Ochiq risk / texnik qarz
+- M9b qadoqlash: `pnpm --prod deploy` repo'dagi `node_modules/.pnpm-workspace-state-v1.json` ga `"dev": false` yozadi → keyingi har `pnpm run` "install --production" qilib yiqiladi (commit hook ham). Vaqtincha: `pnpm install --frozen-lockfile`. Tuzatish: qadoqlash skriptidan keyin holatni tiklash yoki deploy'ni alohida papkada qilish
+- PGlite testlari (`backup.spec`, `prisma.service.spec`) to'liq `pnpm test` ostida ba'zan 5 s timeout'ga uriladi (alohida 1.5 s) — test timeout'ini oshirish kerak
 - **Didox ichki API** (2026-10-11): akkaunt bloklanishi, Didox o'zgartirsa ogohlantirishsiz buzilish, foydalanish shartlariga ziddlik — Sir qabul qilgan. Har chaqiriq javobi tekshiriladi, kutilmagan javobda to'xtaladi
 - E-IMZO har kirishda ERI parolini o'z oynasida so'raydi → oy 1-kuni 06:00 to'liq avtomatik ishga tushish **bo'lmasligi** mumkin (spike'da tekshiriladi)
 - Har buxgalterda alohida baza → zaxira nusxa va ilovani yangilash har kompyuterda (M9)
