@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { DatabaseBackup, FolderOpen } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useDesktop } from '@/lib/desktop'
@@ -30,7 +31,7 @@ export function BackupMenu() {
         <p className="text-muted-foreground text-xs">
           Ilova har kuni bazadan avtomatik nusxa oladi: oxirgi 14 kun va har oydan bittasi (1 yil) saqlanadi.
         </p>
-        <Button variant="outline" className="h-9" onClick={() => void desktop.backups.openFolder()}>
+        <Button variant="outline" className="h-9" onClick={() => desktop.backups.openFolder().catch(() => toast.error("Zaxira papkasini ochib bo'lmadi"))}>
           <FolderOpen aria-hidden="true" />
           Zaxira papkasini ochish
         </Button>

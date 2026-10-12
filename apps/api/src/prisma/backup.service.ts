@@ -34,14 +34,26 @@ export class BackupService implements OnApplicationBootstrap, OnModuleDestroy {
     clearInterval(this.timer);
   }
 
+  private inFlight?: Promise<string | null>;
+
   /** Writes today's backup if it is missing and prunes old ones. Returns the new file, or null if nothing was due. */
-  async runDaily(): Promise<string | null> {
+  runDaily(): Promise<string | null> {
+    // One run at a time: an overlapping call waits for the running one instead of writing the same file.
+    this.inFlight ??= this.backupNow().finally(() => (this.inFlight = undefined));
+    return this.inFlight;
+  }
+
+  private async backupNow(): Promise<string | null> {
     const local = this.prisma.localDatabase();
     if (!local) return null;
     const file = join(local.backupsDir, dailyBackupName(this.clock.today()));
+    mkdirSync(local.backupsDir, { recursive: true });
+    // Writes cut short by a crash or power loss: never finished, never restorable.
+    for (const name of readdirSync(local.backupsDir)) {
+      if (name.endsWith('.tgz.partial')) rmSync(join(local.backupsDir, name), { force: true });
+    }
     let made: string | null = null;
     if (!existsSync(file)) {
-      mkdirSync(local.backupsDir, { recursive: true });
       const dump = await local.pglite.dumpDataDir();
       // Write aside, then rename: a crash mid-write never leaves a file that looks like today's finished backup.
       writeFileSync(`${file}.partial`, Buffer.from(await dump.arrayBuffer()));

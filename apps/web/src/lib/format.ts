@@ -62,23 +62,30 @@ export function rateInRange(value: string): boolean {
   return units > 0n && units <= 100n * 10_000n
 }
 
-/** A moment ("2026-09-30T20:00:00.000Z") → the accountants' calendar date in Tashkent ("01.10.2026"). */
-/** Instant → "12.10.2026 11:05" in Tashkent time. */
-export function formatInstantDateTime(value: string): string {
-  const parts = Object.fromEntries(
+/** Date (and optionally time) parts of a moment in Tashkent — the accountants' calendar. */
+const tashkentParts = (value: string, time: boolean) =>
+  Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      timeZone: 'Asia/Tashkent',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      ...(time && { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
     })
       .formatToParts(new Date(value))
       .map((p) => [p.type, p.value]),
   )
-  return `${parts.day}.${parts.month}.${parts.year} ${parts.hour}:${parts.minute}`
+
+/** Instant → "12.10.2026 11:05" in Tashkent time. */
+export function formatInstantDateTime(value: string): string {
+  const p = tashkentParts(value, true)
+  return `${p.day}.${p.month}.${p.year} ${p.hour}:${p.minute}`
 }
 
+/** A moment ("2026-09-30T20:00:00.000Z") → the accountants' calendar date in Tashkent ("01.10.2026"). */
 export function formatInstantDate(value: string): string {
-  return new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric' }).format(
-    new Date(value),
-  )
+  const p = tashkentParts(value, false)
+  return `${p.day}.${p.month}.${p.year}`
 }
 
 /**

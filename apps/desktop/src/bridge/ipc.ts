@@ -1,4 +1,4 @@
-import { readdir, stat } from 'node:fs/promises'
+import { mkdir, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { type BrowserWindow, ipcMain, type IpcMainInvokeEvent, shell } from 'electron'
 import { WebSocket } from 'ws'
@@ -76,6 +76,7 @@ export function registerIpc(getAppWindow: () => BrowserWindow | null, origin: st
   ipcMain.handle(
     'backups:open-folder',
     guarded(async () => {
+      await mkdir(backupsDir, { recursive: true }) // before the first backup the folder may not exist yet
       const error = await shell.openPath(backupsDir)
       if (error) throw new Error(error)
     }),

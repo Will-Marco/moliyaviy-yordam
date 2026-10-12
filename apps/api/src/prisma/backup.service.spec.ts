@@ -21,8 +21,13 @@ describe('daily backup of the local database (M9)', () => {
     const prisma = new PrismaService(config(dir));
     await prisma.onModuleInit(); // also writes a before-migrate snapshot into `backups`
     await prisma.company.create({ data: { name: 'ZAXIRA MCHJ', tin: '306000001' } });
+    for (let day = 29; day <= 41; day++) {
+      // 2026-09-29 … 2026-10-11: the last two weeks are full, so older dailies fall out of the window.
+      writeFileSync(join(backups, `daily-${new Date(Date.UTC(2026, 8, day)).toISOString().slice(0, 10)}.tgz`), 'recent');
+    }
     writeFileSync(join(backups, 'daily-2026-09-01.tgz'), 'old'); // first of September: kept as the monthly copy
     writeFileSync(join(backups, 'daily-2026-09-20.tgz'), 'old'); // older than 14 days: dropped
+    writeFileSync(join(backups, 'daily-2026-10-01.tgz.partial'), 'cut'); // a write cut short by a crash
     const service = new BackupService(prisma, { today: () => '2026-10-12' } as Clock);
 
     const made = await service.runDaily();
@@ -31,6 +36,7 @@ describe('daily backup of the local database (M9)', () => {
     const files = readdirSync(backups);
     expect(files).toEqual(expect.arrayContaining(['daily-2026-10-12.tgz', 'daily-2026-09-01.tgz']));
     expect(files).not.toContain('daily-2026-09-20.tgz');
+    expect(files.filter((f) => f.endsWith('.partial'))).toEqual([]);
     expect(files.some((f) => f.startsWith('before-migrate-'))).toBe(true);
 
     expect(await service.runDaily()).toBeNull(); // already done today
