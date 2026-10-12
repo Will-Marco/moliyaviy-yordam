@@ -107,6 +107,8 @@ model InvoiceDraft {
   month           String   @db.Char(7)
   amount          Decimal  @db.Decimal(18, 2)
   didoxDocumentId String?  @map("didox_document_id") @db.VarChar(100)
+  /// "manual" — marked by hand (M7); "didox" — the app saved it in Didox (M8). CHECK in migration.
+  source          String   @default("manual") @db.VarChar(10)
   draftedAt       DateTime @map("drafted_at") @db.Timestamptz(3)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)

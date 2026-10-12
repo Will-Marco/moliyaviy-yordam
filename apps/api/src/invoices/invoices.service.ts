@@ -3,6 +3,7 @@ import { Clock, tashkentDate } from '../common/clock.js';
 import { fromDbDate } from '../common/dates.js';
 import { formatDate } from '../common/format.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { toTiyin } from '../interest/engine.js';
 import { money } from '../interest/report.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MarkDraftDto, MONTH } from './dto/invoice.dto.js';
@@ -68,9 +69,18 @@ export class InvoicesService {
     const contract = await this.find(month, contractId);
     const interest = monthInterest(contract, month, this.clock.today());
     if (interest <= 0n) throw new BadRequestException("Bu oy uchun foiz yo'q — faktura tuzilmaydi");
+    if (dto.expectedAmount !== undefined && toTiyin(dto.expectedAmount) !== interest) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'AMOUNT_CHANGED',
+        message: `Summa o'zgargan: Didox'dagi qoralamada ${money(toTiyin(dto.expectedAmount))}, hozirgi hisob ${money(interest)}`,
+      });
+    }
 
     const existing = contract.invoiceDrafts[0];
-    if (existing && !dto.confirmWarnings) {
+    // The app may complete a hand mark that has no Didox ID with the one it read from Didox (no duplicate is made).
+    const attachesId = dto.source === 'didox' && existing?.didoxDocumentId === null;
+    if (existing && !dto.confirmWarnings && !attachesId) {
       const id = existing.didoxDocumentId ? `, Didox ID: ${existing.didoxDocumentId}` : '';
       throw new ConflictException({
         statusCode: 409,
@@ -82,7 +92,12 @@ export class InvoicesService {
       });
     }
 
-    const data = { amount: money(interest), didoxDocumentId: dto.didoxDocumentId || null, draftedAt: new Date() };
+    const data = {
+      amount: money(interest),
+      didoxDocumentId: dto.didoxDocumentId || null,
+      draftedAt: new Date(),
+      source: dto.source ?? 'manual',
+    };
     const draft = await this.prisma.invoiceDraft.upsert({
       where: { contractId_month: { contractId, month } },
       create: { contractId, month, ...data },

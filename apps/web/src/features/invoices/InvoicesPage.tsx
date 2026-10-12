@@ -228,7 +228,9 @@ function InvoiceRow({ invoice: r, onMark, onUnmark }: { invoice: Invoice; onMark
       <TableCell className="min-w-40 whitespace-normal">
         {r.draft ? (
           <div className="grid gap-1">
-            <Badge className="bg-emerald-100 text-emerald-900">Qoralama yaratildi</Badge>
+            <Badge className="bg-emerald-100 text-emerald-900">
+              {r.draft.source === 'didox' ? 'Qoralama yaratildi (Didox)' : 'Qoralama yaratildi'}
+            </Badge>
             <span className="text-muted-foreground text-xs tabular-nums">
               {formatInstantDate(r.draft.draftedAt)}
               {r.draft.didoxDocumentId && ` · ID ${r.draft.didoxDocumentId}`}

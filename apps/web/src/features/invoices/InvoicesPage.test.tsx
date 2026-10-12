@@ -114,8 +114,15 @@ describe('InvoicesPage (Module 7)', () => {
     expect(await navigator.clipboard.readText()).toBe('28.12.2025')
   })
 
+  it('tells a draft the app created in Didox apart from a hand mark (M8)', async () => {
+    const byApp = { ...ready, draft: { amount: ready.amount, didoxDocumentId: '36B734EEC5FE11F1BEFEFA163EA3FD69', draftedAt: '2026-10-01T04:00:00.000Z', amountChanged: false, source: 'didox' as const } }
+    mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([byApp]) }) })
+    renderWithProviders(<InvoicesPage />)
+    expect(await screen.findByText('Qoralama yaratildi (Didox)')).toBeInTheDocument()
+  })
+
   it('marks an invoice as drafted with an optional Didox ID (FR-7.4)', async () => {
-    const drafted = { ...ready, draft: { amount: ready.amount, didoxDocumentId: 'D-1', draftedAt: '2026-10-01T04:00:00.000Z', amountChanged: false } }
+    const drafted = { ...ready, draft: { amount: ready.amount, didoxDocumentId: 'D-1', draftedAt: '2026-10-01T04:00:00.000Z', amountChanged: false, source: 'manual' as const } }
     let current = list([ready])
     const api = mockApi({
       'GET /api/invoices': () => ({ status: 200, body: current }),
@@ -158,7 +165,7 @@ describe('InvoicesPage (Module 7)', () => {
   })
 
   it('shows when a drafted amount no longer matches and lets the mark be removed', async () => {
-    const stale = { ...ready, draft: { amount: '500000.00', didoxDocumentId: null, draftedAt: '2026-10-01T04:00:00.000Z', amountChanged: true } }
+    const stale = { ...ready, draft: { amount: '500000.00', didoxDocumentId: null, draftedAt: '2026-10-01T04:00:00.000Z', amountChanged: true, source: 'manual' as const } }
     const api = mockApi({
       'GET /api/invoices': () => ({ status: 200, body: list([stale]) }),
       [`DELETE /api/invoices/2026-09/${ready.contractId}/draft`]: () => ({ status: 204 }),
@@ -172,7 +179,7 @@ describe('InvoicesPage (Module 7)', () => {
   })
 
   it('keeps the Didox ID when an invoice is marked again', async () => {
-    const drafted = { ...ready, draft: { amount: ready.amount, didoxDocumentId: 'D-1', draftedAt: '2026-10-01T04:00:00.000Z', amountChanged: false } }
+    const drafted = { ...ready, draft: { amount: ready.amount, didoxDocumentId: 'D-1', draftedAt: '2026-10-01T04:00:00.000Z', amountChanged: false, source: 'manual' as const } }
     mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([drafted]) }) })
     renderWithProviders(<InvoicesPage />)
     await userEvent.click(await screen.findByRole('button', { name: 'Qayta belgilash: № 1' }))
@@ -180,7 +187,7 @@ describe('InvoicesPage (Module 7)', () => {
   })
 
   it('only lets a draft be removed once the month has no interest left', async () => {
-    const zero = { ...ready, amount: '0.00', draft: { amount: '100.00', didoxDocumentId: null, draftedAt: '2026-10-01T04:00:00.000Z', amountChanged: true } }
+    const zero = { ...ready, amount: '0.00', draft: { amount: '100.00', didoxDocumentId: null, draftedAt: '2026-10-01T04:00:00.000Z', amountChanged: true, source: 'manual' as const } }
     mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([zero]) }) })
     renderWithProviders(<InvoicesPage />)
     expect(await screen.findByRole('button', { name: 'Belgini olib tashlash: № 1' })).toBeInTheDocument()

@@ -95,19 +95,20 @@ describe('monthInterest and invoiceRow (FR-7.1–7.4)', () => {
   });
 
   it('marks a draft and flags an amount that changed since (FR-7.4)', () => {
-    const draft = { amount: new Prisma.Decimal('552328.77'), didoxDocumentId: 'abc', draftedAt: new Date('2026-02-01T04:00:00Z') };
+    const draft = { amount: new Prisma.Decimal('552328.77'), didoxDocumentId: 'abc', draftedAt: new Date('2026-02-01T04:00:00Z'), source: 'manual' };
     expect(invoiceRow('2026-01', 55232877n, draft)?.draft).toEqual({
       amount: '552328.77',
       didoxDocumentId: 'abc',
       draftedAt: '2026-02-01T04:00:00.000Z',
       amountChanged: false,
+      source: 'manual',
     });
     const stale = { ...draft, amount: new Prisma.Decimal('500000') };
     expect(invoiceRow('2026-01', 55232877n, stale)?.draft).toMatchObject({ amount: '500000.00', amountChanged: true });
   });
 
   it('keeps a drafted month even if its interest is now zero, so the stale draft is visible', () => {
-    const draft = { amount: new Prisma.Decimal('100'), didoxDocumentId: null, draftedAt: new Date('2026-01-01T00:00:00Z') };
+    const draft = { amount: new Prisma.Decimal('100'), didoxDocumentId: null, draftedAt: new Date('2026-01-01T00:00:00Z'), source: 'manual' };
     expect(invoiceRow('2025-12', 0n, draft)).toMatchObject({
       amount: '0.00',
       draft: { amount: '100.00', amountChanged: true },

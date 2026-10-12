@@ -35,13 +35,14 @@ export interface StoredDraft {
   amount: Prisma.Decimal;
   didoxDocumentId: string | null;
   draftedAt: Date;
+  source: string;
 }
 
 export interface InvoiceRow {
   lineName: string;
   amount: string;
   /** Null — `tayyor`; otherwise `qoralama yaratildi` (FR-7.4). */
-  draft: { amount: string; didoxDocumentId: string | null; draftedAt: string; amountChanged: boolean } | null;
+  draft: { amount: string; didoxDocumentId: string | null; draftedAt: string; amountChanged: boolean; source: string } | null;
 }
 
 /**
@@ -68,6 +69,7 @@ export function invoiceRow(month: string, interest: bigint, draft: StoredDraft |
       didoxDocumentId: draft.didoxDocumentId,
       draftedAt: draft.draftedAt.toISOString(),
       amountChanged: toTiyin(draft.amount) !== interest,
+      source: draft.source,
     },
   };
 }

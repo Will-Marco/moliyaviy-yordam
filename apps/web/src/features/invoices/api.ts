@@ -18,6 +18,8 @@ export interface Invoice {
     didoxDocumentId: string | null
     draftedAt: string
     amountChanged: boolean
+    /** `didox` — the desktop app saved it in Didox (M8); `manual` — marked by hand. */
+    source: 'manual' | 'didox'
   } | null
 }
 

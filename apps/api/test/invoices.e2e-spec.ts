@@ -167,6 +167,54 @@ describe('Monthly invoice list (Module 7)', () => {
     expect(res.body.rows[0].draft).toMatchObject({ amount: '552328.77', amountChanged: true });
   });
 
+  const DIDOX_ID = '36B734EEC5FE11F1BEFEFA163EA3FD69';
+
+  it('records whether a draft was marked by hand or created in Didox by the app (M8)', async () => {
+    const manual = await agent.put(draft('2026-01')).send({}).expect(200);
+    expect(manual.body.draft.source).toBe('manual');
+
+    const fromDidox = await agent.put(draft('2026-02')).send({ didoxDocumentId: DIDOX_ID, source: 'didox' }).expect(200);
+    expect(fromDidox.body.draft).toMatchObject({ source: 'didox', didoxDocumentId: DIDOX_ID });
+    const list = await agent.get('/api/invoices?month=2026-02').expect(200);
+    expect(list.body.rows[0].draft.source).toBe('didox');
+  });
+
+  it('requires a real Didox document ID when the app marks a draft (M8)', async () => {
+    await agent.put(draft('2026-01')).send({ source: 'didox' }).expect(400);
+    await agent.put(draft('2026-01')).send({ source: 'didox', didoxDocumentId: 'D-42' }).expect(400);
+    await agent.put(draft('2026-01')).send({ source: 'robot', didoxDocumentId: DIDOX_ID }).expect(400);
+    await agent.put(draft('2026-01')).send({ didoxDocumentId: 'D-42' }).expect(200); // by hand: free text, as before
+  });
+
+  it('refuses to mark a draft whose amount in Didox no longer matches the month (M8)', async () => {
+    await agent.post(ops).send({ date: '2026-01-25', type: 'DISBURSEMENT', amount: '1000000' }).expect(201);
+
+    const conflict = await agent
+      .put(draft('2026-01'))
+      .send({ source: 'didox', didoxDocumentId: DIDOX_ID, expectedAmount: '552328.77' })
+      .expect(409);
+    expect(conflict.body).toMatchObject({ code: 'AMOUNT_CHANGED' });
+    const list = await agent.get('/api/invoices?month=2026-01').expect(200);
+    expect(list.body.rows[0].draft).toBeNull();
+
+    const current = list.body.rows[0].amount as string;
+    await agent.put(draft('2026-01')).send({ source: 'didox', didoxDocumentId: DIDOX_ID, expectedAmount: current }).expect(200);
+    await agent.put(draft('2026-02')).send({ expectedAmount: '12,5' }).expect(400);
+  });
+
+  it('lets the app attach its Didox ID to a hand mark that has none, but never overwrites an ID (M8)', async () => {
+    await agent.put(draft('2026-01')).send({}).expect(200);
+    const attached = await agent.put(draft('2026-01')).send({ source: 'didox', didoxDocumentId: DIDOX_ID }).expect(200);
+    expect(attached.body.draft).toMatchObject({ source: 'didox', didoxDocumentId: DIDOX_ID });
+
+    const other = '4593FDCEC24511F1B1CBFA163EA3FD69';
+    const conflict = await agent.put(draft('2026-01')).send({ source: 'didox', didoxDocumentId: other }).expect(409);
+    expect(conflict.body).toMatchObject({ code: 'CONFIRMATION_REQUIRED', warnings: [{ code: 'ALREADY_DRAFTED' }] });
+
+    await agent.put(draft('2026-02')).send({ didoxDocumentId: 'D-7' }).expect(200);
+    await agent.put(draft('2026-02')).send({ source: 'didox', didoxDocumentId: DIDOX_ID }).expect(409);
+  });
+
   it('refuses to mark a month without interest, an open month or an unknown contract', async () => {
     await agent.put(draft('2025-12')).send({}).expect(400);
     await agent.put(draft('2026-10')).send({}).expect(400);
