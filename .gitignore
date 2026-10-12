@@ -13,3 +13,7 @@ apps/api/src/generated/
 apps/desktop/.resources/
 apps/desktop/dist-app/
 apps/desktop/dist/
+
+# local bundles (not part of the docs)
+docs/M8-toplam.md
+M8b-macOS/
