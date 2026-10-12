@@ -31,9 +31,8 @@ Hajm: `trivial | standard | complex`
 ## Keyingi sessiya uchun (2026-10-12 dagi to'xtash nuqtasi)
 - **Reja (Sir, 2026-10-12): Windows'ga bog'liq ishlar keyinga** (A1 NSIS o'rnatgich, A2 Windows gate — Windows PC
   bo'lganda). Navbat prioritet bo'yicha:
-  1. **B1 — Didox "Excel юклаш" importi** (taklif; M8 formasini avtomatlashtirish Claude qura olmaydi): ilova beruvchi firma ×
-     oy uchun `tayyor` fakturalarni Didox import shabloni formatida Excel qiladi → buxgalter Didox'da o'zi yuklaydi.
-     **Bloker:** Sir Didox'ga kirib, shablonni birga o'rganamiz (yuklab olish — Sir ruxsati bilan).
+  1. ~~B1 — Didox Excel importi~~ — **bekor (Sir, 2026-10-12): kerak emas, ortiqcha murakkablik.** Ilova maqsadi — foizni aniq
+     hisoblash, qoldiqlar, Excel hisobot; Didox uchun ma'lumot M7 Fakturalar sahifasida (nusxalash + belgilash) yetarli.
   2. A3 — qaror: qo'lda yangilash (Sir). A5 bajarildi (2026-10-12).
   3. Past: logout JWT bekor qilish, company DTO helper, ko'p shartnomada tezlik.
 - **M8 holati:** M8a accepted (E-IMZO kalitlar). ERI parolini saqlash/avto-yozish va Didox formasini avtomatik to'ldirish —
@@ -47,10 +46,11 @@ Hajm: `trivial | standard | complex`
   `formatTiyin`/`formatMoney` mingliklarni NBSP (`\u00a0`) bilan ajratadi — test matnlarida hisobga oling.
 - **Uslub:** TDD, seam'lar Sir bilan kelishiladi; har ishdan keyin `code-review` (high) + `ReportFindings`, brauzerda
   tekshiruv; commit inglizcha, `Co-Authored-By` siz; tayyor ishlar `main` ga push.
-- **Sir'dan kutilayotganlar:** Didox sessiyasi (B1 shablon); o'zbekcha Didox eksport namunasi (FR-1.3); Windows PC (A2);
+- **Sir'dan kutilayotganlar:** o'zbekcha Didox eksport namunasi (FR-1.3); Windows PC (A2);
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-12 — **B1 (Didox Excel importi) bekor — Sir:** "bu xususiyat kerak emas". Saboq: Didox avtomatlashtirish imkonsiz bo'lgach muqobil izlashni davom ettirmasdan, avval ilova maqsadiga zarurligini so'rash kerak edi. Tadqiqot hujjati (docs/research/didox-excel-import.md) ma'lumot uchun qoladi
 - 2026-10-12 — **A3: yangilanish qo'lda** — Sir. Yangi versiya = yangi o'rnatgich (dmg / keyin Windows NSIS), buxgalter ustidan o'rnatadi; ma'lumot `userData` da qoladi (migratsiya + snapshot ilova ichida). Avtomatik yangilanish (electron-updater) yo'q
 - 2026-10-12 — **A5 macOS qadoqlash:** API runtime bog'liqliklari Node resolution bo'yicha hisoblanib (`scripts/runtime-packages.mjs`, Prisma CLI tarmog'isiz) qolgani kesiladi + Prisma'ning postgresql'dan boshqa query compiler'lari va .map'lar olib tashlanadi: staged API 299M→170M, .app 627M→489M, `dmg` 160M (`pack:mac:dmg`, hdiutil verify VALID). Kesilgan ilova smoke: setup, login, validatsiya, shartnoma/operatsiya/hisobot, Excel, fakturalar, kunlik zaxira. Ikonka: `build/icon.svg`→`icon.png` (sarlavhadagi Landmark, #1E40AF)
 - 2026-10-12 — `pnpm audit --prod`: 4 ta (mysql2 ×2, deepmerge-ts, uuid — hammasi tranzitiv) → pnpm `overrides` bilan yamalgan versiyalar; audit toza; unit/e2e (pg+PGlite, Excel), prisma validate, qadoqlash staging tekshirildi
