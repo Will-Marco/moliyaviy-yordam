@@ -1,0 +1,9 @@
+const { contextBridge, ipcRenderer } = require('electron')
+
+// Desktop-only bridge for the app window (M8). Whitelisted calls only; no Node access reaches the page.
+contextBridge.exposeInMainWorld('desktop', {
+  platform: process.platform,
+  eri: {
+    listKeys: (tins) => ipcRenderer.invoke('eri:list-keys', tins),
+  },
+})

@@ -1,10 +1,14 @@
-import { Building2, FileUp, Pencil, Plus } from 'lucide-react'
+import { Building2, FileUp, KeyRound, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { QueryErrorState } from '@/components/QueryErrorState'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useEriKeys } from '@/features/eri/api'
+import { EriKeyCell } from '@/features/eri/EriKeyCell'
+import { useDesktop } from '@/lib/desktop'
 import { type Company, missingRequisites, useCompanies } from './api'
 import { CompanyFormDialog } from './CompanyFormDialog'
 import { ImportCompaniesDialog } from './ImportCompaniesDialog'
@@ -16,6 +20,9 @@ export function CompaniesPage() {
   const [dialog, setDialog] = useState<DialogState>({ open: false })
   const [importOpen, setImportOpen] = useState(false)
   const openNew = () => setDialog({ open: true })
+  const desktop = useDesktop()
+  const eri = useEriKeys(companies.data?.map((c) => c.tin) ?? [])
+  const keys = eri.data?.eimzo === 'ok' ? eri.data.keys : null
 
   return (
     <section className="grid gap-4" aria-labelledby="companies-title">
@@ -37,6 +44,15 @@ export function CompaniesPage() {
           </Button>
         </div>
       </div>
+
+      {eri.data && eri.data.eimzo !== 'ok' && (
+        <Alert className="border-amber-300 bg-amber-50 text-amber-900">
+          <KeyRound aria-hidden="true" />
+          <AlertDescription className="text-amber-900">
+            ERI kalitlarini o'qib bo'lmadi: {eri.data.message}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {companies.error ? (
         <QueryErrorState error={companies.error} onRetry={() => companies.refetch()} />
@@ -68,6 +84,7 @@ export function CompaniesPage() {
                 <TableHead>QQS kodi</TableHead>
                 <TableHead>Hisob raqami</TableHead>
                 <TableHead>MFO</TableHead>
+                {desktop && <TableHead>ERI kalit</TableHead>}
                 <TableHead className="w-12">
                   <span className="sr-only">Amallar</span>
                 </TableHead>
@@ -91,6 +108,11 @@ export function CompaniesPage() {
                   </TableCell>
                   <TableCell className="font-mono tabular-nums">{company.bankAccount ?? <Dash />}</TableCell>
                   <TableCell className="font-mono tabular-nums">{company.mfo ?? <Dash />}</TableCell>
+                  {desktop && (
+                    <TableCell>
+                      <EriKeyCell eriKey={keys?.[company.tin]} />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Button
                       variant="ghost"

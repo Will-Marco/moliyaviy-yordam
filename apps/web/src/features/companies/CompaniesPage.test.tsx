@@ -34,6 +34,45 @@ describe('CompaniesPage', () => {
     expect(within(full).queryByText("Rekvizitlar to'liq emas")).not.toBeInTheDocument()
   })
 
+  it('has no ERI column in a plain browser', async () => {
+    mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa] }) })
+    renderWithProviders(<CompaniesPage />)
+    await screen.findByText('"ALFA SAVDO" MCHJ')
+    expect(screen.queryByRole('columnheader', { name: 'ERI kalit' })).not.toBeInTheDocument()
+  })
+
+  it("shows each firm's ERI key status in the desktop app", async () => {
+    const beta = { ...alfa, id: '0192f000-0000-7000-8000-000000000002', name: 'BETA', tin: '300000002' }
+    const gamma = { ...alfa, id: '0192f000-0000-7000-8000-000000000003', name: 'GAMMA', tin: '300000003' }
+    const listKeys = vi.fn(async () => ({
+      eimzo: 'ok',
+      keys: {
+        '300000001': { status: 'ok', org: 'alfa savdo mchj', title: 'direktor', validTo: '2028-01-21T12:04:52' },
+        '300000002': { status: 'expired', org: 'beta', title: 'direktor', validTo: '2026-01-01T00:00:00' },
+        '300000003': { status: 'missing' },
+      },
+    }))
+    vi.stubGlobal('desktop', { platform: 'darwin', eri: { listKeys } })
+    mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa, beta, gamma] }) })
+    renderWithProviders(<CompaniesPage />)
+
+    const row = async (name: string) => (await screen.findByText(name)).closest('tr')!
+    expect(await within(await row('"ALFA SAVDO" MCHJ')).findByText('21.01.2028 gacha')).toBeInTheDocument()
+    expect(within(await row('BETA')).getByText("Muddati o'tgan")).toBeInTheDocument()
+    expect(within(await row('GAMMA')).getByText("Kalit yo'q")).toBeInTheDocument()
+    expect(listKeys).toHaveBeenCalledWith(['300000001', '300000002', '300000003'])
+  })
+
+  it('says when E-IMZO is not running', async () => {
+    vi.stubGlobal('desktop', {
+      platform: 'darwin',
+      eri: { listKeys: async () => ({ eimzo: 'not_running', message: 'E-IMZO ishga tushirilmagan' }) },
+    })
+    mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa] }) })
+    renderWithProviders(<CompaniesPage />)
+    expect(await screen.findByText(/E-IMZO ishga tushirilmagan/)).toBeInTheDocument()
+  })
+
   it('shows an empty state with a call to action', async () => {
     mockApi({ 'GET /api/companies': () => ({ status: 200, body: [] }) })
     renderWithProviders(<CompaniesPage />)

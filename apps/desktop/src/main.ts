@@ -2,6 +2,8 @@ import { type ChildProcess, fork } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { registerIpc } from './bridge/ipc.js'
+import { isSameOrigin } from './bridge/trust.js'
 import { type AppConfig, isConfigured, loadConfig, saveCredentials } from './config.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -15,6 +17,9 @@ const migrationsDir = res ? join(res, 'migrations') : resolve(here, '../../api/p
 const userData = () => app.getPath('userData')
 
 let api: ChildProcess | null = null
+let baseUrl: string | null = null
+let appWin: BrowserWindow | null = null
+let ipcRegistered = false
 
 /** Boot the API in a child process (PGlite, ephemeral port) with this install's credentials. */
 function startApi(config: AppConfig): Promise<string> {
@@ -49,11 +54,16 @@ function appWindow(baseUrl: string): BrowserWindow {
     width: 1280,
     height: 860,
     title: 'Moliyaviy yordam',
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      preload: join(assets, 'app-preload.cjs'),
+    },
   })
-  // Keep the app inside its own origin; send any other link to the real browser (hardening before M8).
+  // Keep the app inside its own origin (parsed, so `http://host@evil` lookalikes fail); other links go to the browser.
   win.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith(baseUrl)) {
+    if (!isSameOrigin(url, new URL(baseUrl).origin)) {
       event.preventDefault()
       void shell.openExternal(url)
     }
@@ -67,10 +77,17 @@ function appWindow(baseUrl: string): BrowserWindow {
 }
 
 async function launchApp(): Promise<void> {
-  const config = loadConfig(userData())
-  if (!config) throw new Error('config.json is missing')
-  const baseUrl = await startApi(config)
-  appWindow(baseUrl)
+  // macOS `activate` reopens a window after the last one closed: reuse the running API, never start a second one.
+  if (!baseUrl) {
+    const config = loadConfig(userData())
+    if (!config) throw new Error('config.json is missing')
+    baseUrl = await startApi(config)
+  }
+  appWin = appWindow(baseUrl)
+  if (!ipcRegistered) {
+    registerIpc(() => appWin, new URL(baseUrl).origin)
+    ipcRegistered = true
+  }
 }
 
 /** First run: a local setup window collects the password; no network endpoint is involved. */
