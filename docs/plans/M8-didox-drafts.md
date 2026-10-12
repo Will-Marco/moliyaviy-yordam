@@ -5,7 +5,7 @@
 > `tayyor` fakturalari uchun Didox formasini to'ldirib **qoralama** saqlaydi, qoralama ID'sini yozib qo'yadi va chiqadi.
 > Ilova hech qachon imzolamaydi (CONSTITUTION §12).
 
-Status: **reja (Fable, 2026-10-12)** → plan-reviewer (Sonnet) → Sir gate → qurish Opus sessiyada.
+Status: **reja v2 (Fable, 2026-10-12)** — plan-reviewer o'tdi, Sir ochiq qarorlarni berdi → **Sir gate** → qurish Opus sessiyada (M8a dan).
 Manbalar: docs/research/didox-flow.md (login, E-IMZO, forma, sinov qoralamasi — hammasi real Didox'da tekshirilgan),
 docs/research/e-imzo.md, CONSTITUTION §12–16, SRS §9.1–9.2, PROGRESS qaror jurnali (2026-10-12).
 
@@ -286,7 +286,7 @@ rejaga kirgach. Hammasi qabul qilindi, `didox_runs` bo'yicha reviewer varianti t
 **B4 — Electron oynasida real Didox ERI login spike (M8b kodidan oldin, Sir bilan, kodsiz vaqtinchalik skript):** partition, UA,
 `wss://127.0.0.1:64443` sertifikat ishonchi, kalit menyusi, "Кириш" → E-IMZO oynasi, to'g'ri va noto'g'ri parol xulqi (M2).
 
-**M1 — qorovulsiz 06:00 va'dasi rostlanadi** (⚠️ Sir qarori kerak): SRS "09:00 gacha tayyor" olib tashlanadi. FR-8.10: ilova
+**M1 — qorovulsiz 06:00 va'dasi rostlanadi** (✅ Sir, 2026-10-12: "shartli 06:00 + bildirishnoma"): SRS "09:00 gacha tayyor" olib tashlanadi. FR-8.10: ilova
 **shartlar bajarilganda** ishlaydi — ekran qulflanmagan, foydalanuvchi ≥2 daq idle (fokus o'g'irlamaslik), E-IMZO ishlayapti, kalit
 tashuvchi ulangan, Accessibility ruxsati bor (`isTrustedAccessibilityClient(false)` preflight). Shartlar bajarilmasa — **bildirishnoma**
 ("Didox qoralamalari kutmoqda — ishga tushirish") + ilova ochilganda/uyg'onganda/qulf ochilganda catch-up. 06:00 — shartli.
@@ -321,7 +321,7 @@ tartibi, `limit` chegarasi, pagination; (5) ikkinchi `/create_document` bo'shmi,
 (6) imzolash/yuborish endpoint nomlari (faqat Network kuzatuvi); (7) **Windows**: E-IMZO oynasi/jarayoni, UAC, foreground, `SendInput`.
 
 **M9 — Windows:** autotype Windows spike'i M8d'dan **M8b ga** suriladi; M8b/M8c acceptance "macOS'da tasdiqlangan, Windows gate
-ochiq" deb yoziladi. ⚠️ Sir'dan Windows PC (E-IMZO + kalit bilan) qachon bo'lishi so'raladi.
+ochiq" deb yoziladi. ✅ Sir (2026-10-12): Windows PC **M8c dan keyin** → Windows spike va gate M8d da qoladi; M8b/M8c macOS'da "Windows tasdiqlanmagan" belgisi bilan qabul qilinadi.
 
 **`didox_runs` — API'da emas, v1 da `userData/didox-runs/<runId>.json`** (write-ahead yozuvlar shu faylda; main yagona yozuvchi;
 web `didox:list-runs` IPC orqali o'qiydi; M8d catch-up shu fayllardan "oy bajarilganmi"ni biladi). API o'zgarishi faqat
@@ -332,5 +332,5 @@ web `didox:list-runs` IPC orqali o'qiydi; M8d catch-up shu fayllardan "oy bajari
 bo'lmagan tartibda bloklash qoladi; Electron 34 EOL — M8d'da yangilash baholanadi.
 
 ### Qurish tartibi (yangilangan)
-M8a (SRS + TS skelet + kalit/parol) → **B4 spike** (Electron'da login, Sir bilan) → M8b (+ Windows autotype spike, PC bo'lsa) →
+M8a (SRS + TS skelet + kalit/parol) → **B4 spike** (Electron'da login, Sir bilan) → M8b (macOS) →
 **M8c spike ro'yxati** (7 band) → M8c → M8d.
