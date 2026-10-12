@@ -63,6 +63,18 @@ export function rateInRange(value: string): boolean {
 }
 
 /** A moment ("2026-09-30T20:00:00.000Z") → the accountants' calendar date in Tashkent ("01.10.2026"). */
+/** Instant → "12.10.2026 11:05" in Tashkent time. */
+export function formatInstantDateTime(value: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    })
+      .formatToParts(new Date(value))
+      .map((p) => [p.type, p.value]),
+  )
+  return `${parts.day}.${parts.month}.${parts.year} ${parts.hour}:${parts.minute}`
+}
+
 export function formatInstantDate(value: string): string {
   return new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric' }).format(
     new Date(value),

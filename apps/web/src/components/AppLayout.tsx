@@ -1,5 +1,6 @@
 import { Building2, FileText, Landmark, LogOut, Receipt } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router'
+import { BackupMenu } from '@/components/BackupMenu'
 import { Button } from '@/components/ui/button'
 import { useLogout } from '@/features/auth/api'
 import { cn } from '@/lib/utils'
@@ -47,6 +48,7 @@ export function AppLayout() {
               </NavLink>
             ))}
           </nav>
+          <BackupMenu />
           <Button
             variant="ghost"
             size="sm"

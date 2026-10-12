@@ -16,6 +16,11 @@ export interface DesktopBridge {
   eri: {
     listKeys(tins: string[]): Promise<EriKeyReport>
   }
+  backups: {
+    /** `last` — when the newest daily backup was written (ISO), or null. */
+    status(): Promise<{ last: string | null }>
+    openFolder(): Promise<void>
+  }
 }
 
 declare global {

@@ -1,6 +1,6 @@
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import type { ConfigService } from '@nestjs/config';
 import type { Env } from '../config/env.js';
 import { PrismaService } from './prisma.service.js';
@@ -13,7 +13,8 @@ const config = (dir: string) => {
 
 describe('PrismaService on a local PGlite database (M9a)', () => {
   it('migrates on init, persists across restarts, and snapshots before the first migration', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'moliya-db-'));
+    const root = mkdtempSync(join(tmpdir(), 'moliya-')); // own root: `backups` sits next to the data dir
+    const dir = join(root, 'db');
 
     const first = new PrismaService(config(dir));
     await first.onModuleInit();
@@ -31,7 +32,7 @@ describe('PrismaService on a local PGlite database (M9a)', () => {
     await first.onModuleDestroy();
 
     // A pre-migration snapshot landed next to the data dir (CONSTITUTION §5).
-    expect(readdirSync(join(dirname(dir), 'backups')).length).toBeGreaterThan(0);
+    expect(readdirSync(join(root, 'backups')).length).toBeGreaterThan(0);
 
     // A fresh service on the same dir sees the data; migrations do not re-run.
     const second = new PrismaService(config(dir));
@@ -41,7 +42,6 @@ describe('PrismaService on a local PGlite database (M9a)', () => {
     expect(ctr.limitAmount.toFixed(2)).toBe('99999999999999.99');
     await second.onModuleDestroy();
 
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(join(dirname(dir), 'backups'), { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   });
 });

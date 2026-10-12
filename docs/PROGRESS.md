@@ -45,6 +45,7 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — **Kunlik zaxira** (Sir: faqat lokal, 14 kun + har oydan bittasi 1 yil, tiklash qo'lda): API `BackupService` (ishga tushganda + har soat, `daily-YYYY-MM-DD.tgz`, `.partial`→rename, migratsiya snapshot'lariga tegmaydi); sarlavhada "Zaxira" (desktop); `apps/api/scripts/restore-backup.mjs` + docs/runbooks/restore-backup.md (tiklash end-to-end tekshirildi). Topilma: paketda `productName` yo'q edi → userData `…/desktop` (dev bilan bir xil) — `productName: Moliyaviy yordam` qo'shildi
 - 2026-10-12 — Texnik qarz yopildi: sahifalar lazy chunk (kirish bundle 714→552 kB; qolgani freymvork); 4xx xatolar qayta urinilmaydi; Excel yuklash fetch orqali — sessiya tugasa fayl emas, login (brauzerda tekshirildi). Umumiy `lib/download.ts` (M6 va M12)
 - 2026-10-12 — **Electron 34 → 44.7.0** (34 EOL edi; Didox sahifasi eski Chromium'da ochilardi). Ichida Node 24.21, Chromium 152. Dev va qadoqlangan (.app 627M, arm64) ilovada setup → app → bridge → E-IMZO kalitlari, bitta API jarayoni tekshirildi; electron-builder 25 bilan qadoqlanadi
 - 2026-10-12 — Qadoqlash skripti `pnpm deploy --prod` dan keyin (`finally`) `pnpm install --frozen-lockfile` bilan dev holatini tiklaydi — repo'dagi `pnpm run`/commit hook endi buzilmaydi (tekshirildi)
@@ -130,7 +131,7 @@ Hajm: `trivial | standard | complex`
 ## Ochiq risk / texnik qarz
 - **Didox sahifasi o'zgarishi** (yo'l B): Didox UI/selector'lari ogohlantirishsiz o'zgarsa avtomatlashtirish to'xtaydi — fail-closed, didox-flow.md xaritasi yangilanadi
 - E-IMZO paroli har kirishda buxgalter tomonidan kiritiladi (avto-yozish qurilmagan) → oy 1-kuni to'liq qorovulsiz ishga tushish yo'q, bildirishnoma orqali (M8d)
-- Har buxgalterda alohida baza → zaxira nusxa va ilovani yangilash har kompyuterda (M9)
+- Har buxgalterda alohida baza → kunlik lokal zaxira bor (2026-10-12), lekin bir diskda; ilovani yangilash har kompyuterda (M9)
 - M7/M8: summa formati (`552328.77`, mingliklar) haqiqiy Didox formasidagi kiritishda tekshirilmagan
 - Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi
 - M4: ro'yxat har so'rovda har shartnoma uchun to'liq yadroni ishlatadi — yuzlab shartnomada yetarli; ko'paysa yengil "faqat jamilar" rejimi yoki kesh

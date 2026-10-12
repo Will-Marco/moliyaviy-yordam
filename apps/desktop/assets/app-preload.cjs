@@ -6,4 +6,8 @@ contextBridge.exposeInMainWorld('desktop', {
   eri: {
     listKeys: (tins) => ipcRenderer.invoke('eri:list-keys', tins),
   },
+  backups: {
+    status: () => ipcRenderer.invoke('backups:status'),
+    openFolder: () => ipcRenderer.invoke('backups:open-folder'),
+  },
 })

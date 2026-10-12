@@ -1,4 +1,6 @@
-import { type BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { readdir, stat } from 'node:fs/promises'
+import { join } from 'node:path'
+import { type BrowserWindow, ipcMain, type IpcMainInvokeEvent, shell } from 'electron'
 import { WebSocket } from 'ws'
 import { parseAlias } from '../eimzo/alias.js'
 import { createEimzoClient, EimzoError } from '../eimzo/client.js'
@@ -23,8 +25,17 @@ export type KeyReport =
 /** Tashkent wall-clock time in the certificate date form (`yyyy-mm-ddTHH:mm:ss`). */
 const tashkentNow = () => new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Tashkent' }).replace(' ', 'T')
 
+const DAILY_BACKUP = /^daily-\d{4}-\d{2}-\d{2}\.tgz$/
+
+/** When the newest daily backup (written by the API's BackupService) was saved; null if none yet. */
+async function lastBackup(dir: string): Promise<string | null> {
+  const names = (await readdir(dir).catch(() => [] as string[])).filter((n) => DAILY_BACKUP.test(n)).sort()
+  const newest = names.at(-1)
+  return newest ? (await stat(join(dir, newest))).mtime.toISOString() : null
+}
+
 /** `getAppWindow` returns the current app window (macOS can recreate it), so the guard follows it. */
-export function registerIpc(getAppWindow: () => BrowserWindow | null, origin: string): void {
+export function registerIpc(getAppWindow: () => BrowserWindow | null, origin: string, backupsDir: string): void {
   const eimzo = createEimzoClient({ url: EIMZO_URL, WebSocket })
 
   const guarded =
@@ -58,6 +69,15 @@ export function registerIpc(getAppWindow: () => BrowserWindow | null, origin: st
         }
         throw error
       }
+    }),
+  )
+
+  ipcMain.handle('backups:status', guarded(async () => ({ last: await lastBackup(backupsDir) })))
+  ipcMain.handle(
+    'backups:open-folder',
+    guarded(async () => {
+      const error = await shell.openPath(backupsDir)
+      if (error) throw new Error(error)
     }),
   )
 }

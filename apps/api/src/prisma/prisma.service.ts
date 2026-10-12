@@ -43,6 +43,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await runMigrations(pglite, migrationsDir(), beforeApply);
   }
 
+  /** The on-disk PGlite database and its backups folder; null on the server (pg) or for an in-memory database. */
+  localDatabase(): { pglite: PGlite; backupsDir: string } | null {
+    return this.pglite && this.dataDir ? { pglite: this.pglite, backupsDir: join(dirname(this.dataDir), 'backups') } : null;
+  }
+
   async onModuleDestroy(): Promise<void> {
     await this.$disconnect();
     // Flush the local file database to disk on a clean shutdown.

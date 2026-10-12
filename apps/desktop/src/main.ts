@@ -98,7 +98,7 @@ async function launchApp(): Promise<void> {
   if (appWin && !appWin.isDestroyed()) return void appWin.focus()
   appWin = appWindow(baseUrl)
   if (!ipcRegistered) {
-    registerIpc(() => appWin, new URL(baseUrl).origin)
+    registerIpc(() => appWin, new URL(baseUrl).origin, join(userData(), 'backups'))
     ipcRegistered = true
   }
 }
