@@ -9,5 +9,7 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.spec.ts'],
+    // Several specs boot PGlite (WASM Postgres); under the parallel workspace run that alone can pass 5s.
+    testTimeout: 30_000,
   },
 });

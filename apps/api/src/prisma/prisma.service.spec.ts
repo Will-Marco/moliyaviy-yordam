@@ -43,5 +43,5 @@ describe('PrismaService on a local PGlite database (M9a)', () => {
 
     rmSync(dir, { recursive: true, force: true });
     rmSync(join(dirname(dir), 'backups'), { recursive: true, force: true });
-  }, 30_000); // PGlite boots a WASM Postgres; slow when the whole workspace test run shares the CPU
+  });
 });

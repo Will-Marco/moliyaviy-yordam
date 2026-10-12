@@ -1,7 +1,7 @@
 # SRS — Moliyaviy yordam: foiz hisobi
 
 > Software Requirements Specification. Living document — qaror o'zgarsa avval shu yerni yangilang.
-> Oxirgi yangilanish: 2026-10-07 · **Holat: Sir tomonidan tasdiqlangan (2026-10-07)**; Didox yo'li — **partner API** (2026-10-07)
+> Oxirgi yangilanish: 2026-10-12 · **Holat: Sir tomonidan tasdiqlangan (2026-10-07)**; Didox yo'li — **B: ilova Didox saytini o'z oynasida boshqaradi** (2026-10-12, M8 rejasi tasdiqlangan)
 
 ## 1. Maqsad (Goal)
 Firmalar bir-biriga foizli moliyaviy yordam (qarz) beradi. Ilova har bir shartnoma bo'yicha
@@ -18,8 +18,9 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - Oylik foiz hisoboti, qarz va foiz qoldig'i
 - Excel eksport
 - Didox'da schyot-faktura **qoralamasi** (imzolash — buxgalter qo'lida)
-- **Didox partner API** orqali qoralama yaratish (firma Didox paroli bilan, ERI'siz)
-- Serverga joylash (barcha buxgalterlar internet orqali ko'radi)
+- Didox'da qoralamani **ilova o'zi** yaratadi: Didox saytini o'z oynasida ochib, firma ERI kaliti bilan avtomatik kiradi
+  va formani to'ldiradi (yo'l B, Modul 8)
+- Har buxgalter kompyuteriga lokal o'rnatiladigan desktop ilova (Electron + lokal baza, Modul 9)
 
 **Kirmaydi (non-goals):**
 - Penya / jarima foizi
@@ -29,7 +30,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - Bank ko'chirmasidan import, 1C integratsiya
 - Ko'p valyuta (faqat UZS)
 - Fakturani avtomatik imzolash / yuborish
-- Didox cookie/sessiyasini olish yoki Didox'ning ichki (hujjatlashtirilmagan) API'sidan foydalanish — **taqiqlangan**
+- Didox'ning partner tokeni/maxfiy kalitini ilova kodiga olish yoki Didox API'sini to'g'ridan-to'g'ri chaqirish — **taqiqlangan**
+  (CONSTITUTION §14); ilova faqat Didox sahifasi bilan, inson kabi ishlaydi
 - Soliq bo'yicha qaror (MXIK kodi, QQS stavkasi buxgalter tomonidan beriladi)
 
 ## 3. Foydalanuvchilar / aktyorlar
@@ -180,50 +182,59 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   (Didox ulanmagan firma uchun ham qo'lda kiritish oson bo'lsin).
 - *Acceptance:* etalon shartnoma uchun yanvar qatori 552 328,77 va to'g'ri qator nomi bilan chiqadi.
 
-### Modul 8: Didox — brauzerni boshqarib qoralamalar (yo'l B)
-> ⚠️ **2026-10-11: qayta yozilmoqda.** Partner token yo'q va Didox'ning tokenini sug'urib olish rad etildi (CONSTITUTION §14).
-> Tanlangan yo'l **B**: buxgalter Didox'ga o'z brauzerida ERI bilan kiradi, ilova shu sessiyani boshqarib forma/Excel orqali
-> qoralama yaratadi. FR'lar real Didox oqimi o'rganilgach yoziladi (reja + plan-reviewer).
-- FR-8.1 — **Didox akkauntlari** (alohida ro'yxat): login (STIR yoki PINFL), Didox akkaunt paroli,
-  bog'langan beruvchi firmalar. Bitta akkaunt → **bir nechta firma** (bitta buxgalter ko'p firmani yuritadi).
-  Parol **shifrlangan** saqlanadi, UI'da qayta ko'rsatilmaydi, log'ga yozilmaydi.
-- FR-8.2 — Kirish turi **avtomatik** aniqlanadi: akkaunt logini firma STIR'iga teng bo'lsa — to'g'ridan-to'g'ri;
-  aks holda akkaunt bilan kirib, har firmaga `POST /v1/auth/company/{tin}/login`. Login javobidagi
-  `related_companies` dan akkaunt qaysi firmalarga kira olishi ko'rsatiladi (bog'lashda yordam).
-  "Ulanishni tekshirish" tugmasi — bitta login urinishi.
-- FR-8.3 — **Avtomatik ishga tushish:** har oyning **1-kuni soat 06:00** (Asia/Tashkent, sozlanadi) — natija
-  **09:00 gacha tayyor** bo'lishi shart. Ilova o'tgan oy
-  uchun Modul 7 ro'yxatidagi **barcha** `tayyor` fakturalar bo'yicha: har akkauntga bir marta kiradi →
-  har firmaga o'tadi → har faktura uchun `POST /v1/documents/002/create` → Didox hujjat ID + holat
-  `qoralama yaratildi`. Ilovada alohida tasdiqlash qadami **yo'q**.
-- FR-8.3a — Vaqtinchalik xatolar (tarmoq, timeout, Didox 5xx) uchun avtomatik qayta urinish **07:00 va 08:00** da —
-  faqat xato bo'lgan fakturalar. Login xatolariga bu tegishli emas (FR-8.8).
-- FR-8.4 — Qo'lda ishga tushirish ham bor ("Hozir yaratish" — tanlangan oy uchun); xatoga uchragan
-  fakturalar uchun "Qayta urinish".
-- FR-8.5 — **Takror yo'q:** bitta shartnoma × oy uchun qoralama faqat bir marta yaratiladi
-  (`qoralama yaratildi` bo'lsa o'tkazib yuboriladi).
-- FR-8.6 — Qoralama tarkibi §9.1 ga mos: sotuvchi = beruvchi firma, xaridor STIR, shartnoma № va sanasi,
-  bitta qator (MXIK, nom, birlik, miqdor 1, narx, "Без НДС" + imtiyoz maydonlari, kelib chiqishi — xizmat).
-  **Faktura raqami va sanasi bo'sh** — buxgalter Didox'da qo'yadi (API qabul qilmasa — §9.2 ochiq savol).
-- FR-8.7 — Har ishga tushish natijasi ilovada: akkaunt/firma bo'yicha nechta yaratildi, nechta xato
-  (sababi — Didox javobi tushunarli matn bilan).
-- FR-8.8 — **Login xatosida avtomatik qayta urinish yo'q** (25 noto'g'ri urinish → akkaunt doimiy bloklanadi):
-  401/422/423/429 dan keyin akkaunt "tekshirish kerak" holatiga o'tadi, shu akkauntning qolgan firmalari
-  o'tkazib yuboriladi, boshqa akkauntlar davom etadi.
-- FR-8.9 — Ilova **hech qachon** imzolamaydi, yubormaydi (`tosign`/`sign` chaqirilmaydi). Imzolash —
-  buxgalter Didox'da: raqam/sana qo'yadi va qoralamalarni **birdaniga** imzolaydi.
-- FR-8.10 — Partner token va API URL server `.env` da; test (`testapi3`) va prod (`api-partners`) muhitlari.
-- *Acceptance:* test muhitida 1 akkaunt × 2 firma × bir nechta shartnoma → "Hozir yaratish" → har firma
-  Ҳужжатлар → Қоралама'da §9.1 ga mos qoralamalar; qayta ishga tushirish takror yaratmaydi;
-  noto'g'ri parol bilan bitta urinishdan keyin to'xtaydi.
-- *Blokerlar:* partner token (test) — Sir Didox'ga yozadi (mijoz nomidan); §9.2 ochiq savollar.
+### Modul 8: Didox — avtomatik qoralamalar (yo'l B, 2026-10-12)
+> Rasmiy partner token yo'q; Didox'ning tokenini olish taqiqlangan (CONSTITUTION §14). Ilova Didox saytini **o'z oynasida**
+> ochadi va sahifani inson kabi boshqaradi. Real Didox oqimi: docs/research/didox-flow.md. Reja: docs/plans/M8-didox-drafts.md (v2).
+> Bo'linish: **M8a** kalit va parollar · **M8b** avtomatik kirish · **M8c** qoralama yaratish · **M8d** jadval, tray, Windows.
+- FR-8.1 — **ERI kalitlar (M8a).** Ilova kalitlar ro'yxatini lokal E-IMZO'dan oladi (`pfx.list_all_certificates`) va har
+  kalitni firmaga **STIR** bo'yicha bog'laydi (sertifikat maydoni `1.2.860.3.16.1.1`). Firmalar sahifasida har firma uchun:
+  "Kalit · DD.MM.YYYY gacha" / "Muddati o'tgan" / "Kalit yo'q"; E-IMZO ishlamasa — "E-IMZO ishlamayapti". Bir STIR'ga bir
+  nechta amaldagi kalit bo'lsa — amal muddati eng uzog'i olinadi. Sertifikatdagi shaxsiy ma'lumotlar (JShShIR, F.I.Sh.)
+  ilovada saqlanmaydi va log'ga yozilmaydi. E-IMZO'ga faqat ro'yxat o'qish so'rovlari yuboriladi (imzolash funksiyalari hech qachon).
+- FR-8.2 — **ERI paroli (M8a).** Har firma uchun ilovada bir marta kiritiladi; faqat OS shifri bilan saqlanadi
+  (Windows DPAPI / macOS Keychain — Electron `safeStorage`); UI'da qayta ko'rsatilmaydi, log'ga yozilmaydi, tarmoqqa
+  chiqmaydi; o'chirish mumkin. Holat: "Parol bor" / "Parol yo'q" / "E'tibor kerak" (rad etilgan). Kalit almashtirilsa
+  (seriya o'zgarsa) — parol qayta so'raladi. Faqat desktop ilovada; brauzer versiyasida bu ustun ko'rinmaydi.
+- FR-8.3 — **Avtomatik kirish (M8b).** Firma uchun ilova Didox'ni alohida, izolyatsiyalangan oynada ochadi, login sahifasida
+  firma kalitini STIR bo'yicha tanlaydi, "Кириш"ni bosadi va parolni **E-IMZO'ning o'z oynasiga bir marta** yozadi (yozishdan
+  oldin oyna va parol maydoni fokusda ekani tekshiriladi). Kirilgan firma sotuvchi STIR bilan tasdiqlanadi. "Kirishni tekshirish"
+  tugmasi aynan shuni bajarib chiqadi.
+- FR-8.4 — **Qoralama yaratish (M8c).** Tugagan oy uchun tanlangan (sukut — barcha) beruvchi firmalar bo'yicha ketma-ket: kirish →
+  har `tayyor` faktura uchun Didox formasi (Ҳисоб-фактура актсиз / Стандарт; shartnoma № va sanasi; kontragent STIR; bitta
+  qator — MXIK 10401999001000000, nom §9.1, miqdor 1, narx = summa, ҚҚСсиз va imtiyoz Didox tomonidan, kelib chiqishi
+  "Хизмат кўрсатиш"; **faktura raqami va sanasi bo'sh**) → avtomatik to'lgan qiymatlar va jami tekshiriladi → "Сақлаб қолиш" →
+  qoralama ID'si Didox ro'yxatidan olinib ilovada yoziladi (`source: didox`) → chiqish. Didox oynasi ish paytida ko'rinadi,
+  lekin foydalanuvchi kiritishi bloklanadi.
+- FR-8.5 — **Takror yo'q.** Ilovada qoralama belgisi bor faktura o'tkaziladi; API qayta belgilashni tasdiqsiz rad etadi.
+  "Saqlandi, lekin ID topilmadi" yoki saqlash paytida uzilgan faktura **karantinga** tushadi — avtomatik qayta urinilmaydi,
+  buxgalter Didox'da tekshirib qo'lda hal qiladi. Ilovadan tashqarida yaratilgan o'xshash qoralama avtomatik moslanmaydi —
+  ilova to'xtab xabar beradi.
+- FR-8.6 — **Inson tezligi va to'xtash.** Harakatlar ketma-ket, belgilar va bosishlar orasida pauza; bir vaqtda bitta ish.
+  Sahifa kutilganidan farq qilsa (element yo'q, qiymat boshqa) — shu firma to'xtaydi, skrinshot lokal saqlanadi, sababi
+  o'zbekcha ko'rsatiladi; taxmin bilan davom etish va qayta urinish yo'q. Ish bekor qilinishi mumkin.
+- FR-8.7 — **Natijalar.** Har ishga tushish lokal yoziladi (oy, kim/qachon, har faktura: yaratildi / o'tkazildi / xato /
+  karantin, sabab, Didox ID) va ilovada ko'rinadi; ish paytida jonli jarayon.
+- FR-8.8 — **Kirish xatosi.** Noto'g'ri parol, E-IMZO oynasi chiqmasligi yoki kirib bo'lmaslik → firma "E'tibor kerak"
+  holatiga o'tadi, uning qolgan fakturalari o'tkaziladi, boshqa firmalar davom etadi. Avtomatik qayta urinish **taqiqlangan**;
+  firma faqat buxgalter parolni qayta kiritsa yoki "tekshirildi" desa ochiladi.
+- FR-8.9 — **Imzolamaydi.** Ilova hech qachon "Имзолаш"/"Юбориш"ni bosmaydi (kod qo'riqchisi va tarmoq bloki), E-IMZO'ning
+  imzolash funksiyalarini chaqirmaydi, `.pfx`ni o'qimaydi. Imzolash — buxgalter Didox'da (raqam/sana qo'yib).
+- FR-8.10 — **Jadval (M8d).** Har oy 1-kuni 06:00 (Asia/Tashkent) o'tgan oy uchun avtomatik — **faqat shartlar bajarilsa**:
+  ekran qulflanmagan, foydalanuvchi band emas, E-IMZO ishlayapti, kalit tashuvchi ulangan, OS ruxsatlari bor. Bajarilmasa —
+  bildirishnoma ("Didox qoralamalari kutmoqda") va ilova ochilganda / kompyuter uyg'onganda / qulf ochilganda davom etadi.
+  Vaqtinchalik xatolar uchun 07:00 va 08:00 da faqat o'sha fakturalar qayta uriniladi (kirish xatolari va karantin bundan
+  mustasno). Ilova tray'da yashaydi va tizim bilan birga ishga tushadi. Natija vaqti kafolatlanmaydi.
+- *Acceptance (modul):* 2 firma × bir nechta faktura → "Didox'da qoralamalarni yaratish" → Didox Қоралама'dagi qoralamalar
+  §9.1 ga maydonma-maydon mos, ID'lar ilovada; qayta ishga tushirish hech narsa yaratmaydi; noto'g'ri parol bir urinishdan
+  keyin to'xtaydi va firmani belgilaydi; Didox elementi o'zgarsa skrinshot bilan to'xtaydi. macOS'da qabul qilinadi;
+  Windows (production) — M8d gate.
 
-### Modul 9: Serverga joylash
-> ⚠️ **2026-10-11: o'zgardi** → har buxgalter Windows kompyuteriga alohida o'rnatish (umumiy server/baza yo'q).
-- FR-9.1 — Docker Compose (api + web + PostgreSQL + reverse proxy, HTTPS).
-- FR-9.2 — DB zaxira nusxasi (backup).
-- FR-9.3 — Prod partner token va shifrlash kaliti serverga xavfsiz o'rnatiladi (Sir qo'li bilan).
-- *Acceptance:* buxgalterlar server manzili orqali kirib ishlay oladi.
+### Modul 9: Lokal desktop ilova (2026-10-11 dan; server yo'q)
+> Har buxgalter kompyuteriga alohida o'rnatiladi (umumiy server/baza yo'q). Reja: docs/plans/M9-desktop-shell.md.
+- FR-9.1 — **M9a:** lokal PGlite baza, dastur ichida migratsiya (migratsiyadan oldin snapshot) — qabul qilingan.
+- FR-9.2 — **M9b:** Electron qobig'i (API child-process'da, statik web, birinchi ishga tushishda parol) — o'zak qabul qilingan;
+  qadoqlash (macOS dir), Windows NSIS va imzolash — qolgan.
+- *Acceptance:* ilova serversiz ochiladi, ma'lumot lokal saqlanadi va qayta ochilganda turadi.
 
 ### Modul 10: Kiritish qulayliklari (Sir, 2026-10-09)
 - FR-10.1 — Barcha summa maydonlari **yozilayotganda** formatlanadi: `2000000` → `2 000 000`, kasr — vergul
@@ -256,23 +267,24 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - **Aniqlik:** pul va stavka hech qachon `float`'da hisoblanmaydi — DB'da `Decimal`, kodda decimal kutubxona
   yoki butun son (BigInt, tiyin) — foiz yadrosi BigInt'da.
 - **Performance:** bitta shartnoma hisoboti (19+ oy, yuzlab operatsiya) < 1 s.
-- **Security:** HTTPS; parol hash'langan; login urinishlariga rate-limit; secret'lar `.env`'da, repo'da emas.
-  Didox akkaunt parollari DB'da **shifrlangan** (AES-256-GCM, kalit `.env` da); ERI kaliti va .pfx
-  hech qachon saqlanmaydi. Didox token (360 daq) faqat xotirada/qisqa muddat keshlanadi.
-- **Reliability:** kunlik DB backup.
+- **Security:** ilova login paroli argon2 hash; login urinishlariga rate-limit. ERI parollari faqat OS shifri bilan
+  (`safeStorage`, FR-8.2) buxgalter kompyuterida; `.pfx` E-IMZO'da qoladi. Didox oynasi ilovadan izolyatsiyalangan.
+  Parol + `.pfx` bir kompyuterda bo'lgani uchun imzolash texnik mumkin — bu Sir tomonidan ongli qabul qilingan
+  (CONSTITUTION §13), FR-8.9 kod qo'riqchilari bilan ushlanadi.
+- **Reliability:** migratsiyadan oldin baza snapshot'i; kunlik zaxira — M9 qadoqlash bosqichida.
 - **Til / format:** UI o'zbek (lotin); sana `dd.mm.yyyy`; summa `552 328,77`.
 
 ## 7. Tech stack & arxitektura
 - Backend: NestJS + Prisma + PostgreSQL
 - Frontend: React + Vite + TypeScript + shadcn/ui + Tailwind
-- Infra: Docker Compose, server (Sir'niki)
+- Infra: Electron desktop ilova (`apps/desktop`), lokal PGlite baza; Windows (production), macOS (dev)
 - Arxitektura eslatmalari:
   - **Foiz hisoblash yadrosi — sof funksiya** (DB/HTTP'siz): kirish — shartnoma, stavkalar tarixi,
     operatsiyalar; chiqish — kunlik bo'laklar va oylik jadval. Barcha CR qoidalari shu yerda va
     shu yerda test qilinadi.
-  - Monorepo: `apps/api`, `apps/web`.
-  - Didox — `apps/api` ichida alohida adapter modul (`didox`): auth, qoralama yaratish; boshqa kod
-    Didox HTTP tafsilotlarini bilmaydi.
+  - Monorepo: `apps/api`, `apps/web`, `apps/desktop`.
+  - Didox — `apps/desktop` (Electron main) ichida: E-IMZO klienti, ERI parol ombori, Didox oynasi drayveri. Didox DOM bilimi
+    bitta joyda (`locators`). API Didox'ni bilmaydi — faqat qoralama belgisini (`invoice_drafts`, `source`) saqlaydi.
 
 ## 8. UI/UX
 - Dizayn manbai: `design/` papka hozircha yo'q — oddiy, toza admin-panel uslubi (shadcn).
@@ -280,7 +292,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   oylik hisobot, eksport) → Firmalar.
 
 ## 9. Tashqi bog'liqliklar / integratsiyalar
-- **Didox** (didox.uz) — schyot-faktura qoralamasi, rasmiy **partner API** orqali (§9.2).
+- **Didox** (didox.uz) — schyot-faktura qoralamasi, Didox saytini ilova oynasida boshqarish orqali (Modul 8, §9.2).
+- **E-IMZO** (lokal, `ws://127.0.0.1:64646`) — ERI kalitlar ro'yxati; parol oynasi E-IMZO'niki.
 
 ### 9.1 Schyot-faktura namunasi (Sir bergan, 2026-09 dagi haqiqiy faktura asosida)
 > Haqiqiy firma rekvizitlari repo'ga yozilmaydi — faqat tuzilma.
@@ -348,10 +361,10 @@ xavfi); brauzer kengaytmasi (Sir API'ni tanladi).
 - [x] Faktura sanasi — buxgalter Didox'da o'zi qo'yadi
 - [x] Qator nomi, MXIK, "Без НДС" — doimiy, barcha shartnomalar uchun bir xil
 - [x] Har MCHJ'ning **o'z Didox login'i** bor; buxgalter ERI (.pfx) kaliti bilan kiradi
-- [x] Didox yo'li — partner API
+- [x] Didox yo'li — ~~partner API~~ → **B: ilova Didox saytini o'z oynasida boshqaradi, ERI bilan avtomatik kirish** (2026-10-12)
 - [x] Partner token — Sir Didox account manager'ga yozadi; token **mijoz nomidan**
 - [x] Bitta buxgalter — bir nechta firma; buxgalterlar Didox akkaunt parolini biladi
-- [x] Kirish va qoralama yaratish **to'liq avtomatik** (oy 1-kuni); ilovada tasdiqlash qadami yo'q
+- [x] Kirish va qoralama yaratish avtomatik; oy 1-kuni 06:00 — **shartli** (FR-8.10), natija vaqti kafolatlanmaydi (2026-10-12)
 - [x] Imzolash — buxgalter Didox'da qoralamalarni birdaniga imzolaydi; raqam/sanani Didox'da o'zi qo'yadi
 - [ ] Didox UI'da bir nechta qoralamani birdaniga imzolash imkoni — TEKSHIRILMADI (Didox tomoni, ilovaga ta'sir qilmaydi)
 - [ ] API bo'sh `FacturaNo`/`FacturaDate` bilan qoralamani qabul qiladimi — test muhitida

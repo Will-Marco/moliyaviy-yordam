@@ -24,5 +24,5 @@ describe('snapshot (M9a backup)', () => {
 
     rmSync(dataDir, { recursive: true });
     rmSync(backups, { recursive: true });
-  }, 30_000); // PGlite boots a WASM Postgres; slow when the whole workspace test run shares the CPU
+  });
 });
