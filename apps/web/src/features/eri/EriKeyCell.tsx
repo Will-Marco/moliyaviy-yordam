@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/format'
 export function EriKeyCell({ eriKey }: { eriKey: EriKey | undefined }) {
   if (!eriKey) return <span className="text-muted-foreground">—</span>
   if (eriKey.status === 'missing') return <span className="text-muted-foreground text-sm">Kalit yo'q</span>
+  if (eriKey.status === 'unknown') return <span className="text-muted-foreground text-sm">Muddat noma'lum</span>
   if (eriKey.status === 'expired') {
     return (
       <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-900">

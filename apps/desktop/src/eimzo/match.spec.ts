@@ -40,4 +40,10 @@ describe('matchKeys', () => {
 
     expect(matchKeys([expired, later, sooner], ['300000001'], now).get('300000001')).toEqual({ status: 'ok', key: later })
   })
+
+  it('does not call a key expired when its validity dates could not be read', () => {
+    const unreadable = { ...key('300000001', '2028-01-01T00:00:00'), validTo: null }
+
+    expect(matchKeys([unreadable], ['300000001'], now).get('300000001')).toEqual({ status: 'unknown', key: unreadable })
+  })
 })

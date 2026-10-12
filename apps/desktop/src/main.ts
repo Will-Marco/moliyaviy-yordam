@@ -1,7 +1,7 @@
 import { type ChildProcess, fork } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { registerIpc } from './bridge/ipc.js'
 import { isSameOrigin } from './bridge/trust.js'
 import { type AppConfig, isConfigured, loadConfig, saveCredentials } from './config.js'
@@ -17,9 +17,11 @@ const migrationsDir = res ? join(res, 'migrations') : resolve(here, '../../api/p
 const userData = () => app.getPath('userData')
 
 let api: ChildProcess | null = null
-let baseUrl: string | null = null
+let apiReady: Promise<string> | null = null
 let appWin: BrowserWindow | null = null
+let setupWin: BrowserWindow | null = null
 let ipcRegistered = false
+let quitting = false
 
 /** Boot the API in a child process (PGlite, ephemeral port) with this install's credentials. */
 function startApi(config: AppConfig): Promise<string> {
@@ -41,11 +43,20 @@ function startApi(config: AppConfig): Promise<string> {
       },
     })
     api = child
+    let started = false
     child.on('message', (msg: { type?: string; port?: number } | null) => {
-      if (msg?.type === 'listening') ok(`http://127.0.0.1:${msg.port}`)
+      if (msg?.type !== 'listening') return
+      started = true
+      ok(`http://127.0.0.1:${msg.port}`)
     })
     child.on('error', fail)
-    child.on('exit', (code) => code && fail(new Error(`API process exited with code ${code}`)))
+    child.on('exit', (code) => {
+      if (!started) return fail(new Error(`API process exited with code ${code}`))
+      if (quitting) return
+      // The window would keep showing a dead app; say so and close instead.
+      dialog.showErrorBox('Moliyaviy yordam', "Ilovaning ichki serveri to'xtadi. Dasturni qayta oching.")
+      app.quit()
+    })
   })
 }
 
@@ -77,12 +88,14 @@ function appWindow(baseUrl: string): BrowserWindow {
 }
 
 async function launchApp(): Promise<void> {
-  // macOS `activate` reopens a window after the last one closed: reuse the running API, never start a second one.
-  if (!baseUrl) {
+  // One API per app run: macOS `activate` can call this again (even while the first start is still booting).
+  apiReady ??= (async () => {
     const config = loadConfig(userData())
     if (!config) throw new Error('config.json is missing')
-    baseUrl = await startApi(config)
-  }
+    return startApi(config)
+  })()
+  const baseUrl = await apiReady
+  if (appWin && !appWin.isDestroyed()) return void appWin.focus()
   appWin = appWindow(baseUrl)
   if (!ipcRegistered) {
     registerIpc(() => appWin, new URL(baseUrl).origin)
@@ -92,6 +105,8 @@ async function launchApp(): Promise<void> {
 
 /** First run: a local setup window collects the password; no network endpoint is involved. */
 function setupWindow(): void {
+  if (setupWin && !setupWin.isDestroyed()) return void setupWin.focus()
+  registerSetupIpc()
   const win = new BrowserWindow({
     width: 440,
     height: 560,
@@ -100,17 +115,28 @@ function setupWindow(): void {
     webPreferences: { contextIsolation: true, sandbox: true, preload: join(assets, 'setup-preload.cjs') },
   })
   void win.loadFile(join(assets, 'setup.html'))
+  setupWin = win
+}
 
-  ipcMain.handle('setup:save', async (_event, { username, password }: { username: unknown; password: unknown }) => {
+let setupIpcRegistered = false
+/** Registered once: the setup window can be closed and reopened (macOS `activate`) without re-registering. */
+function registerSetupIpc(): void {
+  if (setupIpcRegistered) return
+  setupIpcRegistered = true
+  const fromSetup = (event: { sender: { id: number } }) => !!setupWin && !setupWin.isDestroyed() && event.sender.id === setupWin.webContents.id
+  ipcMain.handle('setup:save', async (event, { username, password }: { username: unknown; password: unknown }) => {
+    if (!fromSetup(event)) throw new Error('Untrusted IPC sender')
     if (typeof username !== 'string' || typeof password !== 'string' || password.length < 8) {
       return { ok: false, message: "Parol kamida 8 belgi bo'lishi kerak" }
     }
     await saveCredentials(userData(), username, password)
     return { ok: true }
   })
-  ipcMain.once('setup:done', async () => {
+  ipcMain.on('setup:done', async (event) => {
+    if (!fromSetup(event) || !isConfigured(userData())) return
+    const win = setupWin
     await launchApp()
-    win.close()
+    win?.close()
   })
 }
 
@@ -125,8 +151,18 @@ if (!app.requestSingleInstanceLock()) {
     }
   })
 
-  app.whenReady().then(() => (isConfigured(userData()) ? launchApp() : setupWindow()))
-  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && (isConfigured(userData()) ? launchApp() : setupWindow()))
+  const open = () => (isConfigured(userData()) ? launchApp() : setupWindow())
+  const fatal = (error: unknown) => {
+    dialog.showErrorBox('Moliyaviy yordam', `Ilovani ishga tushirib bo'lmadi: ${error instanceof Error ? error.message : String(error)}`)
+    app.quit()
+  }
+  app.whenReady().then(open).catch(fatal)
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) Promise.resolve(open()).catch(fatal)
+  })
   app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
+  app.on('before-quit', () => {
+    quitting = true
+  })
   app.on('quit', () => api?.kill())
 }

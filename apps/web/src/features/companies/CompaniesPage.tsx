@@ -45,11 +45,12 @@ export function CompaniesPage() {
         </div>
       </div>
 
-      {eri.data && eri.data.eimzo !== 'ok' && (
+      {(eri.error || (eri.data && eri.data.eimzo !== 'ok')) && (
         <Alert className="border-amber-300 bg-amber-50 text-amber-900">
           <KeyRound aria-hidden="true" />
           <AlertDescription className="text-amber-900">
-            ERI kalitlarini o'qib bo'lmadi: {eri.data.message}
+            ERI kalitlarini o'qib bo'lmadi:{' '}
+            {eri.data && eri.data.eimzo !== 'ok' ? eri.data.message : "ilova E-IMZO bilan bog'lana olmadi"}
           </AlertDescription>
         </Alert>
       )}

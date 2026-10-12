@@ -71,4 +71,26 @@ describe('E-IMZO client', () => {
       message: expect.stringContaining('Disk topilmadi'),
     })
   })
+
+  it('rejects a reply that is not JSON instead of throwing in the main process', async () => {
+    server = new WebSocketServer({ port: 0, host: '127.0.0.1' })
+    server.on('connection', (socket) => socket.on('message', () => socket.send('not json')))
+    await new Promise((ok) => server!.once('listening', ok))
+    const url = `ws://127.0.0.1:${(server.address() as AddressInfo).port}/service/cryptapi`
+
+    await expect(createEimzoClient({ url, WebSocket, timeoutMs: 2000 }).listCertificates()).rejects.toMatchObject({
+      code: 'EIMZO_ERROR',
+    })
+  })
+
+  it('reports a dropped connection as an E-IMZO error, not a raw socket error', async () => {
+    server = new WebSocketServer({ port: 0, host: '127.0.0.1' })
+    server.on('connection', (socket) => socket.on('message', () => socket.terminate()))
+    await new Promise((ok) => server!.once('listening', ok))
+    const url = `ws://127.0.0.1:${(server.address() as AddressInfo).port}/service/cryptapi`
+
+    await expect(createEimzoClient({ url, WebSocket, timeoutMs: 2000 }).listCertificates()).rejects.toMatchObject({
+      code: 'EIMZO_ERROR',
+    })
+  })
 })

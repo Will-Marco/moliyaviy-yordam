@@ -36,20 +36,37 @@ export function createEimzoClient({ url, WebSocket, timeoutMs = 5000 }: EimzoCli
   function request<T>(message: object): Promise<T> {
     return new Promise((ok, fail) => {
       const socket = new WebSocket(url)
-      const timer = setTimeout(() => {
+      let settled = false
+      // Every outcome ends here exactly once; nothing is thrown from a socket listener (that would hit the main process).
+      const settle = (outcome: () => void) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        outcome()
         socket.terminate()
-        fail(new EimzoError('EIMZO_TIMEOUT', "E-IMZO javob bermadi"))
-      }, timeoutMs)
+      }
+      const timer = setTimeout(() => settle(() => fail(new EimzoError('EIMZO_TIMEOUT', 'E-IMZO javob bermadi'))), timeoutMs)
       socket.on('open', () => socket.send(JSON.stringify(message)))
       socket.on('message', (data) => {
-        clearTimeout(timer)
-        ok(JSON.parse(String(data)) as T)
-        socket.close()
+        let reply: T
+        try {
+          reply = JSON.parse(String(data)) as T
+        } catch {
+          return settle(() => fail(new EimzoError('EIMZO_ERROR', "E-IMZO tushunarsiz javob qaytardi")))
+        }
+        settle(() => ok(reply))
       })
       socket.on('error', (error: NodeJS.ErrnoException) => {
-        clearTimeout(timer)
-        fail(error.code === 'ECONNREFUSED' ? new EimzoError('EIMZO_NOT_RUNNING', "E-IMZO ishga tushirilmagan") : error)
+        const refused = error.code === 'ECONNREFUSED'
+        settle(() =>
+          fail(
+            refused
+              ? new EimzoError('EIMZO_NOT_RUNNING', 'E-IMZO ishga tushirilmagan')
+              : new EimzoError('EIMZO_ERROR', `E-IMZO bilan aloqa uzildi (${error.code ?? error.message})`),
+          ),
+        )
       })
+      socket.on('close', () => settle(() => fail(new EimzoError('EIMZO_ERROR', 'E-IMZO javob bermasdan ulanishni yopdi'))))
     })
   }
 

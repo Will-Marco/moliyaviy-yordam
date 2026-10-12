@@ -8,9 +8,16 @@ import { isTrustedSender } from './trust.js'
 const EIMZO_URL = 'ws://127.0.0.1:64646/service/cryptapi'
 const TIN = /^\d{9}$/
 
-/** Key status per firm STIR, as `window.desktop.eri.listKeys` returns it. No personal certificate data. */
+/**
+ * Bridge contract for `window.desktop.eri.listKeys`. Mirrored in apps/web/src/lib/desktop.ts — change both together.
+ * No personal certificate data.
+ */
+export type EriKey =
+  | { status: 'ok' | 'expired' | 'unknown'; org: string | null; title: string | null; validTo: string | null }
+  | { status: 'missing' }
+
 export type KeyReport =
-  | { eimzo: 'ok'; keys: Record<string, { status: 'ok' | 'expired' | 'missing'; org?: string | null; title?: string | null; validTo?: string | null }> }
+  | { eimzo: 'ok'; keys: Record<string, EriKey> }
   | { eimzo: 'not_running' | 'error'; message: string }
 
 /** Tashkent wall-clock time in the certificate date form (`yyyy-mm-ddTHH:mm:ss`). */

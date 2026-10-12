@@ -73,6 +73,16 @@ describe('CompaniesPage', () => {
     expect(await screen.findByText(/E-IMZO ishga tushirilmagan/)).toBeInTheDocument()
   })
 
+  it('explains when the desktop app could not read the ERI keys at all', async () => {
+    vi.stubGlobal('desktop', {
+      platform: 'darwin',
+      eri: { listKeys: async () => Promise.reject(new Error('IPC failed')) },
+    })
+    mockApi({ 'GET /api/companies': () => ({ status: 200, body: [alfa] }) })
+    renderWithProviders(<CompaniesPage />)
+    expect(await screen.findByText(/ERI kalitlarini o'qib bo'lmadi/)).toBeInTheDocument()
+  })
+
   it('shows an empty state with a call to action', async () => {
     mockApi({ 'GET /api/companies': () => ({ status: 200, body: [] }) })
     renderWithProviders(<CompaniesPage />)
