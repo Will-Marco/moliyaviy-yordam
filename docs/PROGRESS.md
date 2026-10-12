@@ -45,6 +45,7 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — **M8a qisman:** SRS M8 yo'l B ga qayta yozildi; desktop TypeScript'ga o'tdi; E-IMZO qatlami (parseAlias, matchKeys, faqat-o'qish klienti) + IPC qo'riqchisi (origin solishtirish, M3) + `activate` ikkinchi API'ni ochmaydi (M4) + Firmalar sahifasida "ERI kalit" ustuni (faqat desktop). Haqiqiy E-IMZO bilan app ichida tekshirildi. Testlar: desktop 15, web 156, api 124. **Qolgan:** ERI parol ombori + parol dialogi — Claude qurmaydi (Sir qarori kerak)
 - 2026-10-12 — **M8 reja tasdiqlandi — Sir.** Qurish Opus sessiyada M8a dan (SRS M8 qayta yozish → desktop TS skelet → `alias.spec.ts`)
 - 2026-10-12 — Sir: **06:00 shartli + bildirishnoma** (qulf ochiq, E-IMZO, kalit, idle bo'lsa o'zi; bo'lmasa bildirishnoma + catch-up; "09:00 gacha" SRS'dan olib tashlanadi); **Windows PC M8c dan keyin** → Windows gate M8d da. M8 rejasi gate'ga tayyor
 - 2026-10-12 — **M8 reja v2** — plan-reviewer (Sonnet) APPROVE_WITH_CHANGES: 4 blocker (precheck false-positive — 31 kunlik oylar bir xil summa; dublikat spirali → write-ahead + karantin; parol noto'g'ri oynaga — fokus identifikatsiyasi; Electron'da real login spike) + 9 major qabul qilindi; `didox_runs` → userData JSON; Windows spike M8b ga. Sir qarorlari keyingi qatorda
