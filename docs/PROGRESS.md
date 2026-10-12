@@ -45,6 +45,7 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — Texnik qarz yopildi: sahifalar lazy chunk (kirish bundle 714→552 kB; qolgani freymvork); 4xx xatolar qayta urinilmaydi; Excel yuklash fetch orqali — sessiya tugasa fayl emas, login (brauzerda tekshirildi). Umumiy `lib/download.ts` (M6 va M12)
 - 2026-10-12 — **Electron 34 → 44.7.0** (34 EOL edi; Didox sahifasi eski Chromium'da ochilardi). Ichida Node 24.21, Chromium 152. Dev va qadoqlangan (.app 627M, arm64) ilovada setup → app → bridge → E-IMZO kalitlari, bitta API jarayoni tekshirildi; electron-builder 25 bilan qadoqlanadi
 - 2026-10-12 — Qadoqlash skripti `pnpm deploy --prod` dan keyin (`finally`) `pnpm install --frozen-lockfile` bilan dev holatini tiklaydi — repo'dagi `pnpm run`/commit hook endi buzilmaydi (tekshirildi)
 - 2026-10-12 — **M8c API qismi:** `PUT …/draft` — `source` (manual|didox, migratsiya 20261012100000), app belgisi uchun 32-hex Didox ID + `expectedAmount` majburiy (farq → 409 AMOUNT_CHANGED), ID'siz qo'lda belgiga ilova ID biriktirishi → POSSIBLE_DUPLICATE tasdig'i, qayta belgilash eski ID'ni saqlaydi, shartli yozish (409 DRAFT_CHANGED). Fakturalar'da "Qoralama yaratildi (Didox)". code-review (high) 7 topilma: 6 tuzatildi, dev PG bazaga migrate deploy — Sir ruxsati kutilmoqda. Didox formasini avtomatlashtirish (M8c yadrosi) — Claude qurmaydi (xavfsizlik cheklovi)
@@ -131,14 +132,11 @@ Hajm: `trivial | standard | complex`
 - E-IMZO har kirishda ERI parolini o'z oynasida so'raydi → oy 1-kuni 06:00 to'liq avtomatik ishga tushish **bo'lmasligi** mumkin (spike'da tekshiriladi)
 - Har buxgalterda alohida baza → zaxira nusxa va ilovani yangilash har kompyuterda (M9)
 - M7: `552328.77` summa formati haqiqiy Didox formasida tekshirilmagan
-- Global query `retry` 400 xatolarni ham 2 marta qayta uradi (sekin xato ko'rsatish) — 4xx'da retry'ni o'chirish mumkin
 - Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; shadcn CLI (web dependencies'da — devDependencies'ga o'tkazish kerak); exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi
-- M6: Excel tugmasi oddiy havola — sessiya tugagan bo'lsa JSON xato fayli yuklanadi (kam uchraydi)
 - M4: ro'yxat har so'rovda har shartnoma uchun to'liq yadroni ishlatadi — yuzlab shartnomada yetarli; ko'paysa yengil "faqat jamilar" rejimi yoki kesh
 - M4: operatsiyani o'chirish ogohlantirishsiz (tasdiq oynasi bor) — o'chirish foiz to'lovini ortiqcha qilib qo'yishi mumkin
 - M1 FR-1.3: o'zbek (kirill) tilidagi Didox eksport yorliqlari haqiqiy fayl bilan tekshirilmagan — o'zbekcha eksport namunasi kerak
 - M1: logout JWT'ni bekor qilmaydi (12 soat amal qiladi) — bitta umumiy login uchun qabul qilingan; kerak bo'lsa token versiyasi bilan yopiladi
-- M1: web bundle bitta chunk (>500 kB) — modullar ko'payganda route-level lazy import
 - M1: Create/Update company DTO qoidalari takrorlangan — keyingi DTO'lar ko'payganda umumiy helper
 - Partner token hali yo'q — Modul 8 bloker (Modul 1–7 bunga bog'liq emas)
 - API'da bo'sh `FacturaNo`/`FacturaDate` qabul qilinishi va "Без НДС" `LgotaId` — test muhitida tekshiriladi

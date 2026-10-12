@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ApiError, apiFetch } from '@/lib/api'
+import { apiFetch } from '@/lib/api'
+import { downloadFile } from '@/lib/download'
 import { contractsKey } from './api'
 
 /** FR-12.2: one contract over the period — movements inside it, balances at its end. */
@@ -39,21 +40,10 @@ export function useExportPeriod() {
 }
 
 /** FR-12.3: the contracts on screen, in screen order, as an .xlsx download. */
-async function downloadPeriodXlsx(from: string, to: string, contractIds: string[]): Promise<void> {
-  const response = await fetch('/api/reports/period.xlsx', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to, contractIds }),
-  })
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { message?: unknown }
-    throw new ApiError(response.status, typeof body.message === 'string' ? body.message : "Faylni yuklab bo'lmadi")
-  }
-  const url = URL.createObjectURL(await response.blob())
-  const link = Object.assign(document.createElement('a'), { href: url, download: `Davr_${from}_${to}.xlsx` })
-  document.body.append(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+function downloadPeriodXlsx(from: string, to: string, contractIds: string[]): Promise<void> {
+  return downloadFile(
+    '/reports/period.xlsx',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to, contractIds }) },
+    `Davr_${from}_${to}.xlsx`,
+  )
 }

@@ -1,5 +1,6 @@
-import { ChevronRight, FileDown } from 'lucide-react'
+import { ChevronRight, FileDown, LoaderCircle } from 'lucide-react'
 import { Fragment, type ReactNode, useState } from 'react'
+import { toast } from 'sonner'
 import { NativeSelect } from '@/components/NativeSelect'
 import { QueryErrorState } from '@/components/QueryErrorState'
 import { Badge } from '@/components/ui/badge'
@@ -8,8 +9,9 @@ import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/comp
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDayMonth, formatDecimal, formatMoney, formatMonth, formatRate, isNegativeMoney } from '@/lib/format'
+import { isUnauthorized } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { type ReportMonth, useReport } from './report-api'
+import { type ReportMonth, useExportReport, useReport } from './report-api'
 import { ALL_YEARS, selectedYear } from './reportYears'
 
 const COLUMNS = 10
@@ -17,6 +19,7 @@ const COLUMNS = 10
 /** FR-4.1/4.2: monthly interest with the segments behind every figure. */
 export function ReportCard({ contractId }: { contractId: string }) {
   const report = useReport(contractId)
+  const exportReport = useExportReport(contractId)
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [pickedYear, setPickedYear] = useState<string | null>(null)
   const months = report.data?.months ?? []
@@ -50,12 +53,15 @@ export function ReportCard({ contractId }: { contractId: string }) {
               </NativeSelect>
             </div>
           )}
-          {/* Same-origin GET: the session cookie travels; the server builds the file from this report (FR-6.1). */}
-          <Button asChild variant="outline" className="h-9">
-            <a href={`/api/contracts/${contractId}/report.xlsx`} download>
-              <FileDown aria-hidden="true" />
-              Excel yuklab olish
-            </a>
+          {/* The server builds the file from this report (FR-6.1); an expired session goes to login, not into a file. */}
+          <Button
+            variant="outline"
+            className="h-9"
+            disabled={exportReport.isPending}
+            onClick={() => exportReport.mutate(undefined, { onError: (error) => !isUnauthorized(error) && toast.error(error.message) })}
+          >
+            {exportReport.isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <FileDown aria-hidden="true" />}
+            Excel yuklab olish
           </Button>
         </CardAction>
       </CardHeader>

@@ -3,7 +3,7 @@ import { render } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 
-type Handler = (init: RequestInit | undefined) => { status: number; body?: unknown }
+type Handler = (init: RequestInit | undefined) => { status: number; body?: unknown; headers?: Record<string, string> }
 
 /** Stubs global fetch; keys are "METHOD /path". Unmatched requests fail the test loudly. */
 export function mockApi(routes: Record<string, Handler>) {
@@ -14,10 +14,10 @@ export function mockApi(routes: Record<string, Handler>) {
     calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined })
     const handler = routes[`${method} ${path}`]
     if (!handler) throw new Error(`Unexpected request: ${method} ${path}`)
-    const { status, body } = handler(init)
+    const { status, body, headers } = handler(init)
     return new Response(body === undefined ? null : JSON.stringify(body), {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
     })
   })
   vi.stubGlobal('fetch', fetchMock)

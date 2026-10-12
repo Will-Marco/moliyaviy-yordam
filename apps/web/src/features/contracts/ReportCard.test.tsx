@@ -6,6 +6,8 @@ import { ReportCard } from './ReportCard'
 
 const reportPath = `/api/contracts/${etalon.id}/report`
 
+afterEach(() => vi.restoreAllMocks())
+
 describe('ReportCard (FR-4.1, FR-4.2)', () => {
   it('shows one row per month with balances, interest and debt', async () => {
     mockApi({ [`GET ${reportPath}`]: () => ({ status: 200, body: etalonReport }) })
@@ -47,12 +49,43 @@ describe('ReportCard (FR-4.1, FR-4.2)', () => {
     expect(screen.queryByLabelText('Yil')).not.toBeInTheDocument()
   })
 
-  it('offers the report as an Excel download (FR-6.1)', async () => {
-    mockApi({ [`GET ${reportPath}`]: () => ({ status: 200, body: etalonReport }) })
+  const xlsxPath = `/api/contracts/${etalon.id}/report.xlsx`
+  /** Records what the page hands to the browser as a file download. */
+  function captureDownloads() {
+    const saved: string[] = []
+    URL.createObjectURL = vi.fn(() => 'blob:report')
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      saved.push(this.download)
+    })
+    return saved
+  }
+
+  it('downloads the report as an Excel file named by the server (FR-6.1)', async () => {
+    const saved = captureDownloads()
+    mockApi({
+      [`GET ${reportPath}`]: () => ({ status: 200, body: etalonReport }),
+      [`GET ${xlsxPath}`]: () => ({
+        status: 200,
+        body: {},
+        headers: { 'Content-Disposition': `attachment; filename="x.xlsx"; filename*=UTF-8''Shartnoma_1_ALFA_2026-10-07.xlsx` },
+      }),
+    })
     renderWithProviders(<ReportCard contractId={etalon.id} />)
-    const link = await screen.findByRole('link', { name: 'Excel yuklab olish' })
-    expect(link).toHaveAttribute('href', `/api/contracts/${etalon.id}/report.xlsx`)
-    expect(link).toHaveAttribute('download')
+    await userEvent.click(await screen.findByRole('button', { name: 'Excel yuklab olish' }))
+    await vi.waitFor(() => expect(saved).toEqual(['Shartnoma_1_ALFA_2026-10-07.xlsx']))
+  })
+
+  it('saves no file when the download fails, e.g. after the session expired (FR-6.1)', async () => {
+    const saved = captureDownloads()
+    const api = mockApi({
+      [`GET ${reportPath}`]: () => ({ status: 200, body: etalonReport }),
+      [`GET ${xlsxPath}`]: () => ({ status: 401, body: { message: 'Sessiya tugagan. Qaytadan kiring.' } }),
+    })
+    renderWithProviders(<ReportCard contractId={etalon.id} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Excel yuklab olish' }))
+    await vi.waitFor(() => expect(api.calls.some((c) => c.path === xlsxPath)).toBe(true))
+    expect(saved).toEqual([])
   })
 
   it('opens the segments behind a month', async () => {

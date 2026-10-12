@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
+import { downloadFile } from '@/lib/download'
 import { contractsKey } from './api'
 
 export interface ReportSegment {
@@ -44,4 +45,9 @@ export function useReport(contractId: string) {
     queryKey: [...contractsKey, contractId, 'report'],
     queryFn: () => apiFetch<Report>(`/contracts/${contractId}/report`),
   })
+}
+
+/** FR-6.1 — a mutation, so an expired session goes through the global handler instead of saving an error file. */
+export function useExportReport(contractId: string) {
+  return useMutation({ mutationFn: () => downloadFile(`/contracts/${contractId}/report.xlsx`) })
 }
