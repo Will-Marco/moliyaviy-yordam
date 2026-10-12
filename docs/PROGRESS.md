@@ -45,6 +45,7 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — **Electron 34 → 44.7.0** (34 EOL edi; Didox sahifasi eski Chromium'da ochilardi). Ichida Node 24.21, Chromium 152. Dev va qadoqlangan (.app 627M, arm64) ilovada setup → app → bridge → E-IMZO kalitlari, bitta API jarayoni tekshirildi; electron-builder 25 bilan qadoqlanadi
 - 2026-10-12 — Qadoqlash skripti `pnpm deploy --prod` dan keyin (`finally`) `pnpm install --frozen-lockfile` bilan dev holatini tiklaydi — repo'dagi `pnpm run`/commit hook endi buzilmaydi (tekshirildi)
 - 2026-10-12 — **M8c API qismi:** `PUT …/draft` — `source` (manual|didox, migratsiya 20261012100000), app belgisi uchun 32-hex Didox ID + `expectedAmount` majburiy (farq → 409 AMOUNT_CHANGED), ID'siz qo'lda belgiga ilova ID biriktirishi → POSSIBLE_DUPLICATE tasdig'i, qayta belgilash eski ID'ni saqlaydi, shartli yozish (409 DRAFT_CHANGED). Fakturalar'da "Qoralama yaratildi (Didox)". code-review (high) 7 topilma: 6 tuzatildi, dev PG bazaga migrate deploy — Sir ruxsati kutilmoqda. Didox formasini avtomatlashtirish (M8c yadrosi) — Claude qurmaydi (xavfsizlik cheklovi)
 - 2026-10-12 — **M8a qabul qilindi — Sir** (doira: E-IMZO kalitlar + ERI ustuni + desktop mustahkamlash; FR-8.2 parol ombori va E-IMZO'ga avto-yozish **Claude qurmaydi** — xavfsizlik cheklovi; kirishda parolni buxgalter E-IMZO oynasiga o'zi kiritadi). Keyingi: M8c — buxgalter kirgan sessiyada qoralamalar; avval B4 spike
