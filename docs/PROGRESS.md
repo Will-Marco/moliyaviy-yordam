@@ -45,6 +45,7 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — Qadoqlash skripti `pnpm deploy --prod` dan keyin (`finally`) `pnpm install --frozen-lockfile` bilan dev holatini tiklaydi — repo'dagi `pnpm run`/commit hook endi buzilmaydi (tekshirildi)
 - 2026-10-12 — **M8c API qismi:** `PUT …/draft` — `source` (manual|didox, migratsiya 20261012100000), app belgisi uchun 32-hex Didox ID + `expectedAmount` majburiy (farq → 409 AMOUNT_CHANGED), ID'siz qo'lda belgiga ilova ID biriktirishi → POSSIBLE_DUPLICATE tasdig'i, qayta belgilash eski ID'ni saqlaydi, shartli yozish (409 DRAFT_CHANGED). Fakturalar'da "Qoralama yaratildi (Didox)". code-review (high) 7 topilma: 6 tuzatildi, dev PG bazaga migrate deploy — Sir ruxsati kutilmoqda. Didox formasini avtomatlashtirish (M8c yadrosi) — Claude qurmaydi (xavfsizlik cheklovi)
 - 2026-10-12 — **M8a qabul qilindi — Sir** (doira: E-IMZO kalitlar + ERI ustuni + desktop mustahkamlash; FR-8.2 parol ombori va E-IMZO'ga avto-yozish **Claude qurmaydi** — xavfsizlik cheklovi; kirishda parolni buxgalter E-IMZO oynasiga o'zi kiritadi). Keyingi: M8c — buxgalter kirgan sessiyada qoralamalar; avval B4 spike
 - 2026-10-12 — **M8a qisman:** SRS M8 yo'l B ga qayta yozildi; desktop TypeScript'ga o'tdi; E-IMZO qatlami (parseAlias, matchKeys, faqat-o'qish klienti) + IPC qo'riqchisi (origin solishtirish, M3) + `activate` ikkinchi API'ni ochmaydi (M4) + Firmalar sahifasida "ERI kalit" ustuni (faqat desktop). Haqiqiy E-IMZO bilan app ichida tekshirildi. Testlar: desktop 15, web 156, api 124. parol ombori — qurilmaydi (keyingi qatorga qarang)
@@ -125,7 +126,6 @@ Hajm: `trivial | standard | complex`
 - 2026-10-07 — Mijoz suhbati: faktura qatori doimiy (faqat oy va narx o'zgaradi); faktura raqami/sanasini buxgalter Didox'da qo'yadi; ilova faqat qoralama yaratadi — SRS §9.1–9.2
 
 ## Ochiq risk / texnik qarz
-- M9b qadoqlash: `pnpm --prod deploy` repo'dagi `node_modules/.pnpm-workspace-state-v1.json` ga `"dev": false` yozadi → keyingi har `pnpm run` "install --production" qilib yiqiladi (commit hook ham). Vaqtincha: `pnpm install --frozen-lockfile`. Tuzatish: qadoqlash skriptidan keyin holatni tiklash yoki deploy'ni alohida papkada qilish
 - **Didox ichki API** (2026-10-11): akkaunt bloklanishi, Didox o'zgartirsa ogohlantirishsiz buzilish, foydalanish shartlariga ziddlik — Sir qabul qilgan. Har chaqiriq javobi tekshiriladi, kutilmagan javobda to'xtaladi
 - E-IMZO har kirishda ERI parolini o'z oynasida so'raydi → oy 1-kuni 06:00 to'liq avtomatik ishga tushish **bo'lmasligi** mumkin (spike'da tekshiriladi)
 - Har buxgalterda alohida baza → zaxira nusxa va ilovani yangilash har kompyuterda (M9)

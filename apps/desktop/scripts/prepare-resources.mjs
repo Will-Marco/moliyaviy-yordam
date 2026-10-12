@@ -14,7 +14,13 @@ const run = (cmd, cwd = repo) => execSync(cmd, { cwd, stdio: 'inherit' })
 rmSync(out, { recursive: true, force: true })
 run('pnpm --filter api build')
 run('pnpm --filter web build')
-run(`pnpm --filter api --prod deploy --legacy "${join(out, 'api')}"`)
+try {
+  run(`pnpm --filter api --prod deploy --legacy "${join(out, 'api')}"`)
+} finally {
+  // `pnpm deploy --prod` records a production-only install for the whole workspace; without this every later
+  // `pnpm run` in the repo tries `pnpm install --production` and fails. Restore the dev install state.
+  run('pnpm install --frozen-lockfile --prefer-offline')
+}
 
 // Drop build-only Prisma tooling and the TS compiler — not needed at runtime (Prisma 7 is Rust-free).
 const pnpmDir = join(out, 'api/node_modules/.pnpm')
