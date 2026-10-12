@@ -6,7 +6,8 @@ asar: true
 asarUnpack:
   - "**/*.node"
 files:
-  - "src/**/*"
+  - "dist/**/*"
+  - "assets/**/*"
   - "package.json"
 extraResources:
   - from: ".resources/api"

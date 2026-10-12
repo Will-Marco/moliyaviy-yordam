@@ -1,10 +1,12 @@
-import { fork } from 'node:child_process'
+import { type ChildProcess, fork } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { isConfigured, loadConfig, saveCredentials } from './config.js'
+import { type AppConfig, isConfigured, loadConfig, saveCredentials } from './config.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
+// Files tsc does not emit (setup page, preloads) live next to dist/ in assets/.
+const assets = resolve(here, '../assets')
 // Dev: read from the monorepo. Packaged: everything is staged under the app's Resources (see electron-builder.yml).
 const res = app.isPackaged ? process.resourcesPath : null
 const apiEntry = res ? join(res, 'api/dist/server-entry.js') : resolve(here, '../../api/dist/server-entry.js')
@@ -12,12 +14,12 @@ const webRoot = res ? join(res, 'web') : resolve(here, '../../web/dist')
 const migrationsDir = res ? join(res, 'migrations') : resolve(here, '../../api/prisma/migrations')
 const userData = () => app.getPath('userData')
 
-let api = null
+let api: ChildProcess | null = null
 
 /** Boot the API in a child process (PGlite, ephemeral port) with this install's credentials. */
-function startApi(config) {
+function startApi(config: AppConfig): Promise<string> {
   return new Promise((ok, fail) => {
-    api = fork(apiEntry, [], {
+    const child = fork(apiEntry, [], {
       stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
       env: {
         ELECTRON_RUN_AS_NODE: '1',
@@ -33,13 +35,16 @@ function startApi(config) {
         JWT_SECRET: config.jwtSecret,
       },
     })
-    api.on('message', (msg) => msg?.type === 'listening' && ok(`http://127.0.0.1:${msg.port}`))
-    api.on('error', fail)
-    api.on('exit', (code) => code && fail(new Error(`API process exited with code ${code}`)))
+    api = child
+    child.on('message', (msg: { type?: string; port?: number } | null) => {
+      if (msg?.type === 'listening') ok(`http://127.0.0.1:${msg.port}`)
+    })
+    child.on('error', fail)
+    child.on('exit', (code) => code && fail(new Error(`API process exited with code ${code}`)))
   })
 }
 
-function appWindow(baseUrl) {
+function appWindow(baseUrl: string): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -61,23 +66,25 @@ function appWindow(baseUrl) {
   return win
 }
 
-async function launchApp() {
-  const baseUrl = await startApi(loadConfig(userData()))
+async function launchApp(): Promise<void> {
+  const config = loadConfig(userData())
+  if (!config) throw new Error('config.json is missing')
+  const baseUrl = await startApi(config)
   appWindow(baseUrl)
 }
 
 /** First run: a local setup window collects the password; no network endpoint is involved. */
-function setupWindow() {
+function setupWindow(): void {
   const win = new BrowserWindow({
     width: 440,
     height: 560,
     resizable: false,
     title: 'Moliyaviy yordam — sozlash',
-    webPreferences: { contextIsolation: true, sandbox: true, preload: join(here, 'setup-preload.js') },
+    webPreferences: { contextIsolation: true, sandbox: true, preload: join(assets, 'setup-preload.cjs') },
   })
-  void win.loadFile(join(here, 'setup.html'))
+  void win.loadFile(join(assets, 'setup.html'))
 
-  ipcMain.handle('setup:save', async (_event, { username, password }) => {
+  ipcMain.handle('setup:save', async (_event, { username, password }: { username: unknown; password: unknown }) => {
     if (typeof username !== 'string' || typeof password !== 'string' || password.length < 8) {
       return { ok: false, message: "Parol kamida 8 belgi bo'lishi kerak" }
     }
