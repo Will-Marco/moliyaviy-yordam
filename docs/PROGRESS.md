@@ -45,6 +45,7 @@ Hajm: `trivial | standard | complex`
   eksporti namunasi (FR-1.3); server ma'lumotlari — M9.
 
 ## Qaror jurnali
+- 2026-10-12 — `pnpm audit --prod`: 4 ta (mysql2 ×2, deepmerge-ts, uuid — hammasi tranzitiv) → pnpm `overrides` bilan yamalgan versiyalar; audit toza; unit/e2e (pg+PGlite, Excel), prisma validate, qadoqlash staging tekshirildi
 - 2026-10-12 — Stavka o'zgarishini o'chirish ham tekshiriladi (RETROACTIVE + DRAFTED_INVOICE_CHANGES, `?confirmWarnings=true`); web'da umumiy `DeleteWithWarningsDialog` (operatsiyalar va stavkalar). Brauzerda № 12/25 da tekshirildi (o'chirilmadi). Web dev porti `PORT` dan (launch.json autoPort)
 - 2026-10-12 — **O'chirish ogohlantirishi + DRAFTED_INVOICE_CHANGES** (Sir: ikkalasi): `DELETE …/operations/:id` manfiy qoldiq / ortiqcha foiz to'lovi bo'lsa 409 → oynada ogohlantirish → `?confirmWarnings=true`; qo'shish/tahrirlash/o'chirish qoralama qilingan oy foizini o'zgartirsa ogohlantirish. Brauzerda tekshirildi (dev ma'lumot o'chirilmadi). SRS FR-3.2, FR-3.7
 - 2026-10-12 — **Kunlik zaxira** (Sir: faqat lokal, 14 kun + har oydan bittasi 1 yil, tiklash qo'lda): API `BackupService` (ishga tushganda + har soat, `daily-YYYY-MM-DD.tgz`, `.partial`→rename, migratsiya snapshot'lariga tegmaydi); sarlavhada "Zaxira" (desktop); `apps/api/scripts/restore-backup.mjs` + docs/runbooks/restore-backup.md (tiklash end-to-end tekshirildi). Topilma: paketda `productName` yo'q edi → userData `…/desktop` (dev bilan bir xil) — `productName: Moliyaviy yordam` qo'shildi
@@ -135,7 +136,6 @@ Hajm: `trivial | standard | complex`
 - E-IMZO paroli har kirishda buxgalter tomonidan kiritiladi (avto-yozish qurilmagan) → oy 1-kuni to'liq qorovulsiz ishga tushish yo'q, bildirishnoma orqali (M8d)
 - Har buxgalterda alohida baza → kunlik lokal zaxira bor (2026-10-12), lekin bir diskda; ilovani yangilash har kompyuterda (M9)
 - M7/M8: summa formati (`552328.77`, mingliklar) haqiqiy Didox formasidagi kiritishda tekshirilmagan
-- Bog'liqliklar auditi: prisma ichidagi mysql2 (ishlatilmaydi), deepmerge-ts; exceljs → uuid (moderate, bizda ishlatilmaydigan yo'l). Prod deploy (M9) oldidan qayta ko'rib chiqiladi
 - M4: ro'yxat har so'rovda har shartnoma uchun to'liq yadroni ishlatadi — yuzlab shartnomada yetarli; ko'paysa yengil "faqat jamilar" rejimi yoki kesh
 - M1 FR-1.3: o'zbek (kirill) tilidagi Didox eksport yorliqlari haqiqiy fayl bilan tekshirilmagan — o'zbekcha eksport namunasi kerak
 - M1: logout JWT'ni bekor qilmaydi (12 soat amal qiladi) — bitta umumiy login uchun qabul qilingan; kerak bo'lsa token versiyasi bilan yopiladi

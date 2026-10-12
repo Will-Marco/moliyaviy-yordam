@@ -5,3 +5,9 @@ allowBuilds:
   '@prisma/engines': true
   electron: true
   prisma: true
+
+# Patched versions of transitive dependencies flagged by `pnpm audit --prod` (2026-10-12).
+overrides:
+  mysql2: ^3.23.1 # via prisma CLI; MySQL is never used, but it ships with the app
+  deepmerge-ts: ^8.0.0 # via @prisma/config
+  uuid: ^11.1.1 # via exceljs
