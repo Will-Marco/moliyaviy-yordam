@@ -190,7 +190,7 @@ export async function createDraft(opts: CreateDraftOptions): Promise<DraftOutcom
   /* 6 — the МХИК brings the unit, the VAT rate and the tax relief with it; all three are checked, not assumed. */
   await run('fillItem', async () => {
     await pause()
-    await fillUntil(page, L.rowField(COL_MXIK), L.INTEREST_MXIK, (v) => v === L.INTEREST_MXIK, 'МХИК kodi', L.INTEREST_MXIK, note, closeNotice)
+    await fillUntil(page, L.rowField(COL_MXIK), L.INTEREST_MXIK, (v) => v === L.INTEREST_MXIK, 'МХИК kodi', L.INTEREST_MXIK, note, closeNotice, true)
     const option = L.rowOptionStartingWith(COL_MXIK, L.INTEREST_MXIK)
     await page.waitFor(`!!(${option.js})`, { timeoutMs: OPTIONS_TIMEOUT_MS, what: 'МХИК varianti' })
     await page.click(option.js, { what: option.what, needsPointer: true })
@@ -377,6 +377,8 @@ async function fillUntil(
   expected: string,
   note: (message: string) => void = () => undefined,
   clearBlocker: () => Promise<boolean> = async () => false,
+  /** Click into the field first: Didox's autocompletes only start searching once they have been opened by hand. */
+  clickFirst = false,
 ): Promise<void> {
   let shown: string | null = null
   for (let attempt = 0; attempt < FILL_TRIES; attempt++) {
@@ -393,6 +395,7 @@ async function fillUntil(
      * can refuse keystrokes outright, so the last attempt puts the value in directly; either way the field is read
      * back, and the fallback is said out loud in the live log rather than hidden.
      */
+    if (clickFirst) await page.click(field.js, { what: field.what, needsPointer: true }).catch(() => undefined)
     const lastTry = attempt === FILL_TRIES - 1
     if (lastTry) {
       note(`${field.what} klaviaturadan yozilmadi — qiymat to'g'ridan-to'g'ri qo'yildi`)

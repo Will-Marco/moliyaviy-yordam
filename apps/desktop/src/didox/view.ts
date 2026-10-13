@@ -276,6 +276,8 @@ function createPage(wc: WebContents, { diagnosticsDir, signal }: { diagnosticsDi
      * date keep its `__.__.____` placeholder and the МХИК box stay empty while the catalogue opened unfiltered.
      */
     async type(snippet, text, { what }) {
+      // The frame must hold input focus or its keydowns are dropped — harmless now that the window is invisible.
+      wc.focus()
       const focused = await evaluate<boolean>(focusScript(snippet))
       if (!focused) throw new StepError('PAGE_UNEXPECTED', `${what} maydoniga kursor qo'yib bo'lmadi`, what)
       for (const ch of text) {
