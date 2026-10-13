@@ -235,6 +235,21 @@ bitta saqlashdan keyin 14 ta bo'ldi. Sinov qoralamasi (summa `552328.77`, izoh "
    tekshiruv "shu yorliqdagi birortasi ham belgilanmagan" shaklida.
 6. To'liq zanjir shu tuzatishlardan keyin real Didox'da o'tdi: forma → saqlash → ID (`locateDraftId`) → o'chirish.
 
+### Oyna ko'rinishi va sintetik kiritish (o'lchov, 2026-10-13)
+
+`sendInputEvent` bilan boshqariladigan oyna **render bo'lishi shart**:
+
+| Oyna holati | Bosish / yozish |
+|---|---|
+| `show: false` (hech qachon ko'rsatilmagan) | **ishlamaydi** (ogohlantirish yopilmadi) |
+| `minimize()` | **ishlamaydi** (yozilmadi) |
+| ko'rsatilgan, lekin fokusssiz (`showInactive`) | qisman — МХИК avtoto'ldirgichi to'lmadi |
+| ko'rsatilgan, boshqa oyna bilan yopilgan | ishlaydi (occlusion kalitlari bilan) |
+| ko'rsatilgan + `setOpacity(0)` + `setIgnoreMouseEvents(true)` | **ishlaydi** — to'liq zanjir uch marta tekshirildi |
+
+Shuning uchun ilova oynani shaffof qilib ochadi (FR-8.4): ekranda hech narsa ko'rinmaydi, bosishlar ostidagi oynaga
+o'tadi, lekin Chromium uni "tirik" deb hisoblaydi. **E-IMZO parol oynasi** baribir chiqadi — u E-IMZO'niki.
+
 ### Spike davomida kiritilgan tuzatishlar
 `eimzo/client.ts` (Origin) · `didox/locators.ts` (`keyPicker`, `selectedKeyInn`, `byExactTextJs`) ·
 `didox/view.ts` (`type` to'liq tugma ketma-ketligi, `clear` `selectAll()`). Desktop 344 test yashil, typecheck toza.

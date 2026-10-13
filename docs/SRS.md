@@ -210,8 +210,13 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   har `tayyor` faktura uchun Didox formasi (Ҳисоб-фактура актсиз / Стандарт; shartnoma № va sanasi; kontragent STIR; bitta
   qator — MXIK 10401999001000000, nom §9.1, miqdor 1, narx = summa, ҚҚСсиз va imtiyoz Didox tomonidan, kelib chiqishi
   "Хизмат кўрсатиш"; **faktura raqami va sanasi bo'sh**) → avtomatik to'lgan qiymatlar va jami tekshiriladi → "Сақлаб қолиш" →
-  qoralama ID'si Didox ro'yxatidan olinib ilovada yoziladi (`source: didox`) → chiqish. Didox oynasi ish paytida ko'rinadi,
-  lekin foydalanuvchi kiritishi bloklanadi. Belgilash **har doim** Didox'ga yozilgan summa bilan birga boradi
+  qoralama ID'si Didox ro'yxatidan olinib ilovada yoziladi (`source: didox`) → chiqish. **Didox oynasi ko'rinmaydi**
+  (Sir, 2026-10-13): u to'liq shaffof va sichqoncha uchun o'tkazuvchan qilinadi, buxgalter jarayonni ilovaning o'z
+  oynasida kuzatadi. Oyna butunlay yashirilmaydi — o'lchangan (2026-10-13): yashirilgan yoki kichraytirilgan oyna
+  sintetik bosish va klaviaturani qabul qilmaydi. **E-IMZO'ning parol oynasi** baribir ekranda chiqadi (u E-IMZO'niki)
+  va o'sha paytda klaviatura band bo'ladi; shuning uchun FR-8.10 dagi "foydalanuvchi band emas" sharti qoladi.
+  Ekranda hech narsa chiqmasligi uchun Didox'ga **parol bilan kirish** kerak bo'ladi — ochiq savol (Sir buxgalterdan
+  aniqlaydi). Belgilash **har doim** Didox'ga yozilgan summa bilan birga boradi
   (`expectedAmount`): ish paytida ilovaning qolgan qismi **bloklanmaydi**, shuning uchun oy foizi o'zgarib qolsa API
   belgilashni rad etadi va faktura "e'tibor kerak" holatiga o'tadi (jim xato yo'q). Ish davomida ilovada bloklamaydigan
   ogohlantirish chizig'i ko'rinadi.

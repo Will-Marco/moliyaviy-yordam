@@ -54,6 +54,13 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-13 — **Didox oynasi ko'rinmaydi (Sir qarori, SRS FR-8.4 yangilandi).** "Jarayonni buxgalterga ko'rsatish shart
+  emas" → oyna `setOpacity(0)` + `setIgnoreMouseEvents(true)` bilan ochiladi (bosishlar ostidagi oynaga o'tadi);
+  `DIDOX_SHOW_WINDOW=1` uni qaytaradi. **O'lchov (2026-10-13):** oynani butunlay yashirish yoki kichraytirish
+  **ishlamaydi** — bunday oyna sintetik bosish/klaviaturani qabul qilmaydi (ogohlantirish yopilmadi, maydonlar
+  to'lmadi); render bo'layotgan (hatto yopilgan yoki shaffof) oyna ishlaydi. Shaffof oynada to'liq zanjir uch marta
+  tekshirildi (yaratildi → o'chirildi). **E-IMZO parol oynasi baribir ekranda chiqadi** — u E-IMZO'niki; to'liq fon
+  rejimi uchun Didox'ga parol bilan kirish kerak (Sir buxgalterdan aniqlaydi — A varianti)
 - 2026-10-13 — **M8c c1 GATE O'TDI (Sir bilan, real Didox).** Ilova Fakturalar sahifasidagi tugmadan bitta fakturani
   (sentabr 2026, 1 315 068.49) o'zi yaratdi: Didox'ga ERI bilan kirdi, formani to'ldirdi, "Сақлаб қолиш" bosdi,
   qoralama ID'sini ro'yxatdan topdi va ilovada `source: didox` bilan belgiladi; qayta bosilganda hech narsa

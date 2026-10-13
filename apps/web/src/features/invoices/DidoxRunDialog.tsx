@@ -197,13 +197,13 @@ export function DidoxRunDialog({ month, pending, onOpenChange }: Props) {
                 : `${pending} ta faktura uchun Didox qoralamasi yaratiladi.`}
             </p>
             <p className="text-muted-foreground">
-              Ilova Didox oynasida har bir firma nomidan ERI bilan kiradi va formani to'ldiradi. Hech narsa
-              imzolanmaydi va yuborilmaydi — imzolashni o'zingiz qilasiz.
+              Ilova har bir firma nomidan ERI bilan Didox'ga kiradi va formani to'ldiradi; Didox oynasi ko'rinmaydi,
+              jarayonni shu yerda kuzatasiz. Hech narsa imzolanmaydi va yuborilmaydi — imzolashni o'zingiz qilasiz.
             </p>
             <Alert>
               <AlertDescription>
-                Jarayon davomida klaviatura va sichqonchaga tegmang: parol E-IMZO oynasiga shu kompyuterning
-                klaviaturasi orqali yoziladi.
+                Jarayon davomida klaviatura va sichqonchaga tegmang: E-IMZO parol oynasi qisqa vaqtga chiqadi va
+                parol shu kompyuterning klaviaturasi orqali yoziladi.
               </AlertDescription>
             </Alert>
           </div>
@@ -211,8 +211,8 @@ export function DidoxRunDialog({ month, pending, onOpenChange }: Props) {
 
         {running && (
           <p className="text-sm">
-            Ilova Didox oynasida har bir firma nomidan kirib, fakturalarni qoralama qilib saqlaydi. Hech narsa
-            imzolanmaydi va yuborilmaydi. Jarayon davomida klaviatura va sichqonchaga tegmang.
+            Ilova har bir firma nomidan kirib, fakturalarni qoralama qilib saqlaydi. Hech narsa imzolanmaydi va
+            yuborilmaydi. Jarayon davomida klaviatura va sichqonchaga tegmang.
           </p>
         )}
 

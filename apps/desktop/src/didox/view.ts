@@ -65,12 +65,28 @@ function guardSession(): Electron.Session {
  * The visible Didox window (plan "Didox oynasi", v2 M7). No preload, sandboxed; the person watches but cannot click or
  * type into it while the app works (`setEnabled(false)`; sendInputEvent still reaches the page).
  */
+/*
+ * The accountant should not have to watch a browser work (Sir, 2026-10-13), so the window is made invisible —
+ * fully transparent and transparent to the mouse, so nothing shows and nothing of theirs is swallowed by it.
+ *
+ * It is not *hidden*, and that is not an oversight. Measured on 2026-10-13: a window that is minimised or never
+ * shown stops receiving the synthetic clicks and keystrokes the form is driven with (Didox's notice would not
+ * close, no field would be filled), while one that renders — even covered, even at zero opacity — works. Running
+ * with nothing rendered at all needs the password login instead of the ERI key, which is Sir's open question.
+ *
+ * E-IMZO's own password window still appears: it belongs to E-IMZO, not to this app.
+ *
+ * `DIDOX_SHOW_WINDOW=1` makes it visible again for debugging.
+ */
+const visibleWindow = (): boolean => process.env.DIDOX_SHOW_WINDOW === '1'
+
 export function openDidoxWindow({ diagnosticsDir, signal }: { diagnosticsDir: string; signal?: AbortSignal }): DidoxWindow {
   const ses = guardSession()
   const win = new BrowserWindow({
     width: 1280,
     height: 860,
     title: 'Didox — Moliyaviy yordam',
+    show: false,
     webPreferences: {
       session: ses,
       contextIsolation: true,
@@ -86,8 +102,13 @@ export function openDidoxWindow({ diagnosticsDir, signal }: { diagnosticsDir: st
     },
   })
   win.setEnabled(false)
-  // Keep it where the accountant can watch it; it cannot be typed into (setEnabled(false)).
+  win.show()
   win.moveTop()
+  if (!visibleWindow()) {
+    win.setOpacity(0)
+    // An invisible window must not eat the accountant's clicks: they pass through to whatever is underneath.
+    win.setIgnoreMouseEvents(true)
+  }
   const wc = win.webContents
   const keepOnDidox = (event: { preventDefault(): void }, url: string) => {
     if (!isAllowedNavigation(url)) event.preventDefault()
@@ -252,8 +273,6 @@ function createPage(wc: WebContents, { diagnosticsDir, signal }: { diagnosticsDi
      * date keep its `__.__.____` placeholder and the МХИК box stay empty while the catalogue opened unfiltered.
      */
     async type(snippet, text, { what }) {
-      // The renderer drops key events while its frame has no input focus, however the DOM focus looks (c1 gate).
-      wc.focus()
       const focused = await evaluate<boolean>(focusScript(snippet))
       if (!focused) throw new StepError('PAGE_UNEXPECTED', `${what} maydoniga kursor qo'yib bo'lmadi`, what)
       for (const ch of text) {
@@ -273,7 +292,6 @@ function createPage(wc: WebContents, { diagnosticsDir, signal }: { diagnosticsDi
       for (let attempt = 0; attempt < CLEAR_TRIES; attempt++) {
         // Focus inside the loop (review finding 2): a React re-render — the very thing the retries are for — drops
         // focus, and select-all + Backspace would then land on whatever has it instead of this field.
-        wc.focus()
         if (!(await evaluate<boolean>(focusScript(snippet)))) {
           throw new StepError('PAGE_UNEXPECTED', `${what} maydoniga kursor qo'yib bo'lmadi`, what)
         }
