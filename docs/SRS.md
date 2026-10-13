@@ -190,7 +190,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 
 ### Modul 8: Didox — avtomatik qoralamalar (yo'l B, 2026-10-12)
 > Rasmiy partner token yo'q; Didox'ning tokenini olish taqiqlangan (CONSTITUTION §14). Ilova Didox saytini **o'z oynasida**
-> ochadi va sahifani inson kabi boshqaradi. Real Didox oqimi: docs/research/didox-flow.md. Reja: docs/plans/M8-didox-drafts.md (v2).
+> ochadi va sahifani inson kabi boshqaradi. Real Didox oqimi: docs/research/didox-flow.md. Reja: docs/plans/M8-didox-drafts.md (v2);
+> **M8c uchun yagona manba — docs/plans/M8c-spec.md (v5)**.
 > Bo'linish: **M8a** kalit va parollar · **M8b** avtomatik kirish · **M8c** qoralama yaratish · **M8d** jadval, tray, Windows.
 - FR-8.1 — **ERI kalitlar (M8a).** Ilova kalitlar ro'yxatini lokal E-IMZO'dan oladi (`pfx.list_all_certificates`) va har
   kalitni firmaga **STIR** bo'yicha bog'laydi (sertifikat maydoni `1.2.860.3.16.1.1`). Firmalar sahifasida har firma uchun:
@@ -210,16 +211,30 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   qator — MXIK 10401999001000000, nom §9.1, miqdor 1, narx = summa, ҚҚСсиз va imtiyoz Didox tomonidan, kelib chiqishi
   "Хизмат кўрсатиш"; **faktura raqami va sanasi bo'sh**) → avtomatik to'lgan qiymatlar va jami tekshiriladi → "Сақлаб қолиш" →
   qoralama ID'si Didox ro'yxatidan olinib ilovada yoziladi (`source: didox`) → chiqish. Didox oynasi ish paytida ko'rinadi,
-  lekin foydalanuvchi kiritishi bloklanadi.
+  lekin foydalanuvchi kiritishi bloklanadi. Belgilash **har doim** Didox'ga yozilgan summa bilan birga boradi
+  (`expectedAmount`): ish paytida ilovaning qolgan qismi **bloklanmaydi**, shuning uchun oy foizi o'zgarib qolsa API
+  belgilashni rad etadi va faktura "e'tibor kerak" holatiga o'tadi (jim xato yo'q). Ish davomida ilovada bloklamaydigan
+  ogohlantirish chizig'i ko'rinadi.
 - FR-8.5 — **Takror yo'q.** Ilovada qoralama belgisi bor faktura o'tkaziladi; API qayta belgilashni tasdiqsiz rad etadi.
-  "Saqlandi, lekin ID topilmadi" yoki saqlash paytida uzilgan faktura **karantinga** tushadi — avtomatik qayta urinilmaydi,
-  buxgalter Didox'da tekshirib qo'lda hal qiladi. Ilovadan tashqarida yaratilgan o'xshash qoralama avtomatik moslanmaydi —
-  ilova to'xtab xabar beradi.
+  "Saqlandi, lekin ID topilmadi" yoki saqlash paytida uzilgan faktura **"e'tibor kerak"** (`needs_check`) holatiga tushadi —
+  formani qayta to'ldirish va qayta saqlash **taqiqlangan**; buxgalter Didox'da tekshirib ilovada hal qiladi. Ilova faqat
+  **o'zi boshlagan** saqlashni, faqat **o'qib**, moslashtirishi mumkin (shu faktura kaliti — kontragent STIR + shartnoma
+  № va sanasi + summa — va saqlash vaqti atrofidagi tor oyna); hech qachon o'zi qoralama yaratmaydi yoki ilovadan tashqarida
+  paydo bo'lgan qoralamani o'ziga belgilamaydi — bunday o'xshash qoralama topilsa faktura "e'tibor kerak" bo'ladi.
+  Buxgalter fakturaga shu oy uchun **"o'tkazib yuborish"** belgisini qo'yishi mumkin: keyingi ishga tushishlarda u
+  o'tkaziladi (deterministik xato butun firmani har oy to'xtatmasligi uchun), belgi olinsa yana `tayyor` bo'ladi.
 - FR-8.6 — **Inson tezligi va to'xtash.** Harakatlar ketma-ket, belgilar va bosishlar orasida pauza; bir vaqtda bitta ish.
-  Sahifa kutilganidan farq qilsa (element yo'q, qiymat boshqa) — shu firma to'xtaydi, skrinshot lokal saqlanadi, sababi
-  o'zbekcha ko'rsatiladi; taxmin bilan davom etish va qayta urinish yo'q. Ish bekor qilinishi mumkin.
-- FR-8.7 — **Natijalar.** Har ishga tushish lokal yoziladi (oy, kim/qachon, har faktura: yaratildi / o'tkazildi / xato /
-  karantin, sabab, Didox ID) va ilovada ko'rinadi; ish paytida jonli jarayon.
+  Sahifa kutilganidan farq qilsa (element yo'q, qiymat boshqa) — shu **firma** to'xtaydi, skrinshot lokal saqlanadi, sababi
+  o'zbekcha ko'rsatiladi, qolgan fakturalari o'tkaziladi va keyingi firma davom etadi; taxmin bilan davom etish va qayta
+  urinish yo'q. Bitta fakturaga tegishli sabablar (o'xshash qoralama bor, kontragent nomi mos emas, saqlangan qoralama
+  ID'si topilmadi yoki bir nechta nomzod, summa o'zgargan) — **faqat shu faktura** "e'tibor kerak" bo'ladi, firma qolgan
+  fakturalar bilan davom etadi. Ish bekor qilinishi mumkin: bekor qilish yarim belgi qoldirmaydi — saqlash boshlangan
+  bo'lsa ID topilib belgilanadi, topilmasa faktura "e'tibor kerak" bo'ladi.
+- FR-8.7 — **Natijalar.** Har ishga tushish lokal yoziladi (oy, qachon, har faktura: yaratildi / o'tkazildi / xato /
+  e'tibor kerak, sabab, Didox ID) va ilovada ko'rinadi; ish paytida jonli jarayon. Yozuvlar buxgalter kompyuterida
+  (`userData/didox-runs`, oxirgi 50 ta; e'tibor kerak fakturasi bor yozuv o'chirilmaydi), tarmoqqa chiqmaydi. Holat har
+  o'zgarishda darhol diskka yoziladi, shuning uchun ilova saqlash o'rtasida yopilsa ham izi qoladi: keyingi ochilishda
+  tugamagan ish yopiladi, saqlash boshlangan faktura "e'tibor kerak" bo'ladi, ID'si bor faktura esa belgilanadi.
 - FR-8.8 — **Kirish xatosi.** Noto'g'ri parol, E-IMZO oynasi chiqmasligi yoki kirib bo'lmaslik → firma "E'tibor kerak"
   holatiga o'tadi, uning qolgan fakturalari o'tkaziladi, boshqa firmalar davom etadi. Avtomatik qayta urinish **taqiqlangan**;
   firma faqat buxgalter parolni qayta kiritsa yoki "tekshirildi" desa ochiladi.
@@ -317,7 +332,7 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 | Miqdor | doimiy | 1 |
 | Narx = Qiymat | Modul 4 | oy foizi, 2 xona (CR-4) |
 | QQS | sozlama | Без НДС |
-| Kelib chiqishi | doimiy | Оказание услуг |
+| Kelib chiqishi | doimiy | Оказание услуг — bu **chop etilgan fakturadagi ruscha yorliq**; Didox formasida tanlanadigan variant matni kirillcha va spike bilan aniqlanadi (M8c) |
 
 Tekshiruv: namunadagi summa `43 572 602,74 × 365 = 15 904 000 000,10` — ya'ni amaldagi hisob
 **365 kunlik** asosda yuritilgan; CR-2 bilan mos.
