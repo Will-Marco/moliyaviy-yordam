@@ -102,13 +102,16 @@ export function openDidoxWindow({ diagnosticsDir, signal }: { diagnosticsDir: st
     },
   })
   win.setEnabled(false)
-  win.show()
-  win.moveTop()
   if (!visibleWindow()) {
+    // Before `show()`: shown first and faded after, the window flashes onto the screen for a frame (Sir saw it).
     win.setOpacity(0)
     // An invisible window must not eat the accountant's clicks: they pass through to whatever is underneath.
     win.setIgnoreMouseEvents(true)
+    // macOS draws a shadow even around a fully transparent window — that shadow is the "something" on the screen.
+    win.setHasShadow(false)
   }
+  win.show()
+  win.moveTop()
   const wc = win.webContents
   const keepOnDidox = (event: { preventDefault(): void }, url: string) => {
     if (!isAllowedNavigation(url)) event.preventDefault()
