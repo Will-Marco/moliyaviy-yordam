@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 8c — qoralama yaratish (**c1 gate o'tdi 2026-10-13**; keyingi qadam — Sir qarori: c2 / M8d / to'xtatish)
+**Joriy modul:** 8c — qoralama yaratish (**c2 gate o'tdi 2026-10-13**; keyingi qadam — Sir qarori: M8d jadval yoki A varianti (Didox paroli))
 **Oxirgi yangilanish:** 2026-10-13
 
 ## Modullar
@@ -54,6 +54,17 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-13 — **M8c c2 GATE O'TDI.** Sir ilovadan ishga tushirdi: **2 ta qoralama yaratildi** (№ 12/25, 13/25),
+  kalitsiz firma (SINOV BERUVCHI) "E-IMZO kaliti topilmadi" deb o'tkazildi va **birinchi firma davom etdi** (FR-8.8).
+  Qolgan acceptance ssenariylari real Didox'da tekshirildi (Claude, Sir vaqtini olmasdan):
+  **(1) `kill -9` saqlash o'rtasida** → jurnalda `saving` → ilova ochilishida `needs_check{INTERRUPTED_SAVE}` →
+  keyingi run Didox ro'yxatidan o'sha qoralamani topdi, belgiladi va **qayta yaratmadi** (`ALREADY_DRAFTED`);
+  **(2) saqlash ichida bekor qilish** → kritik bo'lim tugaguncha davom etdi, ID topildi va faktura belgilandi
+  (yarim belgi qolmadi); **(3) locator ataylab buzildi** → firma `PAGE_UNEXPECTED` bilan to'xtadi, **screenshot**
+  saqlandi, fakturasi sababi bilan o'tkazildi, Didox'da hech narsa yaratilmadi. Yo'l-yo'lakay tuzatilgan ikki
+  nosozlik: fokussiz oynada `keydown` yetmagani uchun МХИК to'lmay qolardi (endi oyna input fokusini oladi va
+  avtoto'ldirgichga avval bosiladi), va "Диққат!" oynasi birinchi bosishda yopilmasa butun firma to'xtardi (endi
+  uch marta uriniladi). Testlar: desktop 450, web 195, api 130
 - 2026-10-13 — **Didox oynasi ko'rinmaydi (Sir qarori, SRS FR-8.4 yangilandi).** "Jarayonni buxgalterga ko'rsatish shart
   emas" → oyna `setOpacity(0)` + `setIgnoreMouseEvents(true)` bilan ochiladi (bosishlar ostidagi oynaga o'tadi);
   `DIDOX_SHOW_WINDOW=1` uni qaytaradi. **O'lchov (2026-10-13):** oynani butunlay yashirish yoki kichraytirish

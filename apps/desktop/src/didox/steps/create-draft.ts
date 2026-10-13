@@ -71,6 +71,8 @@ const LOCATE_GAP_MS = 3_000
  * given. The settle pauses give the re-render time to finish before the next keystroke arrives.
  */
 const FILL_TRIES = 3
+/** The notice does not always go on the first press (c2 gate). */
+const NOTICE_TRIES = 3
 const FIELD_SETTLE_MS = 600
 
 /** What the row must say once the МХИК has been chosen (spike §2c S2). */
@@ -106,13 +108,19 @@ export async function createDraft(opts: CreateDraftOptions): Promise<DraftOutcom
   const key = draftKey(item)
 
   const note = (message: string) => ctx.onProgress?.({ firmTin: ctx.tin, step: 'fill', status: 'running', message })
-  /** Closes Didox's notice if it is covering the form; says whether there was one. */
+  /**
+   * Closes Didox's notice if it is covering the form; says whether there was one. The click is tried a few times:
+   * the notice sometimes stays on the first press, and losing a whole firm to that would be absurd.
+   */
   const closeNotice = async (): Promise<boolean> => {
-    const open = await page.read<boolean>(`!!(${L.attentionModalClose.js})`).catch(() => false)
-    if (!open) return false
-    await page.click(L.attentionModalClose.js, { what: L.attentionModalClose.what, needsPointer: true })
-    await page.waitFor(`!(${L.attentionModalClose.js})`, { timeoutMs: MODAL_GONE_MS, what: 'ogohlantirish oynasi' })
-    return true
+    const isOpen = () => page.read<boolean>(`!!(${L.attentionModalClose.js})`).catch(() => false)
+    if (!(await isOpen())) return false
+    for (let attempt = 0; attempt < NOTICE_TRIES; attempt++) {
+      await page.click(L.attentionModalClose.js, { what: L.attentionModalClose.what, needsPointer: true }).catch(() => undefined)
+      await page.pause(FIELD_SETTLE_MS)
+      if (!(await isOpen())) return true
+    }
+    throw new StepError('PAGE_UNEXPECTED', 'Didox ogohlantirish oynasi yopilmadi', 'openForm', null)
   }
   const readValue = (loc: L.Locator) => page.read<string | null>(loc.js)
   const expect = async (loc: L.Locator, want: string, what: string) => {
@@ -144,6 +152,7 @@ export async function createDraft(opts: CreateDraftOptions): Promise<DraftOutcom
     await page.goto(L.CREATE_DOCUMENT_URL)
     await page.waitFor(`(${L.docTypeValues.js}).length === 2`, { timeoutMs: FIELD_TIMEOUT_MS, what: 'hujjat turi' })
     if (await waitQuietly(page, `!!(${L.attentionModalClose.js})`, MODAL_WAIT_MS)) await closeNotice()
+    // It can also turn up a moment later, while the type is being checked; the fills below close it too.
   })
 
   /* 2–3 — the app fills an invoice form of one exact kind, for the firm it logged in as. */

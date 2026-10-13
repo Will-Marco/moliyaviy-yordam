@@ -448,9 +448,34 @@ describe('createDraft', () => {
 
   it('closes the attention notice when Didox shows one', async () => {
     const s = scene({ attentionModal: true })
+    let noticeOpen = true
+    s.page.on(`!!(${L.attentionModalClose.js})`, () => noticeOpen)
+    s.page.onClick.set(L.attentionModalClose.js, () => {
+      noticeOpen = false
+    })
 
     await expect(s.call()).resolves.toMatchObject({ kind: 'marked' })
     expect(s.page.of('click').some((c) => c.what === L.attentionModalClose.what)).toBe(true)
+  })
+
+  /* One press does not always take it away (c2 gate), and losing the firm to that would be absurd. */
+  it('presses the notice away again when it stays after the first press', async () => {
+    const s = scene({ attentionModal: true })
+    let presses = 0
+    s.page.on(`!!(${L.attentionModalClose.js})`, () => presses < 2)
+    s.page.onClick.set(L.attentionModalClose.js, () => {
+      presses++
+    })
+
+    await expect(s.call()).resolves.toMatchObject({ kind: 'marked' })
+    expect(presses).toBeGreaterThanOrEqual(2)
+  })
+
+  it('stops the firm when the notice will not go at all', async () => {
+    const s = scene({ attentionModal: true })
+    s.page.on(`!!(${L.attentionModalClose.js})`, true)
+
+    await expect(s.call()).rejects.toMatchObject({ code: 'PAGE_UNEXPECTED' })
   })
 
   it('reports a cancelled run as cancelled, not as a page fault', async () => {
