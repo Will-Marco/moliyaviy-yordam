@@ -337,3 +337,119 @@ describe('createDidoxRunner.checkLogin', () => {
     expect(() => runner.cancel()).not.toThrow()
   })
 })
+
+describe('createDidoxRunner.createDrafts', () => {
+  const invoice = {
+    contractId: 'c-1',
+    contractNumber: '12/25',
+    contractSignedOn: '2026-09-01',
+    borrowerTin: '300000002',
+    borrowerName: 'BETA TRADE MCHJ',
+    lineName: 'Foiz',
+    amount: '552328.77',
+  }
+
+  /** A journal that records what it was asked to do, without touching the disk. */
+  function fakeJournal(runId = '2026-10-13T09-00-00.000Z-a1b2') {
+    const finished: { status: string; failure?: { code: string } }[] = []
+    const handle = {
+      runId,
+      snapshot: () => ({ runId, month: '2026-09', trigger: 'manual' as const, startedAt: 'x', status: 'running' as const, firms: [] }),
+      setFirm: vi.fn(async () => undefined),
+      setInvoice: vi.fn(async () => undefined),
+      markInvoice: vi.fn(async () => 'marked' as const),
+      addStep: vi.fn(async () => undefined),
+      finish: vi.fn(async (status: string, failure?: { code: string }) => void finished.push({ status, ...(failure ? { failure } : {}) })),
+    }
+    return {
+      finished,
+      handle,
+      journal: {
+        start: vi.fn(async () => handle),
+        read: vi.fn(async () => null),
+        flushIdFound: vi.fn(async () => ({ marked: 0, needsCheck: 0, left: 0, unauthorized: false })),
+      },
+    }
+  }
+
+  const drafts = (over: { rows?: unknown[]; journal?: unknown } = {}) => {
+    const j = fakeJournal()
+    return {
+      spy: j,
+      deps: {
+        api: {
+          listInvoices: vi.fn(async () => ({
+            month: '2026-09',
+            months: ['2026-09'],
+            lenders: [],
+            rows: over.rows ?? [
+              { ...invoice, lender: { id: 'l1', tin: TIN, name: 'ALFA' }, borrower: { id: 'b1', tin: invoice.borrowerTin, name: invoice.borrowerName }, contract: { number: invoice.contractNumber, signedOn: invoice.contractSignedOn }, draft: null },
+            ],
+          })),
+          markDraft: vi.fn(async () => ({ ok: true as const, row: {} as never })),
+        },
+        journal: (over.journal ?? j.journal) as never,
+        skips: { list: vi.fn(async () => ({})) },
+      } as never,
+    }
+  }
+
+  it('answers with the run id at once and does the work in the background', async () => {
+    const d = drafts()
+    const { runner } = setup({ drafts: d.deps })
+
+    const started = await runner.createDrafts({ month: '2026-09', lenderIds: 'all' })
+
+    expect(started).toEqual({ ok: true, runId: '2026-10-13T09-00-00.000Z-a1b2' })
+    await vi.waitFor(() => expect(d.spy.handle.finish).toHaveBeenCalled())
+  })
+
+  it('sends any id found earlier before it plans new work', async () => {
+    const d = drafts()
+    const { runner } = setup({ drafts: d.deps })
+
+    await runner.createDrafts({ month: '2026-09', lenderIds: 'all' })
+
+    expect(d.spy.journal.flushIdFound).toHaveBeenCalled()
+  })
+
+  it('says there is nothing to do instead of starting an empty run', async () => {
+    const d = drafts({ rows: [] })
+    const { runner } = setup({ drafts: d.deps })
+
+    await expect(runner.createDrafts({ month: '2026-09', lenderIds: 'all' })).resolves.toMatchObject({
+      ok: false,
+      code: 'NOTHING_TO_DO',
+    })
+    expect(d.spy.journal.start).not.toHaveBeenCalled()
+  })
+
+  it('refuses a month it cannot read', async () => {
+    const { runner } = setup({ drafts: drafts().deps })
+    await expect(runner.createDrafts({ month: '2026-13', lenderIds: 'all' })).resolves.toMatchObject({ ok: false })
+  })
+
+  it('runs one at a time', async () => {
+    const d = drafts()
+    const { runner } = setup({ drafts: d.deps })
+
+    const first = await runner.createDrafts({ month: '2026-09', lenderIds: 'all' })
+    const second = await runner.createDrafts({ month: '2026-09', lenderIds: 'all' })
+
+    expect(first).toMatchObject({ ok: true })
+    expect(second).toMatchObject({ ok: false, code: 'RUN_IN_PROGRESS' })
+  })
+
+  it('refuses to create drafts in a build without the draft side', async () => {
+    const { runner } = setup()
+    await expect(runner.createDrafts({ month: '2026-09', lenderIds: 'all' })).resolves.toMatchObject({
+      ok: false,
+      code: 'UNAVAILABLE',
+    })
+  })
+
+  it('has no status to show before the first run', async () => {
+    const { runner } = setup({ drafts: drafts().deps })
+    await expect(runner.status()).resolves.toBeNull()
+  })
+})

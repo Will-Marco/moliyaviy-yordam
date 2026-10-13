@@ -1,6 +1,7 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { companyA, companyB } from '@/features/contracts/fixtures'
+import type { DidoxProgress, DidoxRun, DidoxRunInvoice, DidoxStartResult } from '@/lib/desktop'
 import { mockApi, renderWithProviders } from '@/test/utils'
 import type { Invoice, InvoiceList } from './api'
 import { InvoicesPage } from './InvoicesPage'
@@ -192,6 +193,190 @@ describe('InvoicesPage (Module 7)', () => {
     renderWithProviders(<InvoicesPage />)
     expect(await screen.findByRole('button', { name: 'Belgini olib tashlash: № 1' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Qayta belgilash: № 1' })).not.toBeInTheDocument()
+  })
+
+  describe('Didox draft run (M8c, desktop)', () => {
+    const START = "Didox'da qoralama yaratish"
+    const withDraft = (i: Invoice): Invoice => ({
+      ...i,
+      draft: {
+        amount: i.amount,
+        didoxDocumentId: 'D-1',
+        draftedAt: '2026-10-01T04:00:00.000Z',
+        amountChanged: false,
+        source: 'didox',
+      },
+    })
+    const runInvoice = (over: Partial<DidoxRunInvoice> = {}): DidoxRunInvoice => ({
+      contractId: ready.contractId,
+      contractNumber: '1',
+      borrowerName: companyB.name,
+      amount: ready.amount,
+      state: 'pending',
+      ...over,
+    })
+    const runOf = (over: Partial<DidoxRun> = {}): DidoxRun => ({
+      runId: 'r1',
+      month: '2026-09',
+      startedAt: '2026-10-01T04:00:00.000Z',
+      status: 'running',
+      firms: [{ tin: companyA.tin, name: companyA.name, status: 'running', invoices: [runInvoice()] }],
+      ...over,
+    })
+
+    /** Desktop bridge whose run the test settles (`finish`), feeds journals to (`setRun`) and pushes events into (`emit`). */
+    const desktopWithDidox = (rows: Invoice[] = [ready, other]) => {
+      let settle!: (r: DidoxStartResult) => void
+      let listener: ((p: DidoxProgress) => void) | null = null
+      let journal: DidoxRun | null = null
+      const didox = {
+        checkLogin: vi.fn(),
+        createDrafts: vi.fn(() => new Promise<DidoxStartResult>((ok) => (settle = ok))),
+        status: vi.fn(async () => journal),
+        cancel: vi.fn(async () => undefined),
+        onProgress: vi.fn((cb: (p: DidoxProgress) => void) => {
+          listener = cb
+          return () => (listener = null)
+        }),
+      }
+      vi.stubGlobal('desktop', { platform: 'darwin', eri: {}, didox })
+      const api = mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list(rows) }) })
+      const setRun = (run: DidoxRun) => (journal = run)
+      const finish = (r: DidoxStartResult) => act(() => settle(r))
+      const emit = (p: Partial<DidoxProgress> & Pick<DidoxProgress, 'step' | 'status'>) =>
+        act(() => listener?.({ runId: 'r1', firmTin: companyA.tin, ...p }))
+      return { api, didox, setRun, finish, emit }
+    }
+    const openRun = async () => {
+      await userEvent.click(await screen.findByRole('button', { name: START }))
+      return screen.findByRole('dialog')
+    }
+    /** Nothing is driven before the accountant confirms (spec §7) — the app is about to use this keyboard. */
+    const confirmRun = async () => {
+      const dialog = await openRun()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Boshlash' }))
+      return dialog
+    }
+
+    it('asks before it takes over the keyboard, and starts nothing until then', async () => {
+      const { didox } = desktopWithDidox()
+      renderWithProviders(<InvoicesPage />)
+
+      const dialog = await openRun()
+
+      expect(within(dialog).getByText(/klaviatura va sichqonchaga tegmang/i)).toBeInTheDocument()
+      expect(within(dialog).getByText(/imzolanmaydi va yuborilmaydi/i)).toBeInTheDocument()
+      expect(didox.createDrafts).not.toHaveBeenCalled()
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Boshlash' }))
+
+      expect(didox.createDrafts).toHaveBeenCalledWith({ month: '2026-09', lenderIds: 'all' })
+    })
+
+    it('is not offered in a plain browser', async () => {
+      mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([ready]) }) })
+      renderWithProviders(<InvoicesPage />)
+      await screen.findByText('№ 1')
+      expect(screen.queryByRole('button', { name: START })).not.toBeInTheDocument()
+    })
+
+    it('is not offered by desktop builds older than M8c', async () => {
+      vi.stubGlobal('desktop', {
+        platform: 'darwin',
+        eri: {},
+        didox: { checkLogin: vi.fn(), cancel: vi.fn(), onProgress: vi.fn() },
+      })
+      mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([ready]) }) })
+      renderWithProviders(<InvoicesPage />)
+      await screen.findByText('№ 1')
+      expect(screen.queryByRole('button', { name: START })).not.toBeInTheDocument()
+    })
+
+    it('says why it is disabled when nothing in the month needs a draft', async () => {
+      desktopWithDidox([withDraft(ready), withDraft(other)])
+      renderWithProviders(<InvoicesPage />)
+      const button = await screen.findByRole('button', { name: START })
+      expect(button).toBeDisabled()
+      expect(button).toHaveAttribute('title', "Bu oyda qoralama kutayotgan faktura yo'q")
+    })
+
+    it('starts the run, shows the live log and can be cancelled', async () => {
+      const { didox, setRun, finish, emit } = desktopWithDidox()
+      renderWithProviders(<InvoicesPage />)
+      const dialog = await confirmRun()
+      expect(didox.createDrafts).toHaveBeenCalledWith({ month: '2026-09', lenderIds: 'all' })
+      expect(within(dialog).getByText(/Hech narsa imzolanmaydi/)).toBeInTheDocument()
+
+      setRun(runOf())
+      await finish({ ok: true, runId: 'r1' })
+      await emit({ step: 'awaitLogin', status: 'running' })
+      expect(await within(dialog).findByText(/A MCHJ · Didox'ga kirish/)).toBeInTheDocument()
+
+      await emit({ contractId: ready.contractId, invoiceIndex: 1, invoiceCount: 2, step: 'save', status: 'running' })
+      const steps = within(dialog).getByRole('list', { name: 'Jarayon' })
+      expect(within(steps).getAllByRole('listitem')).toHaveLength(2)
+      expect(within(steps).getByText(/1\/2 · № 1 · Qoralamani saqlash/)).toBeInTheDocument()
+      await emit({ contractId: ready.contractId, invoiceIndex: 1, invoiceCount: 2, step: 'mark', status: 'done' })
+      expect(within(steps).getAllByRole('listitem')).toHaveLength(2) // one line per invoice, newest step
+      expect(within(steps).getByText(/1\/2 · № 1 · Ilovada belgilash/)).toBeInTheDocument()
+
+      await userEvent.keyboard('{Escape}') // cannot be dismissed while Didox is being driven
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(within(dialog).queryByRole('button', { name: 'Yopish' })).not.toBeInTheDocument()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Bekor qilish' }))
+      expect(didox.cancel).toHaveBeenCalledOnce()
+    })
+
+    it('says when the run could not be started and lets the dialog be closed', async () => {
+      const { didox, finish } = desktopWithDidox()
+      renderWithProviders(<InvoicesPage />)
+      const dialog = await confirmRun()
+      await finish({ ok: false, code: 'RUN_IN_PROGRESS', message: 'Boshqa jarayon tugashini kuting' })
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent('Boshqa jarayon tugashini kuting')
+      expect(didox.status).not.toHaveBeenCalled()
+      await userEvent.click(within(dialog).getAllByRole('button', { name: 'Yopish' })[0]!)
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    })
+
+    it('sums up a finished run and refreshes the invoices', async () => {
+      const { api, setRun, finish } = desktopWithDidox()
+      renderWithProviders(<InvoicesPage />)
+      const dialog = await confirmRun()
+      setRun(
+        runOf({
+          status: 'done',
+          finishedAt: '2026-10-01T05:00:00.000Z',
+          firms: [
+            {
+              tin: companyA.tin,
+              name: companyA.name,
+              status: 'done',
+              invoices: [
+                runInvoice({ state: 'marked', didoxId: 'A'.repeat(32) }),
+                runInvoice({
+                  contractId: other.contractId,
+                  contractNumber: '7',
+                  state: 'needs_check',
+                  code: 'SAVED_ID_UNKNOWN',
+                  didoxId: 'B'.repeat(32),
+                  message: "Didox'da qoralama bo'lishi mumkin — uni tekshiring",
+                }),
+              ],
+            },
+          ],
+        }),
+      )
+      const before = api.calls.length
+      await finish({ ok: true, runId: 'r1' })
+
+      const summary = await within(dialog).findByRole('status')
+      expect(summary).toHaveTextContent('Yakunlandi: 1 ta yaratildi')
+      expect(summary).toHaveTextContent("1 ta e'tibor kerak")
+      expect(summary).toHaveTextContent("№ 7 — Didox'da qoralama bo'lishi mumkin — uni tekshiring")
+      expect(summary).toHaveTextContent(`Didox ID ${'B'.repeat(32)}`)
+      await waitFor(() => expect(api.calls.length).toBeGreaterThan(before)) // the rows pick up their new badge
+      expect(within(dialog).getAllByRole('button', { name: 'Yopish' })[0]).toBeInTheDocument()
+    })
   })
 
   it('explains an empty list before any contract exists', async () => {

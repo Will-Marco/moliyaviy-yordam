@@ -138,5 +138,29 @@ export function valueScript(snippet: string): string {
 })()`
 }
 
+/**
+ * Last resort for a field that will not take keystrokes. Didox's date box is masked and, inside the app's own
+ * window, swallows them (the c1 gate saw `__.__.____` after two full attempts), while the very same box takes a
+ * value set on the element with an `input` event — that is how the spike filled it. React's own listener is on the
+ * document, so the dispatched event reaches it from this isolated world too.
+ *
+ * It is never trusted on its own: the caller reads the field back afterwards, exactly as it does after typing.
+ */
+export function setValueScript(snippet: string, text: string): string {
+  return `(() => {
+  const el = (${snippet});
+  if (!el) return null;
+  el.scrollIntoView && el.scrollIntoView({ block: 'center' });
+  el.focus();
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, 'value');
+  if (!setter || !setter.set) return null;
+  setter.set.call(el, ${JSON.stringify(text)});
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return typeof el.value === 'string' ? el.value : null;
+})()`
+}
+
 /** Select-all is Cmd+A on macOS, Ctrl+A elsewhere; a field is emptied the way a person empties it. */
 export const selectAllModifier = (platform: string): 'cmd' | 'control' => (platform === 'darwin' ? 'cmd' : 'control')

@@ -20,6 +20,11 @@ export interface Page {
    * field that still holds Didox's own value would append, and the amount would be wrong (§9).
    */
   clear(snippet: string, opts: { what: string }): Promise<void>
+  /**
+   * Puts `text` into the field without the keyboard, for a field that refuses keystrokes (a masked date box).
+   * Returns what the field holds afterwards, so the caller can check rather than assume.
+   */
+  setValue(snippet: string, text: string, opts: { what: string }): Promise<string | null>
   /** Reloads the current page (the draft list may need a second look before the new row appears). */
   reload(): Promise<void>
   /**

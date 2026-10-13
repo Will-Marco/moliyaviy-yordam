@@ -140,6 +140,8 @@ const FIRM_TRANSITIONS: Record<FirmStatus, FirmStatus[]> = {
 
 export interface InvoicePatch {
   state: InvoiceState
+  /** The run reads the amount again after login; the record must then say what was actually written. */
+  amount?: string
   savingAt?: string
   didoxId?: string
   candidateIds?: string[]
@@ -300,6 +302,12 @@ export function createJournal({
           edit(journal.runId, (j) => replace(journal, patchFirm(j, tin, patch))),
         setInvoice: (tin: string, contractId: string, patch: InvoicePatch) =>
           edit(journal.runId, (j) => replace(journal, patchInvoice(j, tin, contractId, patch))),
+        /**
+         * Sends a found ID to the API and records what came back — step 13 and the recovery path share this with
+         * `flushIdFound`, so an answer never means two different things depending on who asked.
+         */
+        markInvoice: (markDraft: MarkDraft, tin: string, contractId: string) =>
+          mark(markDraft, journal, findFirm(journal, tin), findInvoice(journal, tin, contractId)),
         addStep: (tin: string, contractId: string, step: { step: string; status: 'done' | 'failed' }) =>
           edit(journal.runId, (j) => {
             const invoice = findInvoice(j, tin, contractId)

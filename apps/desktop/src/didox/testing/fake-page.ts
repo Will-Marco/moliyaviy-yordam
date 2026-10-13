@@ -7,6 +7,7 @@ export type FakeCall =
   | { kind: 'click'; snippet: string; what: string; needsPointer: boolean }
   | { kind: 'type'; snippet: string; text: string; what: string }
   | { kind: 'clear'; snippet: string; what: string }
+  | { kind: 'setValue'; snippet: string; text: string; what: string }
   | { kind: 'reload' }
   | { kind: 'selectOption'; open: string; option: string; what: string }
   | { kind: 'pause'; ms: number }
@@ -86,6 +87,12 @@ export class FakePage implements Page {
   async clear(snippet: string, opts: { what: string }): Promise<void> {
     this.calls.push({ kind: 'clear', snippet, what: opts.what })
     this.values.set(snippet, '')
+  }
+
+  async setValue(snippet: string, text: string, opts: { what: string }): Promise<string | null> {
+    this.calls.push({ kind: 'setValue', snippet, text, what: opts.what })
+    this.values.set(snippet, text)
+    return text
   }
 
   async reload(): Promise<void> {

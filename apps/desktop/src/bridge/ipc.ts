@@ -6,7 +6,8 @@ import { parseAlias } from '../eimzo/alias.js'
 import { createEimzoClient, EimzoError } from '../eimzo/client.js'
 import { type KeyStatus, matchKeys } from '../eimzo/match.js'
 import type { ProgressEvent } from '../didox/contract.js'
-import type { CheckLoginResult } from '../didox/run.js'
+import type { RunJournal } from '../didox/journal.js'
+import type { CheckLoginResult, StartDraftsResult } from '../didox/run.js'
 import type { EriStore, PasswordStatus } from '../secrets/eri-store.js'
 import { isTrustedSender } from './trust.js'
 
@@ -50,8 +51,15 @@ export function createKeyReader(): (tins: string[]) => Promise<Map<string, KeySt
 /** What the IPC layer needs from the Didox runner (didox/run.ts). */
 export interface DidoxIpc {
   checkLogin(tin: string): Promise<CheckLoginResult>
+  createDrafts(opts: { month: string; lenderIds: string[] | 'all' }): Promise<StartDraftsResult>
+  status(): Promise<RunJournal | null>
   cancel(): void
 }
+
+const MONTH = /^\d{4}-(?:0[1-9]|1[0-2])$/
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/** A person picks firms from a list; a page that asks for hundreds is not that. */
+const MAX_LENDERS = 200
 
 /** The runner's `onProgress`: forwards each step to the app window as `didox:progress` (if it is open). */
 export function sendProgress(getAppWindow: () => BrowserWindow | null): (e: ProgressEvent) => void {
@@ -149,6 +157,26 @@ export function registerIpc(
       if (!didox) return { ok: false, code: 'UNAVAILABLE', message: "Didox bilan ishlash bu versiyada yo'q" }
       return didox.checkLogin(tin)
     }),
+  )
+  ipcMain.handle(
+    'didox:create-drafts',
+    guarded(async (payload: unknown): Promise<StartDraftsResult> => {
+      const { month, lenderIds } = (payload ?? {}) as { month?: unknown; lenderIds?: unknown }
+      if (typeof month !== 'string' || !MONTH.test(month)) throw new Error('Invalid month')
+      const lenders =
+        lenderIds === 'all'
+          ? ('all' as const)
+          : Array.isArray(lenderIds) && lenderIds.length > 0 && lenderIds.length <= MAX_LENDERS && lenderIds.every((id) => typeof id === 'string' && UUID.test(id))
+            ? (lenderIds as string[])
+            : null
+      if (lenders === null) throw new Error('Invalid lenderIds')
+      if (!didox) return { ok: false, code: 'UNAVAILABLE', message: "Didox bilan ishlash bu versiyada yo'q" }
+      return didox.createDrafts({ month, lenderIds: lenders })
+    }),
+  )
+  ipcMain.handle(
+    'didox:status',
+    guarded(async (): Promise<RunJournal | null> => (didox ? didox.status() : null)),
   )
   ipcMain.handle(
     'didox:cancel',

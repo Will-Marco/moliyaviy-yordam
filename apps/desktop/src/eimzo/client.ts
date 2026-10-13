@@ -27,6 +27,14 @@ export interface EimzoClientOptions {
   timeoutMs?: number
 }
 
+/*
+ * E-IMZO checks which domain is asking (its published API keys are bound to domains) and reads it from the
+ * handshake's Origin header. Without one it refuses the key list — status -1022, "Domen null uchun API-kalit
+ * yaroqsiz" — even though `version` answers fine. It trusts localhost without an API key, so naming that origin
+ * is all the app needs.
+ */
+const EIMZO_ORIGIN = 'http://localhost'
+
 /**
  * Talks to the local E-IMZO service. Read-only by construction: the only requests it can send are the
  * key list (CONSTITUTION §13 — the app never asks E-IMZO to load a key or sign).
@@ -35,7 +43,7 @@ export function createEimzoClient({ url, WebSocket, timeoutMs = 5000 }: EimzoCli
   // E-IMZO answers one request per connection, like its official JS client.
   function request<T>(message: object): Promise<T> {
     return new Promise((ok, fail) => {
-      const socket = new WebSocket(url)
+      const socket = new WebSocket(url, { origin: EIMZO_ORIGIN })
       let settled = false
       // Every outcome ends here exactly once; nothing is thrown from a socket listener (that would hit the main process).
       const settle = (outcome: () => void) => {

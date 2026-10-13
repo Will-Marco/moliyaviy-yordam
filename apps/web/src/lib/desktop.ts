@@ -15,9 +15,17 @@ export type EriKeyReport = { passwords?: Record<string, EriPasswordStatus> } & (
   | { eimzo: 'not_running' | 'error'; message: string }
 )
 
-/** One step of a Didox run, as the desktop app reports it (apps/desktop/src/didox/contract.ts ProgressEvent). */
+/**
+ * One step of a Didox run, as the desktop app reports it (apps/desktop/src/didox/contract.ts ProgressEvent).
+ * `runId` and the invoice fields are absent for "Kirishni tekshirish", which is not a journalled run.
+ */
 export interface DidoxProgress {
+  runId?: string
   firmTin: string
+  contractId?: string
+  /** 1-based position of this invoice within the firm, for "3/7" in the live log. */
+  invoiceIndex?: number
+  invoiceCount?: number
   step: string
   status: 'running' | 'done' | 'failed'
   message?: string
@@ -25,6 +33,43 @@ export interface DidoxProgress {
 
 /** Outcome of "Kirishni tekshirish" (apps/desktop/src/didox/run.ts CheckLoginResult); `message` is Uzbek. */
 export type DidoxCheckResult = { ok: true } | { ok: false; code: string; message: string; screenshot?: string | null }
+
+/** Outcome of asking for a draft-creation run; `ok: false` means nothing was started. */
+export type DidoxStartResult = { ok: true; runId: string } | { ok: false; code: string; message: string }
+
+/** Where one invoice got to: only `marked` is finished, `needs_check` and `error` wait for a person. */
+export type DidoxInvoiceState = 'pending' | 'saving' | 'id_found' | 'marked' | 'needs_check' | 'skipped' | 'error'
+
+export interface DidoxRunInvoice {
+  contractId: string
+  contractNumber: string
+  borrowerName: string
+  amount: string
+  state: DidoxInvoiceState
+  didoxId?: string
+  code?: string
+  message?: string
+}
+
+export interface DidoxRunFirm {
+  tin: string
+  name: string
+  status: 'pending' | 'login' | 'running' | 'done' | 'skipped' | 'failed'
+  code?: string
+  message?: string
+  invoices: DidoxRunInvoice[]
+}
+
+/** The run journal of the current (or last) draft-creation run — the desktop app keeps it across a reload. */
+export interface DidoxRun {
+  runId: string
+  month: string
+  startedAt: string
+  finishedAt?: string
+  status: 'running' | 'done' | 'cancelled' | 'failed'
+  failure?: { code: string; message: string }
+  firms: DidoxRunFirm[]
+}
 
 /** What the Electron shell exposes as `window.desktop` (apps/desktop/assets/app-preload.cjs). */
 export interface DesktopBridge {
@@ -38,6 +83,10 @@ export interface DesktopBridge {
   /** Absent in desktop builds older than M8b. The app logs in to Didox in its own window; it never signs or sends. */
   didox?: {
     checkLogin(tin: string): Promise<DidoxCheckResult>
+    /** Absent in desktop builds older than M8c. */
+    createDrafts(opts: { month: string; lenderIds: string[] | 'all' }): Promise<DidoxStartResult>
+    /** Null when this computer has never run one. */
+    status(): Promise<DidoxRun | null>
     cancel(): Promise<void>
     /** Returns the unsubscribe function. */
     onProgress(callback: (progress: DidoxProgress) => void): () => void

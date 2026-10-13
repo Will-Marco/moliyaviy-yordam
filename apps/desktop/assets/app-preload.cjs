@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('desktop', {
   // M8b: the app drives Didox in its own window; it never signs or sends. Progress arrives as events.
   didox: {
     checkLogin: (tin) => ipcRenderer.invoke('didox:check-login', tin),
+    createDrafts: (opts) => ipcRenderer.invoke('didox:create-drafts', opts),
+    status: () => ipcRenderer.invoke('didox:status'),
     cancel: () => ipcRenderer.invoke('didox:cancel'),
     onProgress: (callback) => {
       const listener = (_event, progress) => callback(progress)

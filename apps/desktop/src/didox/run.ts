@@ -13,7 +13,9 @@ import {
   StepError,
   type StepErrorCode,
 } from './contract.js'
+import { type CreateDraftsDeps, planRun, runPlan, type StartOptions } from './create-drafts.js'
 import { createRunEngine, RunBusyError, type RunContext } from './engine.js'
+import type { RunJournal } from './journal.js'
 
 /** The Didox window as the runner sees it (view.ts implements it with Electron). */
 export interface DidoxWindow {
@@ -29,6 +31,15 @@ export interface DidoxWindow {
  * `code` is a StepErrorCode, an EriStoreError code, or one of RUN_IN_PROGRESS / KEY_UNKNOWN / EIMZO_ERROR / UNEXPECTED / UNAVAILABLE.
  */
 export type CheckLoginResult = { ok: true } | { ok: false; code: string; message: string; screenshot?: string | null }
+
+/** Everything `createDrafts` needs that the runner itself does not already have (M8c §3). */
+export type DraftsDeps = Pick<CreateDraftsDeps, 'api' | 'journal' | 'skips' | 'maxInvoices' | 'nowMs'>
+
+/** Start of a draft run: the run id is returned at once and the work goes on in the background (§3). */
+export type StartDraftsResult = { ok: true; runId: string } | { ok: false; code: string; message: string }
+
+const MONTH = /^\d{4}-(?:0[1-9]|1[0-2])$/
+const MAX_LENDERS = 200
 
 export interface DidoxRunnerDeps {
   /** Firm STIR -> its E-IMZO key; throws EimzoError when E-IMZO is down. */
@@ -54,6 +65,8 @@ export interface DidoxRunnerDeps {
   criticalMaxMs?: number
   /** How often the watchdog looks. Default 30 s. */
   beatMs?: number
+  /** M8c: absent in a build that can only check the login. */
+  drafts?: DraftsDeps
 }
 
 const LOGOUT_TIMEOUT_MS = 30_000
@@ -119,6 +132,9 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
   })
   /** Set while a run holds the lock, so every progress event counts as a heartbeat. */
   let beat: () => void = () => undefined
+  /** Between planning and taking the lock there is a gap; a second start must not slip into it. */
+  let starting = false
+  let lastRun: string | null = null
   const onProgress = (e: ProgressEvent): void => {
     beat()
     deps.onProgress(e)
@@ -254,8 +270,75 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
     }
   }
 
+  /**
+   * Starts a draft run and returns its id straight away: the accountant keeps using the app while it works (Sir,
+   * 2026-10-13). Everything that decides whether there is anything to do — the API's list, the skip flags — happens
+   * before the lock is taken, so "nothing to do" is an answer, not a run that ends immediately.
+   */
+  async function createDrafts({ month, lenderIds }: StartOptions): Promise<StartDraftsResult> {
+    const refuse = (code: string, message: string): StartDraftsResult => ({ ok: false, code, message })
+    const drafts = deps.drafts
+    if (!drafts) return { ok: false, code: 'UNAVAILABLE', message: "Didox bilan ishlash bu versiyada yo'q" }
+    if (!MONTH.test(month)) return { ok: false, code: 'UNEXPECTED', message: 'Oy formati kutilganidek emas' }
+    if (lenderIds !== 'all' && (lenderIds.length === 0 || lenderIds.length > MAX_LENDERS)) {
+      return { ok: false, code: 'UNEXPECTED', message: "Firmalar ro'yxati kutilganidek emas" }
+    }
+    if (engine.busy() || starting) return refuse('RUN_IN_PROGRESS', didoxMessage('RUN_IN_PROGRESS'))
+
+    starting = true
+    let handle: Awaited<ReturnType<DraftsDeps['journal']['start']>>
+    try {
+      // Anything found in an earlier run but never recorded in the API goes first, before new work is planned (§3).
+      await drafts.journal.flushIdFound({ markDraft: drafts.api.markDraft }).catch(() => undefined)
+      const plan = await planRun(drafts, { month, lenderIds })
+      if (!plan) return refuse('NOTHING_TO_DO', didoxMessage('NOTHING_TO_DO'))
+      handle = await drafts.journal.start({ month, trigger: 'manual', firms: plan.firms })
+      lastRun = handle.runId
+      void engine
+        .run(async (ctx) => {
+          beat = ctx.beat
+          return runPlan({ ...drafts, ...sharedDeps(), onProgress }, handle, plan, ctx)
+        })
+        .then(
+          (outcome) => handle.finish(outcome.status, outcome.failure),
+          (error: unknown) =>
+            handle.finish('failed', {
+              code: error instanceof RunBusyError ? 'RUN_IN_PROGRESS' : 'UNEXPECTED',
+              message: unexpected(error),
+            }),
+        )
+        .catch(() => undefined)
+        .finally(() => {
+          beat = () => undefined
+        })
+      return { ok: true, runId: handle.runId }
+    } catch (error) {
+      return refuse('UNEXPECTED', unexpected(error))
+    } finally {
+      starting = false
+    }
+  }
+
+  /** The pieces a draft run shares with "Kirishni tekshirish": same window, same login, same typist. */
+  const sharedDeps = () => ({
+    listKeys: deps.listKeys,
+    eri: deps.eri,
+    preflight: deps.preflight,
+    openWindow: deps.openWindow,
+    loginFirm,
+    logout: deps.logout,
+  })
+
+  /** The run this app started last, live while it is going (the UI polls it). */
+  async function status(): Promise<RunJournal | null> {
+    if (!deps.drafts || !lastRun) return null
+    return deps.drafts.journal.read(lastRun)
+  }
+
   return {
     checkLogin,
+    createDrafts,
+    status,
     /** Ends the current run's waits early; the window closes and the run reports CANCELLED. */
     cancel: (): void => engine.cancel(),
     busy: (): boolean => engine.busy(),

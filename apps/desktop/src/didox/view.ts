@@ -12,7 +12,7 @@ import {
   pollScript,
   readScript,
   screenshotName,
-  selectAllModifier,
+  setValueScript,
   staleScreenshots,
   valueScript,
 } from './page-scripts.js'
@@ -30,6 +30,12 @@ const LOAD_TIMEOUT_MS = 45_000
 const MENU_TIMEOUT_MS = 10_000
 /** Select-all + Backspace should empty a field at once; a couple of tries cover a slow React re-render. */
 const CLEAR_TRIES = 3
+/**
+ * An emptied date field does not read back as "": Didox's mask prints its own placeholder (`__.__.____`). A value
+ * made only of mask characters holds nothing a later keystroke could append to, so it counts as empty.
+ */
+const EMPTY_FIELD = /^[\s_./-]*$/
+const isEmptyField = (value: string) => EMPTY_FIELD.test(value)
 
 let sessionGuarded = false
 
@@ -65,9 +71,23 @@ export function openDidoxWindow({ diagnosticsDir, signal }: { diagnosticsDir: st
     width: 1280,
     height: 860,
     title: 'Didox — Moliyaviy yordam',
-    webPreferences: { session: ses, contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true },
+    webPreferences: {
+      session: ses,
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      /*
+       * A covered window is a throttled window: Chromium reports `visibilityState: 'hidden'` for an occluded one and
+       * stops delivering the keystrokes the form is filled with (M8c §3; the c1 gate failed exactly here, with the
+       * app's own window in front). The switches in main.ts stop the occlusion itself from backgrounding it.
+       */
+      backgroundThrottling: false,
+    },
   })
   win.setEnabled(false)
+  // Keep it where the accountant can watch it; it cannot be typed into (setEnabled(false)).
+  win.moveTop()
   const wc = win.webContents
   const keepOnDidox = (event: { preventDefault(): void }, url: string) => {
     if (!isAllowedNavigation(url)) event.preventDefault()
@@ -226,12 +246,21 @@ function createPage(wc: WebContents, { diagnosticsDir, signal }: { diagnosticsDi
       throw new StepError('PAGE_UNEXPECTED', `${what} ${why}`, what)
     },
 
+    /*
+     * Every character goes in as a whole key press. A lone `char` event is enough for a plain input, but Didox's
+     * date fields are masked and its autocompletes (МХИК) watch for keydown: with `char` alone the spike saw the
+     * date keep its `__.__.____` placeholder and the МХИК box stay empty while the catalogue opened unfiltered.
+     */
     async type(snippet, text, { what }) {
+      // The renderer drops key events while its frame has no input focus, however the DOM focus looks (c1 gate).
+      wc.focus()
       const focused = await evaluate<boolean>(focusScript(snippet))
       if (!focused) throw new StepError('PAGE_UNEXPECTED', `${what} maydoniga kursor qo'yib bo'lmadi`, what)
       for (const ch of text) {
         alive()
+        wc.sendInputEvent({ type: 'keyDown', keyCode: ch })
         wc.sendInputEvent({ type: 'char', keyCode: ch })
+        wc.sendInputEvent({ type: 'keyUp', keyCode: ch })
         await sleep(charDelay())
       }
     },
@@ -241,25 +270,32 @@ function createPage(wc: WebContents, { diagnosticsDir, signal }: { diagnosticsDi
      * typing into a field that still holds its old value would append — the amount would be wrong (§9).
      */
     async clear(snippet, { what }) {
-      const modifiers = [selectAllModifier(process.platform)]
       for (let attempt = 0; attempt < CLEAR_TRIES; attempt++) {
         // Focus inside the loop (review finding 2): a React re-render — the very thing the retries are for — drops
         // focus, and select-all + Backspace would then land on whatever has it instead of this field.
+        wc.focus()
         if (!(await evaluate<boolean>(focusScript(snippet)))) {
           throw new StepError('PAGE_UNEXPECTED', `${what} maydoniga kursor qo'yib bo'lmadi`, what)
         }
         alive()
-        wc.sendInputEvent({ type: 'keyDown', keyCode: 'a', modifiers })
-        wc.sendInputEvent({ type: 'keyUp', keyCode: 'a', modifiers })
+        // Chromium's own editing command, not a Cmd/Ctrl+A key press: the spike saw the synthetic shortcut leave the
+        // field untouched, and typing into a field that still holds its old text would append to the amount.
+        wc.selectAll()
         wc.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' })
         wc.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' })
         await sleep(charDelay())
         // null means the element is gone, which is not "empty" (review finding 3): typing would go nowhere.
         const left = await evaluate<string | null>(valueScript(snippet))
         if (left === null) throw new StepError('PAGE_UNEXPECTED', `${what} maydoni yo'qoldi`, what)
-        if (left === '') return
+        if (isEmptyField(left)) return
       }
       throw new StepError('PAGE_UNEXPECTED', `${what} maydoni tozalanmadi`, what)
+    },
+
+    async setValue(snippet, text, { what }) {
+      const left = await evaluate<string | null>(setValueScript(snippet, text))
+      if (left === null) throw new StepError('PAGE_UNEXPECTED', `${what} maydoniga qiymat qo'yib bo'lmadi`, what)
+      return left
     },
 
     async reload() {

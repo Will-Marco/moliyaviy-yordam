@@ -6,7 +6,10 @@ import { createKeyReader, registerIpc, sendProgress } from './bridge/ipc.js'
 import { isSameOrigin } from './bridge/trust.js'
 import { type AppConfig, isConfigured, loadConfig, saveCredentials } from './config.js'
 import { autotypePreflight, typeEimzoPassword } from './didox/autotype/index.js'
+import { createApiClient } from './api/client.js'
+import { createJournal } from './didox/journal.js'
 import { createDidoxRunner, type DidoxRunner } from './didox/run.js'
+import { createSkipStore } from './didox/skips.js'
 import { login } from './didox/steps/login.js'
 import { logout } from './didox/steps/logout.js'
 import { openDidoxWindow } from './didox/view.js'
@@ -20,6 +23,13 @@ const res = app.isPackaged ? process.resourcesPath : null
 const apiEntry = res ? join(res, 'api/dist/server-entry.js') : resolve(here, '../../api/dist/server-entry.js')
 const webRoot = res ? join(res, 'web') : resolve(here, '../../web/dist')
 const migrationsDir = res ? join(res, 'migrations') : resolve(here, '../../api/prisma/migrations')
+/*
+ * macOS backgrounds a window the moment another one covers it, and a backgrounded renderer drops the synthetic
+ * keystrokes the Didox form is filled with (c1 gate). Both switches must be set before the app is ready.
+ */
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
+
 const userData = () => app.getPath('userData')
 
 let api: ChildProcess | null = null
@@ -111,6 +121,21 @@ async function launchApp(): Promise<void> {
   appWin = appWindow(baseUrl)
   if (!ipcRegistered) {
     const eri = createEriStore({ file: join(userData(), 'eri-secrets.json'), safeStorage })
+    const config = loadConfig(userData())
+    if (!config) throw new Error('config.json is missing')
+    /*
+     * The app talks to its own API over loopback with a short-lived cookie it signs itself (M8c §6), so a draft run
+     * reads the very same invoice rows the accountant is looking at. c1 ships with DIDOX_MAX_INVOICES=1: one invoice
+     * goes through end to end before a run is allowed to do many.
+     */
+    const configured = Number.parseInt(process.env.DIDOX_MAX_INVOICES ?? '', 10)
+    const drafts = {
+      api: createApiClient({ baseUrl, secret: config.jwtSecret }),
+      journal: createJournal({ dir: join(userData(), 'didox-runs') }),
+      skips: createSkipStore({ file: join(userData(), 'didox-skips.json') }),
+      // c1 default: one invoice per run. Raising it is a deliberate act (`DIDOX_MAX_INVOICES`), not an oversight.
+      maxInvoices: Number.isFinite(configured) && configured > 0 ? configured : 1,
+    }
     didox = createDidoxRunner({
       listKeys: createKeyReader(),
       eri,
@@ -120,9 +145,19 @@ async function launchApp(): Promise<void> {
       logout,
       typePassword: typeEimzoPassword,
       onProgress: sendProgress(() => appWin),
+      drafts,
     })
     registerIpc(() => appWin, new URL(baseUrl).origin, join(userData(), 'backups'), eri, didox)
     ipcRegistered = true
+    /*
+     * A run that the app died in the middle of is closed now, while nothing else is going on: its interrupted save
+     * becomes "needs checking", and any id it had already found is sent to the API again (M8c §2).
+     */
+    void drafts.journal
+      .recoverStaleRuns()
+      .then(() => drafts.journal.flushIdFound({ markDraft: drafts.api.markDraft }))
+      .then(() => drafts.journal.rotate())
+      .catch(() => undefined)
   }
 }
 

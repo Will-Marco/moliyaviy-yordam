@@ -20,8 +20,10 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useDesktop } from '@/lib/desktop'
 import { formatDate, formatInstantDate, formatMoney, formatMonth } from '@/lib/format'
 import { type Invoice, useInvoices, useUnmarkDraft } from './api'
+import { DidoxRunDialog } from './DidoxRunDialog'
 import { MarkDraftDialog } from './MarkDraftDialog'
 
 /** Module 7: invoices to prepare in Didox for a completed month — every field one click from the clipboard. */
@@ -31,12 +33,17 @@ export function InvoicesPage() {
   const lenderId = params.get('lender') ?? ''
   const [marking, setMarking] = useState<Invoice | null>(null)
   const [unmarking, setUnmarking] = useState<Invoice | null>(null)
+  const [creatingDrafts, setCreatingDrafts] = useState(false)
+  // Older desktop builds (and a plain browser) cannot create drafts; the whole run is then out of reach.
+  const canCreateDrafts = !!useDesktop()?.didox?.createDrafts
 
   const data = invoices.data
   const month = data?.month ?? null
   const unmark = useUnmarkDraft(month ?? '')
   const rows = (data?.rows ?? []).filter((r) => !lenderId || r.lender.id === lenderId)
   const drafted = rows.filter((r) => r.draft).length
+  // The run covers every lender of the month, so the lender filter does not narrow what it would do.
+  const needDraft = (data?.rows ?? []).filter((r) => r.draft === null).length
 
   const setParam = (key: 'month' | 'lender', value: string) =>
     setParams(
@@ -93,6 +100,16 @@ export function InvoicesPage() {
             <p className="text-muted-foreground pb-2 text-sm" aria-live="polite">
               {`${rows.length} ta faktura${drafted ? `, ${drafted} tasi qoralama` : ''}`}
             </p>
+          )}
+          {canCreateDrafts && month && (
+            <Button
+              className="mb-0.5 h-9"
+              disabled={needDraft === 0}
+              title={needDraft === 0 ? "Bu oyda qoralama kutayotgan faktura yo'q" : undefined}
+              onClick={() => setCreatingDrafts(true)}
+            >
+              Didox'da qoralama yaratish
+            </Button>
           )}
         </div>
       )}
@@ -154,6 +171,10 @@ export function InvoicesPage() {
       )}
 
       {marking && month && <MarkDraftDialog month={month} invoice={marking} onOpenChange={() => setMarking(null)} />}
+
+      {creatingDrafts && month && (
+        <DidoxRunDialog month={month} pending={needDraft} onOpenChange={() => setCreatingDrafts(false)} />
+      )}
 
       <AlertDialog open={!!unmarking} onOpenChange={(open) => !open && setUnmarking(null)}>
         <AlertDialogContent>

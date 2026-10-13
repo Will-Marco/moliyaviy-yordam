@@ -11,11 +11,13 @@ const cert = {
 
 let server: WebSocketServer | undefined
 const received: unknown[] = []
+const origins: (string | undefined)[] = []
 
 /** A fake local E-IMZO: answers each request with `reply(request)`. */
 async function fakeEimzo(reply: (request: { plugin?: string; name?: string }) => unknown): Promise<string> {
   server = new WebSocketServer({ port: 0, host: '127.0.0.1' })
-  server.on('connection', (socket) => {
+  server.on('connection', (socket, request) => {
+    origins.push(request.headers.origin)
     socket.on('message', (data) => {
       const request = JSON.parse(String(data))
       received.push(request)
@@ -28,6 +30,7 @@ async function fakeEimzo(reply: (request: { plugin?: string; name?: string }) =>
 
 afterEach(async () => {
   received.length = 0
+  origins.length = 0
   server?.clients.forEach((c) => c.terminate())
   await new Promise((ok) => (server ? server.close(ok) : ok(undefined)))
   server = undefined
@@ -41,6 +44,18 @@ describe('E-IMZO client', () => {
 
     expect(certs).toEqual([cert])
     expect(received).toEqual([{ plugin: 'pfx', name: 'list_all_certificates' }])
+  })
+
+  /*
+   * E-IMZO 6.4.7 answers `version` to anyone but refuses the key list without an Origin header: status -1022,
+   * "Domen null uchun API-kalit yaroqsiz". It trusts localhost, so the header alone is enough — no API key.
+   */
+  it('names its origin in the handshake, or E-IMZO refuses the key list', async () => {
+    const url = await fakeEimzo(() => ({ success: true, certificates: [cert] }))
+
+    await createEimzoClient({ url, WebSocket }).listCertificates()
+
+    expect(origins).toEqual(['http://localhost'])
   })
 
   it('says E-IMZO is not running when nothing listens on its port', async () => {
