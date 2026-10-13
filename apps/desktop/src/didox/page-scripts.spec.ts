@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { charDelay, type ClickProbe, clickScript, pointerClick, pollScript, readScript, screenshotName, staleScreenshots } from './page-scripts.js'
+import {
+  charDelay,
+  type ClickProbe,
+  clickScript,
+  pointerClick,
+  pollScript,
+  readScript,
+  screenshotName,
+  selectAllModifier,
+  staleScreenshots,
+  valueScript,
+} from './page-scripts.js'
 
 /** A minimal element as the page script sees it. */
 function element(text: string, attrs: Record<string, string> = {}) {
@@ -139,5 +150,29 @@ describe('pointerClick', () => {
     const d = { ...io([]), probe: vi.fn(async () => at((x += 10))) }
     expect(await pointerClick({ ...d, settleTries: 3 })).toMatchObject({ outcome: 'unstable' })
     expect(d.press).not.toHaveBeenCalled()
+  })
+})
+
+describe('valueScript (M8c §9)', () => {
+  it('reads what the field holds, collapsed like a person reads it', () => {
+    expect(run<string>(valueScript('globalThis.__el'), { value: ' 552 328,77 ' })).toBe('552 328,77')
+    expect(run<string>(valueScript('globalThis.__el'), { textContent: 'Ҳисоб-фактура\n актсиз ' })).toBe('Ҳисоб-фактура актсиз')
+    expect(run<string>(valueScript('globalThis.__el'), { value: '' })).toBe('')
+  })
+
+  it('is null when the element is not there — the caller decides what that means', () => {
+    expect(run<string | null>(valueScript('globalThis.__el'), null)).toBeNull()
+  })
+
+  it('prefers value over text, so a filled input is never read as its placeholder markup', () => {
+    expect(run<string>(valueScript('globalThis.__el'), { value: '1', textContent: 'Сони' })).toBe('1')
+  })
+})
+
+describe('selectAllModifier', () => {
+  it('uses the platform\'s own select-all', () => {
+    expect(selectAllModifier('darwin')).toBe('cmd')
+    expect(selectAllModifier('win32')).toBe('control')
+    expect(selectAllModifier('linux')).toBe('control')
   })
 })

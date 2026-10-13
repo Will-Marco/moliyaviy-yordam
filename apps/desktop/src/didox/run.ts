@@ -5,6 +5,7 @@ import {
   type AutotypePreflight,
   type AutotypePreflightResult,
   type AutotypeResult,
+  didoxMessage,
   type LoginContext,
   type Page,
   type ProgressEvent,
@@ -12,6 +13,7 @@ import {
   StepError,
   type StepErrorCode,
 } from './contract.js'
+import { createRunEngine, RunBusyError, type RunContext } from './engine.js'
 
 /** The Didox window as the runner sees it (view.ts implements it with Electron). */
 export interface DidoxWindow {
@@ -40,14 +42,30 @@ export interface DidoxRunnerDeps {
   logout(page: Page): Promise<void>
   typePassword(password: string, opts: { dialogTimeoutMs: number; signal: AbortSignal }): Promise<AutotypeResult>
   onProgress(e: ProgressEvent): void
-  /** Whole-run limit; after it the run is aborted and the lock is released even if a step hangs. Default 3 min. */
-  watchdogMs?: number
+  /*
+   * Watchdog shape (M8c §3, review B4). There is no whole-run deadline any more: a real run has no sensible total
+   * time, but it always makes progress, so silence is what stops it. Tests pass small values.
+   */
+  /** Silence (no progress event) longer than this stops the run. Default 2 min. */
+  stallMs?: number
+  /** After that cancel, how long the run may take to wind down before its window is closed by force. Default 1 min. */
+  graceMs?: number
+  /** Cap on the section between pressing save and writing the found ID. Default 45 s. */
+  criticalMaxMs?: number
+  /** How often the watchdog looks. Default 30 s. */
+  beatMs?: number
 }
 
-const WATCHDOG_MS = 180_000
-/** After the watchdog aborts, how long the run gets to wind down before the lock is released regardless. */
-const WATCHDOG_GRACE_MS = 10_000
 const LOGOUT_TIMEOUT_MS = 30_000
+/*
+ * Review finding 1: the engine releases the lock when the work settles, and a hung *page* step is ended by closing
+ * the Didox window. The steps before that window exists (E-IMZO list, keychain, preflight, clearing the session) have
+ * no window to take away, so each gets its own bound — otherwise one dep that never settles would wedge the feature
+ * until the app is restarted. These are all local operations; a minute is already far beyond normal.
+ */
+const PREPARE_TIMEOUT_MS = 60_000
+/** Codes that say nothing on their own; when the watchdog stopped the run, it is the better explanation. */
+const STALL_MASKS: ReadonlySet<string> = new Set(['CANCELLED', 'PAGE_UNEXPECTED', 'TIMEOUT'])
 
 /** Preflight verdicts that stop the run before Didox opens. */
 const PREFLIGHT_FAILURES: Record<Exclude<AutotypePreflightResult, 'ok'>, { code: StepErrorCode; message: string }> = {
@@ -65,6 +83,16 @@ const fail = (code: string, message: string, screenshot?: string | null): CheckL
 
 const unexpected = (error: unknown) => `Kutilmagan xato: ${error instanceof Error ? error.message : String(error)}`
 
+/** `task`, but failing with TIMEOUT if it has not settled in `ms` — used where no window can be closed to end it. */
+const bounded = <T>(task: Promise<T>, ms: number, what: string): Promise<T> =>
+  new Promise<T>((ok, fail) => {
+    const timer = setTimeout(() => fail(new StepError('TIMEOUT', `${what} ${Math.round(ms / 1000)} s ichida tugamadi`)), ms)
+    task.then(
+      (v) => (clearTimeout(timer), ok(v)),
+      (e: unknown) => (clearTimeout(timer), fail(e)),
+    )
+  })
+
 /** Resolves `fallback` (or the task's own result) after `ms`, whichever is first; never rejects. */
 const within = <T>(task: Promise<T>, ms: number, fallback: T): Promise<T> =>
   new Promise<T>((ok) => {
@@ -78,44 +106,64 @@ const within = <T>(task: Promise<T>, ms: number, fallback: T): Promise<T> =>
 type Progress = (step: string, status: ProgressEvent['status'], message?: string) => void
 
 /**
- * "Kirishni tekshirish" (M8b): one firm, key -> password -> preflight -> Didox login -> verify -> logout. One run at a
- * time, no retries. Everything that can be known without Didox is checked before the window opens.
+ * The Didox runner. Today: "Kirishni tekshirish" (M8b) — one firm, key -> password -> preflight -> Didox login ->
+ * verify -> logout. M8c's createDrafts shares the same engine, the same lock and the same `loginFirm`.
+ * One run at a time, no retries. Everything that can be known without Didox is checked before the window opens.
  */
 export function createDidoxRunner(deps: DidoxRunnerDeps) {
-  let current: AbortController | null = null
-  const watchdogMs = deps.watchdogMs ?? WATCHDOG_MS
-
-  async function checkLogin(tin: string): Promise<CheckLoginResult> {
-    if (current) return fail('RUN_IN_PROGRESS', 'Didox bilan boshqa ish bajarilmoqda — tugashini kuting')
-    const controller = new AbortController()
-    current = controller
-    const progress: Progress = (step, status, message) =>
-      deps.onProgress(message === undefined ? { firmTin: tin, step, status } : { firmTin: tin, step, status, message })
-    const timeout = () => fail('TIMEOUT', `Tekshirish ${Math.round(watchdogMs / 60_000) || 1} daqiqada tugamadi`)
-    let timedOut = false
-    let hardStop: ReturnType<typeof setTimeout> | undefined
-    const watchdog = setTimeout(() => {
-      timedOut = true
-      controller.abort()
-    }, watchdogMs)
-    try {
-      const running = run(tin, controller.signal, progress).catch((error: unknown) => fail('UNEXPECTED', unexpected(error)))
-      // If a step ignores the abort, the lock is still released (the run's own finally closes the window later).
-      const stuck = new Promise<CheckLoginResult>((ok) => {
-        hardStop = setTimeout(() => ok(timeout()), watchdogMs + WATCHDOG_GRACE_MS)
-      })
-      let result = await Promise.race([running, stuck])
-      if (timedOut && !result.ok && result.code === 'CANCELLED') result = timeout()
-      progress('result', result.ok ? 'done' : 'failed', result.ok ? 'Kirish tekshirildi' : result.message)
-      return result
-    } finally {
-      clearTimeout(watchdog)
-      clearTimeout(hardStop)
-      current = null
-    }
+  const engine = createRunEngine({
+    ...(deps.stallMs === undefined ? {} : { stallMs: deps.stallMs }),
+    ...(deps.graceMs === undefined ? {} : { graceMs: deps.graceMs }),
+    ...(deps.criticalMaxMs === undefined ? {} : { criticalMaxMs: deps.criticalMaxMs }),
+    ...(deps.beatMs === undefined ? {} : { beatMs: deps.beatMs }),
+  })
+  /** Set while a run holds the lock, so every progress event counts as a heartbeat. */
+  let beat: () => void = () => undefined
+  const onProgress = (e: ProgressEvent): void => {
+    beat()
+    deps.onProgress(e)
   }
 
-  async function run(tin: string, signal: AbortSignal, progress: Progress): Promise<CheckLoginResult> {
+  /**
+   * One firm's Didox login in an already-open window (§3): the saved password is decrypted only for the moment it is
+   * typed into E-IMZO's own window, and `steps/login` verifies which firm got in. Shared by checkLogin and createDrafts.
+   */
+  const loginFirm = (win: DidoxWindow, firm: { tin: string; keyValidTo: string | null; serial: string | null }, signal: AbortSignal) =>
+    deps.login(win.page, {
+      tin: firm.tin,
+      keyValidTo: firm.keyValidTo,
+      armAutotype: (opts) =>
+        deps.eri.withPassword(firm.tin, (pw) => deps.typePassword(pw, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal }), firm.serial),
+      onProgress,
+      signal,
+    })
+
+  async function checkLogin(tin: string): Promise<CheckLoginResult> {
+    if (engine.busy()) return fail('RUN_IN_PROGRESS', 'Didox bilan boshqa ish bajarilmoqda — tugashini kuting')
+    const progress: Progress = (step, status, message) =>
+      onProgress(message === undefined ? { firmTin: tin, step, status } : { firmTin: tin, step, status, message })
+    let result: CheckLoginResult
+    try {
+      result = await engine.run(async (ctx) => {
+        beat = ctx.beat
+        return run(tin, ctx, progress)
+      })
+    } catch (error) {
+      result = error instanceof RunBusyError ? fail('RUN_IN_PROGRESS', error.message) : fail('UNEXPECTED', unexpected(error))
+    } finally {
+      beat = () => undefined
+    }
+    // A run the watchdog stopped reports why. Only the "we cannot tell what happened" codes are replaced: a real
+    // verdict (a rejected password, a wrong firm) is what the accountant has to act on, stall or no stall.
+    if (!result.ok && engine.stopReason() === 'stalled' && STALL_MASKS.has(result.code)) {
+      result = fail('STALLED', didoxMessage('STALLED'))
+    }
+    progress('result', result.ok ? 'done' : 'failed', result.ok ? 'Kirish tekshirildi' : result.message)
+    return result
+  }
+
+  async function run(tin: string, ctx: RunContext, progress: Progress): Promise<CheckLoginResult> {
+    const signal = ctx.signal
     const cancelled = () => fail('CANCELLED', 'Bekor qilindi')
     const failStep = (step: string, code: string, message: string): CheckLoginResult => {
       progress(step, 'failed', message)
@@ -125,8 +173,9 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
     progress('eimzo', 'running')
     let key: KeyStatus | undefined
     try {
-      key = (await deps.listKeys([tin])).get(tin)
+      key = (await bounded(deps.listKeys([tin]), PREPARE_TIMEOUT_MS, "E-IMZO kalitlar ro'yxati")).get(tin)
     } catch (error) {
+      if (error instanceof StepError) return failStep('eimzo', error.code, error.message)
       if (!(error instanceof EimzoError)) throw error
       return failStep('eimzo', error.code === 'EIMZO_NOT_RUNNING' ? 'EIMZO_NOT_RUNNING' : 'EIMZO_ERROR', error.message)
     }
@@ -139,15 +188,22 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
     // Decrypt once and discard: missing / rejected / replaced key / unreadable are all known before Didox opens.
     progress('password', 'running')
     try {
-      await deps.eri.withPassword(tin, async () => undefined, serial)
+      await bounded(deps.eri.withPassword(tin, async () => undefined, serial), PREPARE_TIMEOUT_MS, 'Saqlangan parolni ochish')
     } catch (error) {
+      if (error instanceof StepError) return failStep('password', error.code, error.message)
       if (!(error instanceof EriStoreError)) throw error
       return failStep('password', error.code, error.message)
     }
     progress('password', 'done')
 
     progress('preflight', 'running')
-    const verdict = await deps.preflight()
+    let verdict: AutotypePreflightResult
+    try {
+      verdict = await bounded(deps.preflight(), PREPARE_TIMEOUT_MS, 'Tizim tekshiruvi')
+    } catch (error) {
+      if (error instanceof StepError) return failStep('preflight', error.code, error.message)
+      throw error
+    }
     if (verdict !== 'ok') return failStep('preflight', PREFLIGHT_FAILURES[verdict].code, PREFLIGHT_FAILURES[verdict].message)
     progress('preflight', 'done')
     if (signal.aborted) return cancelled()
@@ -159,23 +215,18 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
     } catch (error) {
       return failStep('window', 'UNEXPECTED', unexpected(error))
     }
+    // A step that honours nothing is ended by taking its window away (engine's force stop).
+    ctx.onForceStop(() => win.close())
     try {
       try {
-        await win.resetSession()
+        await bounded(win.resetSession(), PREPARE_TIMEOUT_MS, 'Didox sessiyasini tozalash')
       } catch (error) {
+        if (error instanceof StepError) return failStep('window', error.code, error.message)
         return failStep('window', 'UNEXPECTED', unexpected(error))
       }
       progress('window', 'done')
       if (signal.aborted) return cancelled()
-      await deps.login(win.page, {
-        tin,
-        keyValidTo: key.key.validTo,
-        // The password is decrypted only for the moment it is typed into E-IMZO's own window.
-        armAutotype: (opts) =>
-          deps.eri.withPassword(tin, (pw) => deps.typePassword(pw, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal }), serial),
-        onProgress: deps.onProgress,
-        signal,
-      })
+      await loginFirm(win, { tin, keyValidTo: key.key.validTo, serial }, signal)
       progress('logout', 'running')
       if (await within(deps.logout(win.page).then(() => true), LOGOUT_TIMEOUT_MS, false)) progress('logout', 'done')
       // Logged in and verified; the session is cleared below anyway.
@@ -206,10 +257,10 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
   return {
     checkLogin,
     /** Ends the current run's waits early; the window closes and the run reports CANCELLED. */
-    cancel(): void {
-      current?.abort()
-    },
-    busy: (): boolean => current !== null,
+    cancel: (): void => engine.cancel(),
+    busy: (): boolean => engine.busy(),
+    /** True between pressing "Сақлаб қолиш" and the found ID reaching the disk — quitting waits for it (§3). */
+    inCritical: (): boolean => engine.inCritical(),
   }
 }
 

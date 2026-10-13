@@ -127,3 +127,16 @@ export async function pointerClick(io: {
   io.release(x, y)
   return { outcome: 'clicked', label: after.label }
 }
+
+/** The element's current text as a person sees it: `value` for inputs, the trimmed text otherwise. */
+export function valueScript(snippet: string): string {
+  return `(() => {
+  const el = (${snippet});
+  if (!el) return null;
+  const v = typeof el.value === 'string' ? el.value : (el.textContent || '');
+  return v.replace(/\\s+/g, ' ').trim();
+})()`
+}
+
+/** Select-all is Cmd+A on macOS, Ctrl+A elsewhere; a field is emptied the way a person empties it. */
+export const selectAllModifier = (platform: string): 'cmd' | 'control' => (platform === 'darwin' ? 'cmd' : 'control')

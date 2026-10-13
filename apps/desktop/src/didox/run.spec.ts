@@ -18,6 +18,9 @@ const page = (): Page => ({
   waitFor: vi.fn(async () => true) as Page['waitFor'],
   click: vi.fn(async () => undefined),
   type: vi.fn(async () => undefined),
+  clear: vi.fn(async () => undefined),
+  reload: vi.fn(async () => undefined),
+  selectOption: vi.fn(async () => undefined),
   pause: vi.fn(async () => undefined),
   screenshot: vi.fn(async (label: string) => `/diag/${label}.png`),
 })
@@ -177,28 +180,50 @@ describe('createDidoxRunner.checkLogin', () => {
     expect(win.close).toHaveBeenCalledOnce()
   })
 
-  it('the watchdog aborts a run that takes too long and reports TIMEOUT', async () => {
+  it('the heartbeat stops a run that has gone quiet and says so', async () => {
     const { runner } = setup({
-      watchdogMs: 20,
+      stallMs: 20,
+      beatMs: 5,
       login: (_p, ctx) =>
         new Promise<void>((_ok, fail) => ctx.signal.addEventListener('abort', () => fail(new StepError('CANCELLED', 'Bekor qilindi')))),
     })
-    expect(await runner.checkLogin(TIN)).toMatchObject({ ok: false, code: 'TIMEOUT' })
+    expect(await runner.checkLogin(TIN)).toMatchObject({ ok: false, code: 'STALLED' })
     expect(runner.busy()).toBe(false)
   })
 
-  it('the watchdog releases the lock even if a step ignores the abort', async () => {
-    vi.useFakeTimers()
-    try {
-      const { runner, win } = setup({ watchdogMs: 1_000, login: () => new Promise<void>(() => undefined) })
-      const pending = runner.checkLogin(TIN)
-      await vi.advanceTimersByTimeAsync(12_000)
-      expect(await pending).toMatchObject({ ok: false, code: 'TIMEOUT' })
-      expect(runner.busy()).toBe(false)
-      expect(win.close).not.toHaveBeenCalled() // the hung step still owns the window
-    } finally {
-      vi.useRealTimers()
-    }
+  it('closes the window by force when a hung step ignores the cancel, and keeps no zombie lock', async () => {
+    let closed: (() => void) | undefined
+    const { runner, win } = setup({
+      stallMs: 20,
+      graceMs: 20,
+      beatMs: 5,
+      // Like the real Page: its waits end only when the window goes away.
+      login: () =>
+        new Promise<void>((_ok, fail) => {
+          closed = () => fail(new StepError('PAGE_UNEXPECTED', 'Didox oynasi yopildi'))
+        }),
+    })
+    win.close.mockImplementation(() => closed?.())
+
+    expect(await runner.checkLogin(TIN)).toMatchObject({ ok: false, code: 'STALLED' })
+    expect(win.close).toHaveBeenCalled()
+    expect(runner.busy()).toBe(false)
+  })
+
+  it('a long run that keeps reporting progress is left alone', async () => {
+    const { runner, deps } = setup({
+      stallMs: 60,
+      beatMs: 5,
+      login: async (_p, ctx) => {
+        // Six beats over ~90 ms: longer than the stall window, but never silent for it.
+        for (let i = 0; i < 6; i++) {
+          await new Promise((ok) => setTimeout(ok, 15))
+          ctx.onProgress?.({ firmTin: TIN, step: `ish-${i}`, status: 'done' })
+        }
+      },
+    })
+    expect(await runner.checkLogin(TIN)).toEqual({ ok: true })
+    expect(deps.logout).toHaveBeenCalled()
   })
 
   it('reports other step errors with a screenshot, without touching the password', async () => {
@@ -269,6 +294,42 @@ describe('createDidoxRunner.checkLogin', () => {
     expect(win.close).toHaveBeenCalledOnce()
     expect(eri.markRejected).not.toHaveBeenCalled()
     expect(runner.busy()).toBe(false)
+  })
+
+  // Review finding 1: before the Didox window exists there is nothing to close, so each preparation step is bounded.
+  it.each([
+    ['listKeys', { listKeys: () => new Promise<Map<string, KeyStatus>>(() => undefined) }],
+    ['preflight', { preflight: () => new Promise<'ok'>(() => undefined) }],
+  ])('does not wedge the lock when %s never answers', async (_name, over) => {
+    vi.useFakeTimers()
+    try {
+      const { runner, deps } = setup(over as Partial<DidoxRunnerDeps>)
+      const pending = runner.checkLogin(TIN)
+      await vi.advanceTimersByTimeAsync(61_000)
+      expect(await pending).toMatchObject({ ok: false, code: 'TIMEOUT' })
+      expect(runner.busy()).toBe(false)
+      expect(deps.openWindow).not.toHaveBeenCalled()
+      } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not wedge the lock when clearing the Didox session never answers', async () => {
+    vi.useFakeTimers()
+    try {
+      const { runner, win, deps } = setup()
+      win.resetSession.mockReturnValue(new Promise<void>(() => undefined))
+      const pending = runner.checkLogin(TIN)
+      await vi.advanceTimersByTimeAsync(61_000)
+      // The window is closed anyway: the second resetSession in the run's finally has its own 5 s bound.
+      await vi.advanceTimersByTimeAsync(6_000)
+      expect(await pending).toMatchObject({ ok: false, code: 'TIMEOUT' })
+      expect(deps.login).not.toHaveBeenCalled()
+      expect(win.close).toHaveBeenCalledOnce()
+      expect(runner.busy()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('cancel with nothing running is harmless', () => {

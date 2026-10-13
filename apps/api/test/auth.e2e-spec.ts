@@ -1,7 +1,18 @@
 import { INestApplication } from '@nestjs/common';
+import { createHmac } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { createTestApp, loggedInAgent, TEST_PASSWORD, TEST_USERNAME } from './helpers.js';
+
+const b64 = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+
+/** Mints a session cookie the way the desktop app does (apps/desktop/src/api/jwt.ts), outside this process. */
+function mintToken({ sub = 'desktop', ttlSec = 900, alg = 'HS256', secret = process.env.JWT_SECRET! } = {}) {
+  const iat = Math.floor(Date.now() / 1000);
+  const signed = `${b64({ alg, typ: 'JWT' })}.${b64({ sub, iat, exp: iat + ttlSec })}`;
+  const signature = alg === 'none' ? '' : createHmac('sha256', secret).update(signed).digest('base64url');
+  return `${signed}.${signature}`;
+}
 
 describe('Auth (FR-1.1)', () => {
   let app: INestApplication<App>;
@@ -109,5 +120,41 @@ describe('Auth (FR-1.1)', () => {
 
   it('validates the login body', async () => {
     await request(app.getHttpServer()).post('/api/auth/login').send({}).expect(400);
+  });
+
+  /*
+   * M8c §6: the desktop app owns this install's JWT_SECRET and signs its own short-lived cookie instead of
+   * logging in with the accountant's password. The guard must accept that token — and only that token.
+   */
+  describe('a session minted outside the API (desktop, M8c)', () => {
+    it('accepts an HS256 cookie signed with this install\'s secret', async () => {
+      const me = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Cookie', `session=${mintToken()}`)
+        .expect(200);
+      expect(me.body).toEqual({ username: 'desktop' });
+      await request(app.getHttpServer()).get('/api/invoices').set('Cookie', `session=${mintToken()}`).expect(200);
+    });
+
+    it('rejects alg:none', async () => {
+      await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Cookie', `session=${mintToken({ alg: 'none' })}`)
+        .expect(401);
+    });
+
+    it('rejects another secret', async () => {
+      await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Cookie', `session=${mintToken({ secret: `${process.env.JWT_SECRET!}-other` })}`)
+        .expect(401);
+    });
+
+    it('rejects an expired token', async () => {
+      await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Cookie', `session=${mintToken({ ttlSec: -60 })}`)
+        .expect(401);
+    });
   });
 });

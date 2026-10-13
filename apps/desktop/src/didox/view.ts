@@ -12,7 +12,9 @@ import {
   pollScript,
   readScript,
   screenshotName,
+  selectAllModifier,
   staleScreenshots,
+  valueScript,
 } from './page-scripts.js'
 import type { DidoxWindow } from './run.js'
 
@@ -24,6 +26,10 @@ const KEEP_SCREENSHOTS = 20
 const ISOLATED_WORLD = 1001
 const EVAL_TIMEOUT_MS = 10_000
 const LOAD_TIMEOUT_MS = 45_000
+/** A select's menu is a local widget: it opens and closes in well under this. */
+const MENU_TIMEOUT_MS = 10_000
+/** Select-all + Backspace should empty a field at once; a couple of tries cover a slow React re-render. */
+const CLEAR_TRIES = 3
 
 let sessionGuarded = false
 
@@ -146,7 +152,7 @@ function createPage(wc: WebContents, { diagnosticsDir, signal }: { diagnosticsDi
   const forbidden = (what: string, label: string) =>
     new StepError('FORBIDDEN_ACTION', `"${what}" imzolash/yuborish tugmasiga o'xshaydi (${label.slice(0, 60)}) — ilova uni bosmaydi`, what)
 
-  return {
+  const page: Page = {
     async goto(url) {
       alive()
       if (!isAllowedNavigation(url)) throw new StepError('PAGE_UNEXPECTED', 'Ilova faqat Didox sahifalarini ochadi')
@@ -230,6 +236,56 @@ function createPage(wc: WebContents, { diagnosticsDir, signal }: { diagnosticsDi
       }
     },
 
+    /**
+     * Empties a field like a person: select all, Backspace, then read it back. Didox pre-fills some fields, and
+     * typing into a field that still holds its old value would append — the amount would be wrong (§9).
+     */
+    async clear(snippet, { what }) {
+      const modifiers = [selectAllModifier(process.platform)]
+      for (let attempt = 0; attempt < CLEAR_TRIES; attempt++) {
+        // Focus inside the loop (review finding 2): a React re-render — the very thing the retries are for — drops
+        // focus, and select-all + Backspace would then land on whatever has it instead of this field.
+        if (!(await evaluate<boolean>(focusScript(snippet)))) {
+          throw new StepError('PAGE_UNEXPECTED', `${what} maydoniga kursor qo'yib bo'lmadi`, what)
+        }
+        alive()
+        wc.sendInputEvent({ type: 'keyDown', keyCode: 'a', modifiers })
+        wc.sendInputEvent({ type: 'keyUp', keyCode: 'a', modifiers })
+        wc.sendInputEvent({ type: 'keyDown', keyCode: 'Backspace' })
+        wc.sendInputEvent({ type: 'keyUp', keyCode: 'Backspace' })
+        await sleep(charDelay())
+        // null means the element is gone, which is not "empty" (review finding 3): typing would go nowhere.
+        const left = await evaluate<string | null>(valueScript(snippet))
+        if (left === null) throw new StepError('PAGE_UNEXPECTED', `${what} maydoni yo'qoldi`, what)
+        if (left === '') return
+      }
+      throw new StepError('PAGE_UNEXPECTED', `${what} maydoni tozalanmadi`, what)
+    },
+
+    async reload() {
+      alive()
+      let stopped: () => void = () => undefined
+      const loaded = new Promise<void>((ok) => {
+        stopped = () => ok()
+        wc.once('did-stop-loading', stopped)
+      })
+      try {
+        wc.reload()
+        await guard(loaded, LOAD_TIMEOUT_MS, () => new StepError('TIMEOUT', `Didox sahifasi ${LOAD_TIMEOUT_MS / 1000} s ichida yangilanmadi`))
+      } finally {
+        wc.removeListener('did-stop-loading', stopped)
+      }
+    },
+
+    /** MUI selects ignore element.click(): open with a real pointer, pick the option, wait for the menu to go. */
+    async selectOption(openSnippet, optionSnippet, { what }) {
+      await page.click(openSnippet, { what: `${what} ro'yxati`, needsPointer: true })
+      await page.waitFor(`!!(${optionSnippet})`, { timeoutMs: MENU_TIMEOUT_MS, what: `${what} varianti` })
+      await page.click(optionSnippet, { what: `${what} varianti`, needsPointer: true })
+      // The option element lives in the menu, so it disappearing is the menu having closed.
+      await page.waitFor(`!(${optionSnippet})`, { timeoutMs: MENU_TIMEOUT_MS, what: `${what} menyusi yopilishi` })
+    },
+
     pause: (ms) => sleep(ms),
 
     async screenshot(label) {
@@ -248,4 +304,6 @@ function createPage(wc: WebContents, { diagnosticsDir, signal }: { diagnosticsDi
       }
     },
   }
+
+  return page
 }
