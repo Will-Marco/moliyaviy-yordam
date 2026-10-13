@@ -3,8 +3,8 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 8c — qoralama yaratish (buxgalter Didox'ga o'zi kiradi; avval B4 spike: Electron oynasida real Didox login)
-**Oxirgi yangilanish:** 2026-10-12
+**Joriy modul:** 8c — qoralama yaratish (**c0 poydevor qurildi**; keyingi qadam — spike S1–S7 Sir bilan, so'ng c1)
+**Oxirgi yangilanish:** 2026-10-13
 
 ## Modullar
 > Har modul = bitta vertical slice = bitta **user-visible harakat**.
@@ -18,7 +18,7 @@
 | 5 | Stavkani o'zgartirish | Buxgalter yangi stavka kiritadi, u qachondan amal qilishini ko'radi | standard | accepted | FR-5.1–5.5; API unit 64 + e2e 86, web 81; brauzerda 15.03→01.04, retroaktiv ogohlantirish, aprel 16% va o'chirish tekshirildi | 2026-10-07 |
 | 6 | Excel eksport | Buxgalter oylik hisobotni .xlsx qilib yuklab oladi | standard | accepted | FR-6.1–6.4; API unit 68 + e2e 91 (fayl qayta o'qilib tiyinigacha solishtiriladi), web 82; haqiqiy fayl dev serverdan yuklab tekshirildi | 2026-10-07 |
 | 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | accepted | FR-7.1–7.5; API unit 97 + e2e 101, web 95; brauzerda etalon yanvar, nusxalash, belgilash/409/olib tashlash | 2026-10-07 |
-| 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | in-progress | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni); FR-8.2 parol ombori (safeStorage) + M8b avto-kirish/"Kirishni tekshirish" qurildi (desktop 204 test, typecheck toza); **M8c — spec v5 tayyor (docs/plans/M8c-spec.md), Sir gate kutilmoqda**; keyin c0 (fake) → spike S1–S7 → c1 (1 faktura gate) → c2 | |
+| 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | in-progress | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni); FR-8.2 parol ombori (safeStorage) + M8b avto-kirish/"Kirishni tekshirish" qurildi; **M8c spec v5 Sir gate'idan o'tdi (2026-10-13)**, **c0 poydevor qurildi** (SRS deltalari, `api/jwt`+`api/client`, `didox/money`+`parse`+`journal`+`skips`, `engine` (qulf/heartbeat/kritik bo'lim), `Page` kengayishi, `run.ts` refaktor — desktop 331 test, api 130+125 e2e, typecheck toza); keyin spike S1–S7 → c1 (1 faktura gate) → c2 | |
 | 9a | Lokal PGlite baza | Ilova serversiz lokal fayl-bazada ishlaydi | standard | accepted | PGlite adapter, dastur ichi migratsiya (ledger+rollback+snapshot), persistensiya; e2e PGlite'da ham 110 yashil | 2026-10-12 |
 | 9b | Electron qobig'i | Ilova desktop dastur sifatida ochiladi | complex | o'zak accepted | Electron 44, child-process Nest (PGlite), first-run parol, macOS qadoqlash (dir), kunlik zaxira, `productName`; **qoldi:** Windows NSIS + gate (A1/A2), imzolash; A3 qo'lda yangilash (qaror); dmg/ikona/hajm bajarildi (A5) | |
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
@@ -35,10 +35,10 @@ Hajm: `trivial | standard | complex`
      hisoblash, qoldiqlar, Excel hisobot; Didox uchun ma'lumot M7 Fakturalar sahifasida (nusxalash + belgilash) yetarli.
   2. A3 — qaror: qo'lda yangilash (Sir). A5 bajarildi (2026-10-12).
   3. Past: logout JWT bekor qilish, company DTO helper, ko'p shartnomada tezlik.
-- **M8 holati:** M8a accepted; FR-8.2 parol ombori + M8b ("Kirishni tekshirish") **qurilgan** (desktop 204 test; M8b real gate
-  Electron 44 da hali o'tmagan — M8c-spec S1). **M8c: spec v5 — `docs/plans/M8c-spec.md` (yagona manba) → Sir gate.** Qurish
-  tartibi: c0 poydevor (`api/jwt`+`client`, `money`, `parse`, `journal`, `skips`, `Page` kengayishi, `run.ts` refaktor — fake, Didox'siz)
-  → spike S1–S7 (Sir bilan, real Didox) → c1 bitta faktura (`DIDOX_MAX_INVOICES=1`, gate) → c2 ko'p faktura/tiklash/UI (gate).
+- **M8 holati:** M8a accepted; FR-8.2 parol ombori + M8b ("Kirishni tekshirish") qurilgan (M8b real gate Electron 44 da hali
+  o'tmagan — M8c-spec S1). **M8c: spec v5 — `docs/plans/M8c-spec.md` (yagona manba), Sir tasdiqladi (2026-10-13).**
+  **c0 bajarildi** (quyidagi qaror jurnaliga qara). Keyingi qadam — **spike S1–S7 Sir bilan, real Didox** (kodsiz, DevTools):
+  natijalar `docs/research/didox-flow.md §2c` ga, so'ng c1 bitta faktura (`DIDOX_MAX_INVOICES=1`, gate) → c2 ko'p faktura/tiklash/UI (gate).
   API tayyor: `PUT /invoices/:month/:contractId/draft` (`source`, `expectedAmount` majburiy, 409 AMOUNT_CHANGED/CONFIRMATION_REQUIRED/DRAFT_CHANGED).
 - **Ishga tushirish:** web `pnpm dev:api` (3000) + `pnpm dev:web` (5173, band bo'lsa launch.json autoPort); desktop
   `pnpm dev:desktop` (tsc + electron; ma'lumot `~/Library/Application Support/Moliyaviy yordam`). Dev login —
@@ -52,6 +52,32 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-13 — **M8c c0 poydevori qurildi (Opus, TDD).** Sir spec v5 ni tasdiqladi → c0 Didox'ga tegmasdan qurildi:
+  SRS deltalari (FR-8.4 bloklamaydi + `expectedAmount`; FR-8.5 karantin → "e'tibor kerak" + o'tkazib yuborish belgisi +
+  faqat-o'qib tiklash; FR-8.6 firma-stop va faktura-darajali farqi; FR-8.7 `userData/didox-runs`, 50 ta, tiklash; §9.1 kelib
+  chiqishi yorlig'i spike'dan) · `api/jwt.ts` (HS256, ilova o'z API'siga qisqa token bilan kiradi) + API e2e (tashqi token
+  qabul qilinadi; `alg:none`/boshqa sir/muddati o'tgan → 401) · `api/client.ts` (`listInvoices`, `markDraft`;
+  `confirmWarnings` **hech qachon** yuborilmaydi) · `didox/money.ts` (BigInt tiyin; `src/didox`+`src/api` da
+  `Number(`/`parseFloat(`/`parseInt(` taqiqi qo'riqchi test bilan) · `didox/parse.ts` (UUIDv1 vaqti, Toshkent oy boshi,
+  ro'yxat qatori, `matchOwnDraft` — fail-closed) · `didox/journal.ts` (write-ahead yozuv, holat mashinasi taqiqlar bilan,
+  `recoverStaleRuns`, `flushIdFound`, 50 ta rotatsiya + e'tibor kerak yozuvlar saqlanadi) · `didox/skips.ts` ·
+  `contract.ts` 19 yangi kod + o'zbekcha xabarlar (`DIDOX_MESSAGES`, `MAY_HAVE_SAVED`) + `ProgressEvent` kengayishi ·
+  `Page.clear/reload/selectOption` (view.ts da real, `FakePage` da poll qiladigan `waitFor`) · `run.ts` refaktor:
+  `loginFirm` ajratildi, 180 s watchdog **o'rniga** heartbeat (`engine.ts`: bitta qulf, `stallMs`/`graceMs`, kritik bo'lim
+  `CRITICAL_MAX_MS` bilan, majburiy `win.close()` — zombi qulf yo'q). Testlar: desktop 331, api 130 unit + 125 e2e (pg va
+  PGlite), web 178 — hammasi yashil, typecheck toza. Ikki ataylab chekinish (Sir'ga): `uuidV1TimeMs` `number` emas
+  `bigint` qaytaradi (float qo'riqchisi butun qatlamda ishlasin), engine `run.ts` dan alohida faylga ajratildi (Didox'siz
+  sinalishi uchun). `status()`/`createDrafts`/`rotate()` chaqiruvi — c1 da.
+  **code-review (high) 12 topilma — hammasi yopildi:** (1) oyna ochilishidan oldingi qadamlar (E-IMZO ro'yxati, Keychain,
+  preflight, sessiya tozalash) `PREPARE_TIMEOUT_MS` bilan chegaralandi — aks holda javob bermagan dep qulfni butun jarayon
+  umriga band qilardi; (2) `clear()` fokusni har urinishda qayta oladi (React re-render fokusni oladi); (3) `valueScript`
+  `null` = element yo'q, '' = tozalandi — farqlanadi; (4,5) `res.json()` o'ralgan — buzuq 200 javob `SyntaxError` otmaydi
+  (`BAD_BODY`); (6) journal yozuvi `fsync` qiladi (fayl + katalog) — elektr o'chsa ham `saving` o'qiladi; (7)
+  `PAGE_UNEXPECTED` endi "hech narsa saqlanmadi" deb da'vo qilmaydi (12-qadamdan ham keladi); (8) `RUN_IN_PROGRESS`,
+  `UNEXPECTED`, `EIMZO_ERROR`, `KEY_UNKNOWN` kodlari `DidoxCode` ga qo'shildi; (9) majburiy `win.close()` kritik bo'lim
+  ichida ishlamaydi; (10) shartnoma raqami solishtirishdan oldin normallashtiriladi (`№ 12/25 от` → `12/25`) — aks holda
+  har faktura `SAVED_ID_UNKNOWN` bo'lardi; (11) `rotate()` buzuq fayllarni ham o'chiradi; (12) skip kaliti oyni
+  validatsiya qiladi. Testlar: desktop 343, api 130 + 125 e2e, web 178
 - 2026-10-13 — **M8c spec v5 (Fable) — docs/plans/M8c-spec.md.** plan-reviewer (Sonnet) M8c-REVIEW.md: APPROVE_WITH_CHANGES, 4 blocker (reja v1–v4 o'ziga va qurilgan kodga zid: PUT `expectedAmount`siz → 400; `didox_runs` ikki joyda; tiklash oynasi `now`gacha; 180 s watchdog real run'ni o'ldiradi) + 7 major — hammasi v5 da yopildi. **Sir qarorlari:** faktura-darajali "o'tkazib yuborish" belgisi (deterministik xato firmani har oy to'xtatmasin); run paytida ilova **bloklanmaydi** (`expectedAmount` guard + banner, hard-lock arzimaydi). Reja faylida M8c bo'limlari "→ v5" belgilandi, v3 bekor. Keyingi: Sir gate → c0
 - 2026-10-12 — **M8c yadrosi Claude tomonidan quriladi — Sir.** Oldingi "Didox formasini avtomatlashtirish — Claude qurmaydi" yozuvi bekor (v2 to'liq qaytarilgan): FR-8.4 qoralama forma roboti login autotype kabi quriladi. Tekshiruv sessiyasida M8a+M8b spec/CONSTITUTION §12–16 ga mos deb tasdiqlandi (desktop 204 test, typecheck toza); PROGRESS jadval satri haqiqiy holatga keltirildi. M8c complex → avval reja (docs/plans/M8-didox-drafts.md M8c) + plan-reviewer gate
 - 2026-10-12 — **M8 v2 doirasi qaytarildi — Sir:** "ilova o'zi yozadi". v3 dagi "Claude qurmaydi" bekor; FR-8.2 parol ombori (safeStorage, kalit seriyasiga bog'langan) + Firmalar'da "ERI parol" ustuni qurildi (desktop 29, web 170 test). M8b PM uslubida parallel agentlarga bo'lindi (autotype · driver/login · view/run/IPC/web)
