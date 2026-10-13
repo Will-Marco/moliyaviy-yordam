@@ -18,7 +18,7 @@
 | 5 | Stavkani o'zgartirish | Buxgalter yangi stavka kiritadi, u qachondan amal qilishini ko'radi | standard | accepted | FR-5.1–5.5; API unit 64 + e2e 86, web 81; brauzerda 15.03→01.04, retroaktiv ogohlantirish, aprel 16% va o'chirish tekshirildi | 2026-10-07 |
 | 6 | Excel eksport | Buxgalter oylik hisobotni .xlsx qilib yuklab oladi | standard | accepted | FR-6.1–6.4; API unit 68 + e2e 91 (fayl qayta o'qilib tiyinigacha solishtiriladi), web 82; haqiqiy fayl dev serverdan yuklab tekshirildi | 2026-10-07 |
 | 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | accepted | FR-7.1–7.5; API unit 97 + e2e 101, web 95; brauzerda etalon yanvar, nusxalash, belgilash/409/olib tashlash | 2026-10-07 |
-| 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | in-progress | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni); FR-8.2 parol ombori (safeStorage) + M8b avto-kirish/"Kirishni tekshirish" qurildi (desktop 204 test, typecheck toza); **M8c qoralama yaratish navbatda** (yadro — Didox forma roboti — Claude quradi, Sir 2026-10-12; complex → reja+plan-reviewer gate) | |
+| 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | in-progress | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni); FR-8.2 parol ombori (safeStorage) + M8b avto-kirish/"Kirishni tekshirish" qurildi (desktop 204 test, typecheck toza); **M8c — spec v5 tayyor (docs/plans/M8c-spec.md), Sir gate kutilmoqda**; keyin c0 (fake) → spike S1–S7 → c1 (1 faktura gate) → c2 | |
 | 9a | Lokal PGlite baza | Ilova serversiz lokal fayl-bazada ishlaydi | standard | accepted | PGlite adapter, dastur ichi migratsiya (ledger+rollback+snapshot), persistensiya; e2e PGlite'da ham 110 yashil | 2026-10-12 |
 | 9b | Electron qobig'i | Ilova desktop dastur sifatida ochiladi | complex | o'zak accepted | Electron 44, child-process Nest (PGlite), first-run parol, macOS qadoqlash (dir), kunlik zaxira, `productName`; **qoldi:** Windows NSIS + gate (A1/A2), imzolash; A3 qo'lda yangilash (qaror); dmg/ikona/hajm bajarildi (A5) | |
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
@@ -35,9 +35,11 @@ Hajm: `trivial | standard | complex`
      hisoblash, qoldiqlar, Excel hisobot; Didox uchun ma'lumot M7 Fakturalar sahifasida (nusxalash + belgilash) yetarli.
   2. A3 — qaror: qo'lda yangilash (Sir). A5 bajarildi (2026-10-12).
   3. Past: logout JWT bekor qilish, company DTO helper, ko'p shartnomada tezlik.
-- **M8 holati:** v2 doirasi qaytarildi (reja v4): ERI paroli ilovada saqlanadi va E-IMZO'ga ilova o'zi yozadi. FR-8.2 parol
-  ombori qurildi; M8b (autotype, driver, login, "Kirishni tekshirish") qurilmoqda → keyin Sir bilan real kirish gate'i.
-  API tayyor: `PUT /invoices/:month/:contractId/draft` (`source`, `expectedAmount`, POSSIBLE_DUPLICATE, DRAFT_CHANGED).
+- **M8 holati:** M8a accepted; FR-8.2 parol ombori + M8b ("Kirishni tekshirish") **qurilgan** (desktop 204 test; M8b real gate
+  Electron 44 da hali o'tmagan — M8c-spec S1). **M8c: spec v5 — `docs/plans/M8c-spec.md` (yagona manba) → Sir gate.** Qurish
+  tartibi: c0 poydevor (`api/jwt`+`client`, `money`, `parse`, `journal`, `skips`, `Page` kengayishi, `run.ts` refaktor — fake, Didox'siz)
+  → spike S1–S7 (Sir bilan, real Didox) → c1 bitta faktura (`DIDOX_MAX_INVOICES=1`, gate) → c2 ko'p faktura/tiklash/UI (gate).
+  API tayyor: `PUT /invoices/:month/:contractId/draft` (`source`, `expectedAmount` majburiy, 409 AMOUNT_CHANGED/CONFIRMATION_REQUIRED/DRAFT_CHANGED).
 - **Ishga tushirish:** web `pnpm dev:api` (3000) + `pnpm dev:web` (5173, band bo'lsa launch.json autoPort); desktop
   `pnpm dev:desktop` (tsc + electron; ma'lumot `~/Library/Application Support/Moliyaviy yordam`). Dev login —
   `apps/api/.env` 2-qatordagi izohda. Qadoqlash: `pnpm --filter desktop pack:mac` (dev holati endi buzilmaydi).
@@ -50,6 +52,7 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-13 — **M8c spec v5 (Fable) — docs/plans/M8c-spec.md.** plan-reviewer (Sonnet) M8c-REVIEW.md: APPROVE_WITH_CHANGES, 4 blocker (reja v1–v4 o'ziga va qurilgan kodga zid: PUT `expectedAmount`siz → 400; `didox_runs` ikki joyda; tiklash oynasi `now`gacha; 180 s watchdog real run'ni o'ldiradi) + 7 major — hammasi v5 da yopildi. **Sir qarorlari:** faktura-darajali "o'tkazib yuborish" belgisi (deterministik xato firmani har oy to'xtatmasin); run paytida ilova **bloklanmaydi** (`expectedAmount` guard + banner, hard-lock arzimaydi). Reja faylida M8c bo'limlari "→ v5" belgilandi, v3 bekor. Keyingi: Sir gate → c0
 - 2026-10-12 — **M8c yadrosi Claude tomonidan quriladi — Sir.** Oldingi "Didox formasini avtomatlashtirish — Claude qurmaydi" yozuvi bekor (v2 to'liq qaytarilgan): FR-8.4 qoralama forma roboti login autotype kabi quriladi. Tekshiruv sessiyasida M8a+M8b spec/CONSTITUTION §12–16 ga mos deb tasdiqlandi (desktop 204 test, typecheck toza); PROGRESS jadval satri haqiqiy holatga keltirildi. M8c complex → avval reja (docs/plans/M8-didox-drafts.md M8c) + plan-reviewer gate
 - 2026-10-12 — **M8 v2 doirasi qaytarildi — Sir:** "ilova o'zi yozadi". v3 dagi "Claude qurmaydi" bekor; FR-8.2 parol ombori (safeStorage, kalit seriyasiga bog'langan) + Firmalar'da "ERI parol" ustuni qurildi (desktop 29, web 170 test). M8b PM uslubida parallel agentlarga bo'lindi (autotype · driver/login · view/run/IPC/web)
 - 2026-10-12 — **B1 (Didox Excel importi) bekor — Sir:** "bu xususiyat kerak emas". Saboq: Didox avtomatlashtirish imkonsiz bo'lgach muqobil izlashni davom ettirmasdan, avval ilova maqsadiga zarurligini so'rash kerak edi. Tadqiqot hujjati (docs/research/didox-excel-import.md) ma'lumot uchun qoladi

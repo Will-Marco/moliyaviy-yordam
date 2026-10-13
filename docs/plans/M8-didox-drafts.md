@@ -5,7 +5,9 @@
 > `tayyor` fakturalari uchun Didox formasini to'ldirib **qoralama** saqlaydi, qoralama ID'sini yozib qo'yadi va chiqadi.
 > Ilova hech qachon imzolamaydi (CONSTITUTION §12).
 
-Status: **reja v2 (Fable, 2026-10-12)** — plan-reviewer o'tdi, Sir ochiq qarorlarni berdi → **Sir gate** → qurish Opus sessiyada (M8a dan).
+Status: **v4 doira (M8a accepted, FR-8.2 + M8b qurilgan) · M8c — [M8c-spec.md](M8c-spec.md) (v5, Fable 2026-10-13) → Sir gate → qurish Opus'da.**
+Bu fayl M8a/M8b/M8d va tarix uchun; **M8c bo'limlari (qadamlar, orkestratsiya, IPC, `didox_runs`, xato semantikasi, TDD, spike)
+M8c-spec.md bilan almashtirilgan** — quyida "→ v5" belgilangan joylar qurish qo'llanmasi emas.
 Manbalar: docs/research/didox-flow.md (login, E-IMZO, forma, sinov qoralamasi — hammasi real Didox'da tekshirilgan),
 docs/research/e-imzo.md, CONSTITUTION §12–16, SRS §9.1–9.2, PROGRESS qaror jurnali (2026-10-12).
 
@@ -17,8 +19,8 @@ docs/research/e-imzo.md, CONSTITUTION §12–16, SRS §9.1–9.2, PROGRESS qaror
 - Didox oynasi ish paytida **ko'rinadi**; barcha beruvchi firmalar **ketma-ket, tanlash mumkin**.
 
 ## Tekshirilgan faktlar (dizaynni belgilaydi)
-1. **Electron 34 ichida Node 20 — global `WebSocket` yo'q** (spike Node 24 da edi) → `ws` paketi (`apps/desktop` dependency);
-   `ws` ning `WebSocketServer`i testlarda fake E-IMZO bo'ladi.
+1. ~~Electron 34 ichida Node 20 — global `WebSocket` yo'q~~ → **2026-10-12: Electron 44.7.0 (Node 24, Chromium 152)**; `ws` paketi
+   qoladi (fake E-IMZO server testlarda). B4 spike 34.5.8 da edi — M8b real gate 44 da o'tkaziladi (M8c-spec §10 S1).
 2. API auth: cookie `session`, HS256 JWT, payload `{sub}`, sir = `JWT_SECRET` (`auth.guard.ts`, `auth.module.ts`). Desktop
    main `config.jwtSecret`/`username`ni o'zi yaratadi → main **service token**ni o'zi imzolaydi (`node:crypto`, ~15 qator).
 3. App oynasida preload yo'q; `setup-preload.js` (CommonJS `contextBridge`) namuna.
@@ -41,7 +43,8 @@ docs/research/e-imzo.md, CONSTITUTION §12–16, SRS §9.1–9.2, PROGRESS qaror
 
 Tartib: M8a → M8b → M8c → M8d. **SRS M8 qayta yozish — M8a'ning 1-qadami** (FR'lar oldin, keyin kod).
 M8a alohida: sof testlanadigan qatlam (alias parser, moslashtirish, store) va mustaqil foyda (kalit muddati ko'rinadi).
-M8c bo'linmaydi (firma = login bir marta → N qoralama → chiqish — tabiiy birlik); o'rniga `maxInvoices: 1` dev-toggle bilan oraliq gate.
+~~M8c bo'linmaydi~~ → **v5:** M8c uch vertikal bo'lak — c0 (poydevor, fake) · c1 (bitta faktura end-to-end, `DIDOX_MAX_INVOICES=1` env, real gate)
+· c2 (ko'p faktura, tiklash, UI) — [M8c-spec.md §11](M8c-spec.md).
 
 ## Arxitektura (Electron main — Didox drayveri; API — haqiqat manbai; web — UI)
 
@@ -111,6 +114,9 @@ bo'lsa `ForbiddenAction` (§12, locator'da bunday tugma umuman yo'q — bu ikkin
    7 qadam + `logout`.
 
 ### Qoralama qadamlari (`steps/create-draft.ts`, har faktura)
+> ⚠️ **→ v5:** bu 0–13 qadam v1 matni — **qurilmaydi**. Yakuniy qadamlar: [M8c-spec.md §4](M8c-spec.md) (0-qadam o'xshashlik
+> tekshiruvi — ID olinmaydi; 13-qadam PUT `expectedAmount` bilan; kritik bo'lim 11–12). Tarix uchun qoldirildi.
+
 0. `precheck` — `goto /documents/new/draft?tab=all&partner=<oluvchi STIR>`; `.doc-status--white` qatorlar ichida shartnoma № +
    ҚҚСсиз summa mos bo'lsa → ID olinadi, `already`, 12-qadamga. (Ilova yiqilib PUT bo'lmagan holatga idempotentlik.)
 1. `openForm` — `/create_document`; "Диққат!" bo'lsa (3 s) "Ёпиш"; toast'lar e'tiborsiz.
@@ -133,6 +139,9 @@ bo'lsa `ForbiddenAction` (§12, locator'da bunday tugma umuman yo'q — bu ikkin
 Tezlik: 40–80 ms/belgi, 300–800 ms/harakat, 2 s/faktura, 3 s/firma → ~60–90 s/faktura.
 
 ### Orkestratsiya (`run.ts`)
+> ⚠️ **→ v5:** [M8c-spec.md §3](M8c-spec.md) — `loginFirm` ajratiladi, heartbeat watchdog (180 s butun-run **emas**), kritik bo'lim,
+> `maxInvoices` IPC'da emas (env). Quyidagi matn tarix.
+
 `start({month, lenderIds|'all', maxInvoices?, trigger:'manual'|'scheduled'|'check-login'})`. Bir vaqtda bitta run
 (`RUN_IN_PROGRESS`). Oqim: `GET /api/invoices?month` → `draft===null` qatorlar beruvchi STIR bo'yicha → `POST /api/didox-runs`
 → E-IMZO tekshiruvi bir marta → Didox oynasi → har firma: `eri.status` (`missing`→"Parol kiritilmagan", `rejected`→"Parol rad
@@ -159,6 +168,9 @@ AppleScript o'qiy olmaydi). IPC parolni hech qachon qaytarmaydi (`status: set|mi
   `javaw`/E-IMZO jarayoni bo'yicha, parol `[Console]::In.ReadToEnd()`. Native Node modul yo'q.
 
 ### IPC yuzasi
+> ⚠️ **→ v5:** to'liq ro'yxat (`status`, `list-runs`, `get-run`, `invoice-flags`, `skip-invoice`, `resolve-needs-check`) —
+> [M8c-spec.md §7](M8c-spec.md). Bridge tiplari `bridge/contract.ts`, web `import type` bilan oladi.
+
 `eri:list-keys` → `{eimzo:'ok'|'not_running'|'error', keys:[{tin,org,title,validTo,status}], passwords:{[tin]:'set'|'missing'|'rejected'}}`;
 `eri:set-password`, `eri:remove-password`; `didox:check-login {tin}`; `didox:create-drafts {month, lenderIds, maxInvoices?}` →
 `{ok, runId}`; `didox:cancel`; `didox:open-diagnostics`; event `didox:progress {firmTin, invoice?, step, status, message}`.
@@ -166,8 +178,8 @@ AppleScript o'qiy olmaydi). IPC parolni hech qachon qaytarmaydi (`status: set|mi
 ## API o'zgarishlari (minimal, Didox'ni bilmaydi)
 1. `invoice_drafts.source varchar(10) NOT NULL DEFAULT 'manual'` + CHECK `IN ('manual','didox')` (migratsiya + Prisma +
    `MarkDraftDto.source? @IsIn` + `draft.source` javobda). UI: "Qoralama yaratildi (Didox)".
-2. **`didox_runs`** jadvali: `{id, month char(7), trigger, started_at, finished_at?, status running|done|failed|cancelled,
-   items jsonb}`; `POST /api/didox-runs`, `PATCH /api/didox-runs/:id`, `GET /api/didox-runs?month&limit`, `GET /:id`.
+2. ~~**`didox_runs`** jadvali / `POST|PATCH|GET /api/didox-runs`~~ → **v2 qarori, v5 tasdiqladi: API'da EMAS.** Journal
+   `userData/didox-runs/<runId>.json`, main yagona yozuvchi — [M8c-spec.md §2](M8c-spec.md). Quyidagi sabab tarix:
    Sabab: FR-8.7 tarix qayta ishga tushganda saqlanishi, M8d catch-up "bu oy bajarilganmi"ni bilishi kerak; ikkinchi JSON
    ombor o'rniga bitta PGlite. `running` 6 soatdan eski → UI "to'xtab qolgan". Modul `apps/api/src/didox-runs/` + e2e.
 3. API'da sir, E-IMZO, Didox DOM bilimi **yo'q** (SRS §7 "didox adapter apps/api'da" → `apps/desktop`).
@@ -184,6 +196,9 @@ AppleScript o'qiy olmaydi). IPC parolni hech qachon qaytarmaydi (`status: set|mi
 - Asosiy tugma "Didox'da qoralamalarni yaratish" faqat desktop'da va `tayyor` qator bo'lsa; "Belgilash" qatorda ikkilamchi qoladi.
 
 ## Xato va xavfsizlik semantikasi
+> ⚠️ **→ v5:** M8c uchun to'liq jadval (firma-stop vs faktura-darajali, 409/400 javoblari, bekor/kritik bo'lim, API yo'q) —
+> [M8c-spec.md §3, §8](M8c-spec.md). Quyidagi jadval M8a/M8b qismida amal qiladi; "Didox'da allaqachon bor → `already`" satri **bekor**.
+
 | Holat | Xulq |
 |---|---|
 | E-IMZO ulanmaydi | Run Didox ochilmasdan to'xtaydi: "E-IMZO ishga tushirilmagan" |
@@ -224,12 +239,8 @@ parol saqlanib qayta ochganda "Parol bor"; `eri-secrets.json`da ochiq matn yo'q;
 *Acceptance:* real firmada klaviaturaga tegmasdan kiradi, firmani tasdiqlaydi, chiqadi (keyingi ochishda login so'raydi); ataylab
 noto'g'ri parol → bir marta yozadi, "parol rad etildi", firma belgilanadi, qayta urinmaydi; E-IMZO yopiq → Didox ochilmaydi.
 
-**M8c:** API `source` + `didox_runs` (e2e) → `locators` forma qismi → `steps/create-draft` (fake page: barcha tekshiruv tarmoqlari,
-taqiqlangan locator so'ralmaydi) → `run` to'liq (guruhlash, firma-to'xtash, lock, cancel, yozuv) → IPC → web `DidoxRunDialog`,
-`useDidoxRuns` → tugma. **Oraliq gate** (Sir bilan, `maxInvoices:1`, 552328.77, izoh "SINOV"): yozish usuli, narx formati,
-"Хизмат кўрсатиш" matni aniqlanadi; locators/fixture yangilanadi; qoralama o'chiriladi; qayta run — precheck `already`.
-*Acceptance:* 2 firma × bir nechta faktura → qoralamalar §9.1 ga maydonma-maydon mos, ID'lar yozilgan, qayta run hech narsa
-yaratmaydi; bekor qilish yarim belgi qoldirmaydi; selector ataylab buzilsa screenshot bilan to'xtaydi.
+**M8c:** ⚠️ **→ v5** — [M8c-spec.md §11 (c0 → c1 → c2) va §12 acceptance](M8c-spec.md). `didox_runs` API'si **qurilmaydi**;
+`api/jwt` + `api/client` M8c c0 ning birinchi qadami (M8b da qurilmagan edi).
 
 **M8d:** sof `nextRun`/catch-up testlar → tray + login item + `powerMonitor` → jadval trigger → `win32` adapter (fake spawn) →
 PowerShell spike Windows'da → NSIS paket. *Acceptance:* soat 1-kuni 05:59 → 06:00 o'tgan oy uchun run; vaqtinchalik xato →
@@ -314,7 +325,8 @@ endpoint'lari (`…/sign`, `…/send`, `tosign` …) **tarmoq darajasida to'sila
 tasdiqlanadi). Screenshot'lar: firma rekvizitlari ko'rinadi (F.I.Sh. direktor) — faqat lokal, 7 kun/20 ta rotatsiya.
 
 **M8 — testlar:** fake-page testlari qadam mantig'ini (tarmoqlar, xato kodlari, taqiq) isbotlaydi, locator snippet'larini emas →
-jsdom fixture faqat **drift detektori** (Didox build o'zgarsa qizil). Real-Didox spike ro'yxati (M8c kodidan oldin, 1 sessiya):
+jsdom fixture faqat **drift detektori** (Didox build o'zgarsa qizil). ~~Real-Didox spike ro'yxati (1)–(7)~~ → **v5: [M8c-spec.md §10 S1–S7](M8c-spec.md)**
+(Electron 44, save endpoint'i, UI tili, fon oynasi, autosave qo'shildi; **(7) Windows → M8d**, Sir M9 qarori). Tarix:
 (1) Electron'da login + to'g'ri/noto'g'ri parol; (2) yozish usuli — sana niqobi, STIR, MXIK, Нарҳ 3 summada `1.00`, `552328.77`,
 `15904000000.10` + o'qish formati; (3) "Хизмат кўрсатиш" matni va MUI select usuli; (4) saqlashdan keyingi ro'yxat eskirishi,
 tartibi, `limit` chegarasi, pagination; (5) ikkinchi `/create_document` bo'shmi, `clearStorageData`dan keyin login so'raladimi;
@@ -331,12 +343,14 @@ web `didox:list-runs` IPC orqali o'qiydi; M8d catch-up shu fayllardan "oy bajari
 (`ws://`, TLS yo'q); bir nechta kalit → `validTo` eng uzog'i, UI'da seriya ko'rinadi; firma almashtirgich v1 da yo'q; lotin
 bo'lmagan tartibda bloklash qoladi; Electron 34 EOL — M8d'da yangilash baholanadi.
 
-### Qurish tartibi (yangilangan)
-M8a (SRS + TS skelet + kalit/parol) → **B4 spike** (Electron'da login, Sir bilan) → M8b (macOS) →
-**M8c spike ro'yxati** (7 band) → M8c → M8d.
+### Qurish tartibi (yangilangan, v5)
+~~M8a → B4 spike → M8b → M8c spike (7 band) → M8c → M8d~~ →
+**M8a ✅ → B4 spike ✅ → M8b ✅ (real gate Electron 44 da — S1) → M8c c0 (fake, Didox'siz) → spike S1–S7 → c1 (1 faktura, gate) →
+c2 (ko'p faktura, tiklash, UI, gate) → M8d (jadval, tray, Windows).**
 
 ---
-## v3 — doira o'zgarishi (2026-10-12, M8a qabulidan keyin)
+## v3 — doira o'zgarishi (2026-10-12, M8a qabulidan keyin) — ⚠️ **BEKOR (v4/v5)**: butun bo'lim tarix; "Claude qurmaydi",
+"buxgalter parolni o'zi kiritadi", "M8d avto-kirish yo'q", "spike 1–6" — hech biri amal qilmaydi
 - **ERI parolini ilovada saqlash va E-IMZO oynasiga avtomatik yozish Claude tomonidan qurilmaydi** (Anthropic xavfsizlik
   cheklovi). Shu sababli FR-8.2 qurilmagan; B3 va autotype adapterlari ushbu repo'da bo'lmaydi.
 - **Kirish:** ilova Didox oynasini ochadi (va M8b doirasida kalitni STIR bo'yicha tanlab "Кириш"ni bosishi mumkin), parolni
@@ -353,3 +367,15 @@ M8a (SRS + TS skelet + kalit/parol) → **B4 spike** (Electron'da login, Sir bil
 - Bajarildi: `src/secrets/eri-store.ts` (safeStorage, kalit seriyasiga bog'langan, `rejected`, 0600, ketma-ket yozish) +
   `eri:set-password`/`eri:remove-password` IPC + Firmalar'da "ERI parol" ustuni va dialog.
 - M8b shartnomasi: `src/didox/contract.ts` (Page, StepError, ArmAutotype, FORBIDDEN_LABEL).
+- Bajarildi (2026-10-12): M8b — `driver`, `locators` (login), `steps/login` + `logout`, `autotype/darwin` (JXA, stdin), `view`,
+  `run.checkLogin`, IPC `didox:check-login`/`cancel`/`progress`, web `CheckLoginDialog`. Desktop 204 test.
+
+---
+## v5 — M8c yakuniy spetsifikatsiya (2026-10-13, Fable; Sir qarorlari)
+**[M8c-spec.md](M8c-spec.md)** — M8c uchun yagona manba. [M8c-REVIEW.md](M8c-REVIEW.md) (Sonnet) 4 blocker + 7 major yopildi:
+B1 reja↔kod ziddiyatlari (PUT `expectedAmount`, `didox_runs` JSON, 0/12-qadam `already` bekor, FR-8.4 qaytarilgani yozildi, IPC
+to'liq) · B2 "Didox'da bor, ilovada yo'q" barcha yo'llari `needs_check` (journal `saving→id_found→marked`, API 409/400 jadvali,
+`id_found` diskda PUT'dan oldin) · B3 tiklash oynasi `[savingAt−2daq, savingAt+5daq]`, kalitda shartnoma sanasi, 0-qadam faqat
+`M+1` dan keyingi qatorlar, read-only tiklash · B4 kritik bo'lim (45 s) + heartbeat watchdog (120 s) + zombi yo'q + `before-quit`.
+**Sir (2026-10-13):** (1) faktura-darajali **"o'tkazib yuborish" belgisi** (`didox-skips.json`); (2) run paytida ilova **bloklanmaydi**
+— `expectedAmount` guard + banner. Bo'linish c0/c1/c2, spike S1–S7 (Windows → M8d).
