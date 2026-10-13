@@ -71,6 +71,31 @@ export interface DidoxRun {
   firms: DidoxRunFirm[]
 }
 
+/** Why an invoice needs a person's attention, as the last run recorded it. */
+export interface DidoxNeedsCheck {
+  runId: string
+  code: string
+  message: string
+  didoxId?: string
+  candidateIds?: string[]
+  at: string
+}
+
+export interface DidoxInvoiceFlags {
+  /** Set while the accountant has told the app to leave this invoice alone this month. */
+  skipped?: { at: string }
+  needsCheck?: DidoxNeedsCheck
+}
+
+export interface DidoxRunSummary {
+  runId: string
+  month: string
+  startedAt: string
+  finishedAt?: string
+  status: 'running' | 'done' | 'cancelled' | 'failed'
+  counts: { marked: number; skipped: number; needsCheck: number; error: number; pending: number }
+}
+
 /** What the Electron shell exposes as `window.desktop` (apps/desktop/assets/app-preload.cjs). */
 export interface DesktopBridge {
   platform: string
@@ -90,6 +115,14 @@ export interface DesktopBridge {
     cancel(): Promise<void>
     /** Returns the unsubscribe function. */
     onProgress(callback: (progress: DidoxProgress) => void): () => void
+    /** Keyed by contractId; invoices without a flag are absent. */
+    invoiceFlags(month: string): Promise<Record<string, DidoxInvoiceFlags>>
+    skipInvoice(opts: { month: string; contractId: string; skip: boolean }): Promise<void>
+    /** "Hal qilindi": drops the needs-check flag. Touches nothing in the API. */
+    resolveNeedsCheck(opts: { month: string; contractId: string }): Promise<void>
+    listRuns(opts?: { month?: string; limit?: number }): Promise<DidoxRunSummary[]>
+    getRun(runId: string): Promise<DidoxRun | null>
+    openDiagnostics(): Promise<void>
   }
   backups: {
     /** `last` — when the newest daily backup was written (ISO), or null. */

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router'
 import { BackupMenu } from '@/components/BackupMenu'
 import { Button } from '@/components/ui/button'
 import { useLogout } from '@/features/auth/api'
+import { DidoxRunBanner } from '@/features/invoices/DidoxRunBanner'
 import { cn } from '@/lib/utils'
 
 const nav = [
@@ -62,6 +63,7 @@ export function AppLayout() {
           </Button>
         </div>
       </header>
+      <DidoxRunBanner />
       <main id="main" className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>

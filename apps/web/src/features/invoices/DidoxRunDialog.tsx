@@ -21,6 +21,8 @@ import {
 } from '@/lib/desktop'
 import { formatMoney, formatMonth } from '@/lib/format'
 import { invoicesKey } from './api'
+import { didoxFlagsKey, didoxRunsKey } from './didoxApi'
+import { RUN_LABELS, STATE_CLASS, STATE_LABELS } from './didoxLabels'
 
 /** How often the journal is read while the run is going; events alone do not carry per-invoice state. */
 const POLL_MS = 1500
@@ -54,29 +56,6 @@ const STEP_LABELS: Record<string, string> = {
   save: 'Qoralamani saqlash',
   locateDraftId: 'Qoralama ID sini topish',
   mark: 'Ilovada belgilash',
-}
-
-const STATE_LABELS: Record<DidoxInvoiceState, string> = {
-  pending: 'navbatda',
-  saving: 'saqlanmoqda',
-  id_found: 'ID topildi',
-  marked: 'yaratildi',
-  needs_check: "e'tibor kerak",
-  skipped: "o'tkazib yuborildi",
-  error: 'xato',
-}
-
-const RUN_LABELS: Record<DidoxRun['status'], string> = {
-  running: 'Davom etmoqda',
-  done: 'Yakunlandi',
-  cancelled: 'Bekor qilindi',
-  failed: 'Xatolik bilan tugadi',
-}
-
-const STATE_CLASS: Partial<Record<DidoxInvoiceState, string>> = {
-  marked: 'text-emerald-700',
-  needs_check: 'text-amber-800',
-  error: 'text-destructive',
 }
 
 /** Newest step per invoice (per firm for the login steps), in the order the steps first appeared. */
@@ -157,7 +136,12 @@ export function DidoxRunDialog({ month, pending, onOpenChange }: Props) {
 
   // The rows pick up their "Qoralama yaratildi (Didox)" badge from the API, not from the journal.
   useEffect(() => {
-    if (finished) void client.invalidateQueries({ queryKey: invoicesKey })
+    if (!finished) return
+    void client.invalidateQueries({ queryKey: invoicesKey })
+    // The "e'tibor kerak" / "o'tkazib yuboriladi" marks come from the journal, not the API.
+    void client.invalidateQueries({ queryKey: didoxFlagsKey })
+    // The history card should show the run that has just ended, not only the ones before it.
+    void client.invalidateQueries({ queryKey: didoxRunsKey })
   }, [finished, client])
 
   const cancel = async () => {

@@ -23,13 +23,15 @@ import { type Invoice, type MarkDraftInput, useMarkDraft } from './api'
 interface Props {
   month: string
   invoice: Invoice
+  /** Pre-filled for a row the Didox run left in "e'tibor kerak": the app knows the ID, the accountant confirms it. */
+  didoxDocumentId?: string
   onOpenChange: (open: boolean) => void
 }
 
 /** FR-7.4: the accountant records by hand that the draft exists in Didox. */
-export function MarkDraftDialog({ month, invoice, onOpenChange }: Props) {
+export function MarkDraftDialog({ month, invoice, didoxDocumentId: initialId, onOpenChange }: Props) {
   const mark = useMarkDraft(month, invoice.contractId)
-  const [didoxDocumentId, setDidoxDocumentId] = useState(invoice.draft?.didoxDocumentId ?? '')
+  const [didoxDocumentId, setDidoxDocumentId] = useState(invoice.draft?.didoxDocumentId ?? initialId ?? '')
   const [warnings, setWarnings] = useState<Warning[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 

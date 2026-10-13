@@ -1,7 +1,15 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { toast } from 'sonner'
 import { companyA, companyB } from '@/features/contracts/fixtures'
-import type { DidoxProgress, DidoxRun, DidoxRunInvoice, DidoxStartResult } from '@/lib/desktop'
+import type {
+  DidoxInvoiceFlags,
+  DidoxProgress,
+  DidoxRun,
+  DidoxRunInvoice,
+  DidoxRunSummary,
+  DidoxStartResult,
+} from '@/lib/desktop'
 import { mockApi, renderWithProviders } from '@/test/utils'
 import type { Invoice, InvoiceList } from './api'
 import { InvoicesPage } from './InvoicesPage'
@@ -376,6 +384,178 @@ describe('InvoicesPage (Module 7)', () => {
       expect(summary).toHaveTextContent(`Didox ID ${'B'.repeat(32)}`)
       await waitFor(() => expect(api.calls.length).toBeGreaterThan(before)) // the rows pick up their new badge
       expect(within(dialog).getAllByRole('button', { name: 'Yopish' })[0]).toBeInTheDocument()
+    })
+  })
+
+  describe('Didox row flags and run history (M8c, desktop)', () => {
+    const needsCheck = {
+      runId: 'r1',
+      code: 'SAVED_ID_UNKNOWN',
+      message: "Didox'da qoralama bo'lishi mumkin — uni tekshiring",
+      didoxId: 'B'.repeat(32),
+      at: '2026-10-01T05:00:00.000Z',
+    }
+    const runSummary = (over: Partial<DidoxRunSummary> = {}): DidoxRunSummary => ({
+      runId: 'r1',
+      month: '2026-09',
+      startedAt: '2026-10-01T04:00:00.000Z',
+      finishedAt: '2026-10-01T05:00:00.000Z',
+      status: 'done',
+      counts: { marked: 3, skipped: 0, needsCheck: 1, error: 0, pending: 0 },
+      ...over,
+    })
+
+    /** The M8c half of the bridge: the journal-backed flags and the run history, each spied on. */
+    const desktopWithFlags = (flags: Record<string, DidoxInvoiceFlags> = {}, over: Record<string, unknown> = {}) => {
+      const didox = {
+        checkLogin: vi.fn(),
+        createDrafts: vi.fn(),
+        status: vi.fn(async () => null),
+        cancel: vi.fn(),
+        onProgress: vi.fn(() => () => undefined),
+        invoiceFlags: vi.fn(async () => flags),
+        skipInvoice: vi.fn(async () => undefined),
+        resolveNeedsCheck: vi.fn(async () => undefined),
+        listRuns: vi.fn(async () => [] as DidoxRunSummary[]),
+        getRun: vi.fn(async () => null as DidoxRun | null),
+        openDiagnostics: vi.fn(async () => undefined),
+        ...over,
+      }
+      vi.stubGlobal('desktop', { platform: 'darwin', eri: {}, didox })
+      const api = mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([ready]) }) })
+      return { api, didox }
+    }
+
+    it('shows why the run left an invoice for a person, with its Didox ID (spec §7)', async () => {
+      const user = userEvent.setup()
+      desktopWithFlags({ [ready.contractId]: { needsCheck } })
+      renderWithProviders(<InvoicesPage />)
+
+      const badge = await screen.findByText("E'tibor kerak (Didox)")
+      const row = badge.closest('tr')!
+      expect(row).toHaveTextContent("Didox'da qoralama bo'lishi mumkin — uni tekshiring")
+      expect(within(row).getByText('B'.repeat(32))).toBeInTheDocument()
+      await user.click(within(row).getByRole('button', { name: `Nusxalash: Didox hujjat ID ${'B'.repeat(32)}` }))
+      expect(await navigator.clipboard.readText()).toBe('B'.repeat(32))
+    })
+
+    it('opens the mark dialog with the Didox ID the run found', async () => {
+      desktopWithFlags({ [ready.contractId]: { needsCheck } })
+      renderWithProviders(<InvoicesPage />)
+      await screen.findByText("E'tibor kerak (Didox)")
+      await userEvent.click(screen.getByRole('button', { name: 'Qoralama deb belgilash: № 1' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByLabelText(/Didox hujjat ID/)).toHaveValue('B'.repeat(32))
+    })
+
+    it('"Hal qilindi" drops the flag without touching the API', async () => {
+      const { api, didox } = desktopWithFlags({ [ready.contractId]: { needsCheck } })
+      renderWithProviders(<InvoicesPage />)
+      await userEvent.click(await screen.findByRole('button', { name: 'Hal qilindi: № 1' }))
+      expect(didox.resolveNeedsCheck).toHaveBeenCalledWith({ month: '2026-09', contractId: ready.contractId })
+      expect(api.calls.every((c) => c.method === 'GET')).toBe(true)
+      await waitFor(() => expect(didox.invoiceFlags).toHaveBeenCalledTimes(2)) // the row re-reads its flags
+    })
+
+    it('"O\'tkazib yuborish" tells the app to leave the invoice alone', async () => {
+      const { didox } = desktopWithFlags({ [ready.contractId]: { needsCheck } })
+      renderWithProviders(<InvoicesPage />)
+      await screen.findByText("E'tibor kerak (Didox)")
+      await userEvent.click(screen.getByRole('button', { name: "O'tkazib yuborish: № 1" }))
+      expect(didox.skipInvoice).toHaveBeenCalledWith({ month: '2026-09', contractId: ready.contractId, skip: true })
+    })
+
+    it('offers the skip on a plain ready row too, and says so when it fails', async () => {
+      const failed = vi.fn(async () => Promise.reject(new Error("Belgini saqlab bo'lmadi")))
+      const error = vi.spyOn(toast, 'error')
+      desktopWithFlags({}, { skipInvoice: failed })
+      renderWithProviders(<InvoicesPage />)
+      await userEvent.click(await screen.findByRole('button', { name: "O'tkazib yuborish: № 1" }))
+      expect(failed).toHaveBeenCalledWith({ month: '2026-09', contractId: ready.contractId, skip: true })
+      await waitFor(() => expect(error).toHaveBeenCalledWith("Belgini saqlab bo'lmadi"))
+    })
+
+    it('is not offered in a plain browser', async () => {
+      mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([ready]) }) })
+      renderWithProviders(<InvoicesPage />)
+      await screen.findByText('№ 1')
+      expect(screen.queryByRole('button', { name: "O'tkazib yuborish: № 1" })).not.toBeInTheDocument()
+    })
+
+    it('shows a skipped invoice and takes the mark back', async () => {
+      const { didox } = desktopWithFlags({ [ready.contractId]: { skipped: { at: '2026-10-01T05:00:00.000Z' } } })
+      renderWithProviders(<InvoicesPage />)
+      expect(await screen.findByText("O'tkazib yuboriladi (Didox)")).toBeInTheDocument()
+      // Nothing of the month waits for a draft once its only invoice is skipped.
+      expect(screen.getByRole('button', { name: "Didox'da qoralama yaratish" })).toBeDisabled()
+      await userEvent.click(screen.getByRole('button', { name: "O'tkazib yuborishni bekor qilish: № 1" }))
+      expect(didox.skipInvoice).toHaveBeenCalledWith({ month: '2026-09', contractId: ready.contractId, skip: false })
+    })
+
+    it('lists the last runs of the month and opens one', async () => {
+      const { didox } = desktopWithFlags(
+        {},
+        {
+          listRuns: vi.fn(async () => [runSummary()]),
+          getRun: vi.fn(
+            async (): Promise<DidoxRun> => ({
+              runId: 'r1',
+              month: '2026-09',
+              startedAt: '2026-10-01T04:00:00.000Z',
+              finishedAt: '2026-10-01T05:00:00.000Z',
+              status: 'done',
+              firms: [
+                {
+                  tin: companyA.tin,
+                  name: companyA.name,
+                  status: 'done',
+                  invoices: [
+                    {
+                      contractId: ready.contractId,
+                      contractNumber: '1',
+                      borrowerName: companyB.name,
+                      amount: ready.amount,
+                      state: 'needs_check',
+                      code: 'SAVED_ID_UNKNOWN',
+                      didoxId: 'B'.repeat(32),
+                      message: "Didox'da qoralama bo'lishi mumkin — uni tekshiring",
+                    },
+                  ],
+                },
+              ],
+            }),
+          ),
+        },
+      )
+      renderWithProviders(<InvoicesPage />)
+
+      const runs = await screen.findByRole('list', { name: 'Didox jarayonlari' })
+      expect(didox.listRuns).toHaveBeenCalledWith({ month: '2026-09', limit: 5 })
+      const run = within(runs).getByRole('button', { name: 'Jarayon tafsiloti: 01.10.2026 09:00' })
+      expect(run).toHaveTextContent('Yakunlandi')
+      expect(run).toHaveTextContent("3 yaratildi · 1 e'tibor kerak")
+
+      await userEvent.click(run)
+      const dialog = await screen.findByRole('dialog')
+      expect(didox.getRun).toHaveBeenCalledWith('r1')
+      expect(await within(dialog).findByText(/A MCHJ/)).toBeInTheDocument()
+      expect(dialog).toHaveTextContent("e'tibor kerak")
+      expect(dialog).toHaveTextContent("Didox'da qoralama bo'lishi mumkin — uni tekshiring")
+      expect(dialog).toHaveTextContent(`Didox ID ${'B'.repeat(32)}`)
+    })
+
+    it('opens the diagnostics folder', async () => {
+      const { didox } = desktopWithFlags({}, { listRuns: vi.fn(async () => [runSummary()]) })
+      renderWithProviders(<InvoicesPage />)
+      await userEvent.click(await screen.findByRole('button', { name: 'Diagnostika papkasi' }))
+      expect(didox.openDiagnostics).toHaveBeenCalledOnce()
+    })
+
+    it('has no run history card in a plain browser', async () => {
+      mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([ready]) }) })
+      renderWithProviders(<InvoicesPage />)
+      await screen.findByText('№ 1')
+      expect(screen.queryByText('Didox jarayonlari')).not.toBeInTheDocument()
     })
   })
 

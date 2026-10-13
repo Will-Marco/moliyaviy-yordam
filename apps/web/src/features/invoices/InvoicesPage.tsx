@@ -20,10 +20,14 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import type { DidoxInvoiceFlags } from '@/lib/desktop'
 import { useDesktop } from '@/lib/desktop'
 import { formatDate, formatInstantDate, formatMoney, formatMonth } from '@/lib/format'
 import { type Invoice, useInvoices, useUnmarkDraft } from './api'
+import { useDidoxFlags, useResolveNeedsCheck, useSkipInvoice } from './didoxApi'
+import { DidoxNeedsCheckActions, DidoxNeedsCheckBadge, DidoxSkippedBadge, SkipButton, UnskipButton } from './DidoxRowFlags'
 import { DidoxRunDialog } from './DidoxRunDialog'
+import { DidoxRunsCard } from './DidoxRunsCard'
 import { MarkDraftDialog } from './MarkDraftDialog'
 
 /** Module 7: invoices to prepare in Didox for a completed month — every field one click from the clipboard. */
@@ -35,15 +39,38 @@ export function InvoicesPage() {
   const [unmarking, setUnmarking] = useState<Invoice | null>(null)
   const [creatingDrafts, setCreatingDrafts] = useState(false)
   // Older desktop builds (and a plain browser) cannot create drafts; the whole run is then out of reach.
-  const canCreateDrafts = !!useDesktop()?.didox?.createDrafts
+  const didox = useDesktop()?.didox
+  const canCreateDrafts = !!didox?.createDrafts
+  // The skip mark lives in the desktop app's own store, so a browser row has nothing to skip.
+  const canSkip = !!didox?.skipInvoice
 
   const data = invoices.data
   const month = data?.month ?? null
   const unmark = useUnmarkDraft(month ?? '')
+  // The desktop app's own marks for this month; a plain browser has none and every row keeps its API state.
+  const flags = useDidoxFlags(month)
+  const flagsOf = (contractId: string): DidoxInvoiceFlags | undefined => flags.data?.[contractId]
+  const skip = useSkipInvoice(month ?? '')
+  const resolve = useResolveNeedsCheck(month ?? '')
   const rows = (data?.rows ?? []).filter((r) => !lenderId || r.lender.id === lenderId)
   const drafted = rows.filter((r) => r.draft).length
   // The run covers every lender of the month, so the lender filter does not narrow what it would do.
-  const needDraft = (data?.rows ?? []).filter((r) => r.draft === null).length
+  // An invoice the accountant told the app to leave alone is not waiting for a draft either (spec §7).
+  const needDraft = (data?.rows ?? []).filter((r) => r.draft === null && !flagsOf(r.contractId)?.skipped).length
+
+  const onSkip = (r: Invoice, next: boolean) =>
+    skip.mutate(
+      { contractId: r.contractId, skip: next },
+      {
+        onSuccess: () => toast.success(next ? "Faktura o'tkazib yuboriladi" : "O'tkazib yuborish bekor qilindi"),
+        onError: (e) => toast.error(e instanceof Error ? e.message : "O'zgartirib bo'lmadi"),
+      },
+    )
+  const onResolve = (r: Invoice) =>
+    resolve.mutate(r.contractId, {
+      onSuccess: () => toast.success('Belgi olib tashlandi'),
+      onError: (e) => toast.error(e instanceof Error ? e.message : "O'zgartirib bo'lmadi"),
+    })
 
   const setParam = (key: 'month' | 'lender', value: string) =>
     setParams(
@@ -161,8 +188,13 @@ export function InvoicesPage() {
                 <InvoiceRow
                   key={r.contractId}
                   invoice={r}
+                  flags={flagsOf(r.contractId)}
+                  canSkip={canSkip}
+                  busy={skip.isPending || resolve.isPending}
                   onMark={() => setMarking(r)}
                   onUnmark={() => setUnmarking(r)}
+                  onSkip={(next) => onSkip(r, next)}
+                  onResolve={() => onResolve(r)}
                 />
               ))}
             </TableBody>
@@ -170,7 +202,16 @@ export function InvoicesPage() {
         </Card>
       )}
 
-      {marking && month && <MarkDraftDialog month={month} invoice={marking} onOpenChange={() => setMarking(null)} />}
+      {month && <DidoxRunsCard month={month} />}
+
+      {marking && month && (
+        <MarkDraftDialog
+          month={month}
+          invoice={marking}
+          didoxDocumentId={flagsOf(marking.contractId)?.needsCheck?.didoxId}
+          onOpenChange={() => setMarking(null)}
+        />
+      )}
 
       {creatingDrafts && month && (
         <DidoxRunDialog month={month} pending={needDraft} onOpenChange={() => setCreatingDrafts(false)} />
@@ -206,7 +247,21 @@ export function InvoicesPage() {
   )
 }
 
-function InvoiceRow({ invoice: r, onMark, onUnmark }: { invoice: Invoice; onMark: () => void; onUnmark: () => void }) {
+interface RowProps {
+  invoice: Invoice
+  /** Absent unless the desktop app has a mark on this invoice for this month. */
+  flags: DidoxInvoiceFlags | undefined
+  /** False in a plain browser (or a desktop build older than M8c): no skip mark can be set. */
+  canSkip: boolean
+  /** A flag change is in flight somewhere in the table — the flag buttons wait for it. */
+  busy: boolean
+  onMark: () => void
+  onUnmark: () => void
+  onSkip: (skip: boolean) => void
+  onResolve: () => void
+}
+
+function InvoiceRow({ invoice: r, flags, canSkip, busy, onMark, onUnmark, onSkip, onResolve }: RowProps) {
   const amount = formatMoney(r.amount)
   // A drafted month may have lost its interest since; the API only marks positive amounts (FR-7.1).
   const invoiceable = !r.amount.startsWith('-') && /[1-9]/.test(r.amount)
@@ -263,6 +318,10 @@ function InvoiceRow({ invoice: r, onMark, onUnmark }: { invoice: Invoice; onMark
               </span>
             )}
           </div>
+        ) : flags?.needsCheck ? (
+          <DidoxNeedsCheckBadge needsCheck={flags.needsCheck} />
+        ) : flags?.skipped ? (
+          <DidoxSkippedBadge />
         ) : (
           <Badge variant="secondary">Tayyor</Badge>
         )}
@@ -279,10 +338,23 @@ function InvoiceRow({ invoice: r, onMark, onUnmark }: { invoice: Invoice; onMark
               Olib tashlash
             </Button>
           </div>
+        ) : flags?.needsCheck ? (
+          <DidoxNeedsCheckActions
+            contractNumber={r.contract.number}
+            disabled={busy}
+            onMark={onMark}
+            onResolve={onResolve}
+            onSkip={onSkip}
+          />
+        ) : flags?.skipped ? (
+          <UnskipButton contractNumber={r.contract.number} disabled={busy} onUnskip={() => onSkip(false)} />
         ) : (
-          <Button variant="outline" size="sm" aria-label={`Qoralama deb belgilash: № ${r.contract.number}`} onClick={onMark}>
-            Belgilash
-          </Button>
+          <div className="grid gap-1">
+            <Button variant="outline" size="sm" aria-label={`Qoralama deb belgilash: № ${r.contract.number}`} onClick={onMark}>
+              Belgilash
+            </Button>
+            {canSkip && <SkipButton contractNumber={r.contract.number} disabled={busy} onSkip={() => onSkip(true)} />}
+          </div>
         )}
       </TableCell>
     </TableRow>
