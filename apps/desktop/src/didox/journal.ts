@@ -92,6 +92,8 @@ export interface RunSummary {
   startedAt: string
   finishedAt?: string
   status: RunStatus
+  /** Why the run stopped, when it stopped on its own; the schedule reads the code (M8d). */
+  failure?: { code: string; message: string }
   counts: RunCounts
 }
 
@@ -346,6 +348,8 @@ export function createJournal({
         startedAt: j.startedAt,
         ...(j.finishedAt === undefined ? {} : { finishedAt: j.finishedAt }),
         status: j.status,
+        // The schedule reads this to tell "the app never got going" from "the app ran and found trouble" (M8d).
+        ...(j.failure === undefined ? {} : { failure: j.failure }),
         counts: counts(j),
       }))
     },

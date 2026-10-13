@@ -260,6 +260,23 @@ o'tadi, lekin Chromium uni "tirik" deb hisoblaydi. **E-IMZO parol oynasi** barib
 3. jsdom drift-fixture uchun `jsdom` paketi desktop'ga qo'shiladimi (hozir yo'q) — Sir qarori.
 4. `backgroundThrottling` / ekran uyqusi (S6 qoldig'i).
 
+## 2d. A varianti — Didox'ga parol bilan kirish (boshlang'ich o'lchov, 2026-10-14)
+
+Maqsad: ekranda hech narsa ko'rinmasligi (E-IMZO parol oynasi ham chiqmasligi) uchun ERI o'rniga Didox login/paroli.
+
+- `https://didox.uz/login` **sukut bo'yicha parol formasi**: ikki maydon — `СТИР/ЖШШИР` (`input__input--text`) va
+  `Пароль` (`input__input--password`), tugma "Кириш" (`login-with-signature__btn`, boshida `disabled` emas).
+- **Captcha — ko'rinmas**: sahifada faqat `google.com/recaptcha/api2/aframe` iframe'i bor (yashirin), ko'rinadigan
+  sinov oynasi yoki rasm yo'q, `window.grecaptcha` asosiy dunyoda aniqlanmadi. Ya'ni foydalanuvchidan hech narsa
+  so'ralmaydi — lekin **bizning oynamiz `net-policy` bo'yicha google hostlarini bloklaydi**, shuning uchun kirish
+  shu sababdan rad etilishi mumkin. Spike aynan shuni ham tekshiradi.
+- **Ochiq (spike kutilmoqda, Sir Didox kredensiali bilan):** (1) parol bilan kirishda SMS/2FA bormi; (2) parol
+  sessiyasida `/create_document` va "Сақлаб қолиш" ruxsat etiladimi (portal hujjat yaratishni ERI sessiyasiga
+  cheklashi mumkin); (3) reCAPTCHA bloklangani kirishni buzadimi — buzsa, `net-policy` ga ataylab istisno kerak
+  bo'ladi (qaror Sir'niki).
+- Agar uchala javob ijobiy bo'lsa: ERI kaliti faqat **imzolash** uchun qoladi (uni baribir buxgalter qiladi), ilova
+  esa qoralamalarni to'liq fonda yaratadi.
+
 ## 3. Ochiq savollar
 1. ~~Raqam/sanasiz saqlash~~ — ha (§2a). 2. ~~Kontragent avto-to'ldirish~~ — ha. 3. ~~Ўлчов бирлиги~~ — "xizmat (so'm)".
 4. ~~Qoralama ID~~ — Қоралама ro'yxatidan (§2a).
