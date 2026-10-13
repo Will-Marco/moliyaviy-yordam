@@ -29,6 +29,9 @@
   ⚠️ Class nomlari Didox build'iga bog'liq — buzilsa ilova to'xtab aniq xabar berishi kerak.
 
 ## 1a. Kalitlar ro'yxati — to'g'ridan-to'g'ri E-IMZO'dan (Sir, 2026-10-12)
+
+> ⚠️ **Tuzatish (spike 2026-10-13, §2c):** "API-KEY va Origin'siz" qismi noto'g'ri. E-IMZO kalitlar ro'yxatini
+> `Origin` sarlavhasisiz bermaydi (`-1022`); ilova `Origin: http://localhost` yuboradi (API-kalit baribir kerak emas).
 - **Tekshirildi (Sir Mac'i, E-IMZO v6.4.7 Standard):** Node 24 o'zining `WebSocket`i bilan
   `ws://127.0.0.1:64646/service/cryptapi` va `wss://127.0.0.1:64443/service/cryptapi` (TLS tekshiruvisiz) ga ulandi;
   `{name:"version"}` va `{plugin:"pfx",name:"list_all_certificates"}` **API-KEY yubormasdan, Origin'siz** javob berdi.
@@ -127,10 +130,125 @@ summa 1.00, izoh "SINOV - o'chiriladi". "Имзолаш"ga tegilmadi.
   → Didox oynasi `webRequest` bilan shu yo'llarni **bloklaydi** (FR-8.9); lokal xostlardan faqat E-IMZO (64443/64646) ruxsat.
   E-IMZO'ni o'zi bloklanmaydi (login uchun kerak) — hujjat imzosi baribir yuqoridagi POST'siz bajarilmaydi.
 
+## 2c. Spike S1–S7 (2026-10-13, Sir bilan, real Didox + E-IMZO; sinov qoralamasi yaratildi → o'chirildi)
+
+Ilovaning o'z dvigatelida (Electron 44, `openDidoxWindow`/`locators`/`net-policy`) o'tkazildi; firma rekvizitlari bu yerga
+yozilmaydi. **Didox login va hujjatlar sahifasi qayta dizayn qilingan** (`documents-page-v2`, MUI) — quyida farqlar.
+
+### S1 — M8b login gate: **YASHIL**. Uchta drift topildi va tuzatildi
+1. **E-IMZO endi Origin talab qiladi.** `version` hammaga javob beradi, lekin `pfx.list_all_certificates` Origin'siz
+   `status:-1022` "Domen null uchun API-kalit yaroqsiz" qaytaradi. `Origin: http://localhost` bilan ro'yxat keladi —
+   apikey handshake **kerak emas** (E-IMZO localhost'ga ishonadi). §1a dagi "API-KEY va Origin'siz ishladi" **noto'g'ri**.
+2. **Yopiq kalit tanlagich — `.certs-trigger`** (ichida `.certs-trigger__name` + `.certs-trigger__inn`); kalitlar kelgach
+   birinchisi oldindan tanlangan bo'ladi, kelmagunicha eski "Калитингизни танланг" matni turadi. **Ochiq menyu eski
+   klasslarini saqlagan**: `.certs-select__menu`, `.certs-select__item`, `.certs-select__inn`, `.certs-select__expire`
+   ("до DD.MM.YYYY") — `keyMenuItems`/`keyMenuItem` o'zgarmadi.
+3. **Tugma matnlari `<span>` ichida** (`button.ui-button > span.ui-button__text`) — "eng chuqur element" qoidasi faqat
+   **bir xil selektorga mos** avlodni hisobga olishi kerak, aks holda "Кириш" topilmaydi.
+
+### S2 — forma (`/create_document`)
+- **Yozish usuli:** faqat `char` hodisasi **yetarli emas** — niqobli sana maydoni `__.__.____` bo'lib qoladi, МХИК
+  avtoto'ldirgichi bo'sh qolib katalogni filtrsiz ochadi. Har belgi uchun `keyDown + char + keyUp` kerak (`view.ts` tuzatildi).
+- **Tozalash:** sintetik Cmd/Ctrl+A ishlamaydi; Chromium'ning `webContents.selectAll()` + Backspace ishlaydi (`clear()` tuzatildi).
+- Sarlavha maydonlari (`input.input__input`, `name`/`id` yo'q, tartib bo'yicha): `0` *Ҳисоб-фактура рақами · `1` *Шартнома
+  рақами · `2` *Ҳужжат санаси · `3` *Шартнома санаси · `4` Шартнома ID · `5` ТТЮ ИД · `6` o'z STIR (disabled) ·
+  `11` *контрагент СТИР · `25` kontragent nomi · `30` manzil · `31` direktor.
+- Sana niqobi raqamlarni o'zi formatlaydi: `01092026` → `01.09.2026` (`01.09.2026` ham qabul qilinadi).
+  Shartnoma raqami `12/25` ni muammosiz oladi. Faktura raqami/sanasi bo'sh qoladi.
+- Kontragent STIR yozilgach nom/ҚҚС reg./hisob raqami/MFO/bank/manzil/direktor avtomatik to'ladi; **STIR almashtirilsa
+  hammasi yangilanadi — stale qiymat yo'q**.
+- **Tovar jadvali ustunlari sarlavha matni bo'yicha topilishi shart:** МХИК tanlangach **"Имтиез" ustuni qo'shiladi** va
+  undan keyingi indekslar siljiydi. Tartib: `№ · МХИК ва маҳсулот ёки хизмат номи* · Маҳсулот ёки хизматга изоҳ* ·
+  Товар/хизмат штрих коди · ўлчов бирлиги.* · Сони* · Нарҳ* · етказиб бериш нарҳи* · ққс, % · ққс, Миқдор* · Жами* ·
+  [Имтиез] · Омбор · Товарни келиб чиқиши*`.
+- **МХИК:** to'liq kod yozilsa **aniq bitta variant** chiqadi; ro'yxat `document.getElementById(input.getAttribute('aria-controls'))`
+  ichida (sahifada bir nechta avtoto'ldirgich bor — shu bog'lanish bo'yicha topiladi). Tanlangach: ўлчов бирлиги
+  `xizmat (so’m)` (lotin, egri apostrof), ққс `ҚҚСсиз` (12% dan), Имтиез `102898 - (SK 244-m.) 1-band. 10.xatboshi…`.
+- **Summa:** `Нарҳ` nuqta bilan yoziladi va **xuddi shunday** qaytariladi (`552328.77`, ming ajratgichsiz) →
+  `DIDOX_DECIMAL_SEP = '.'` tasdiqlandi. `етказиб бериш нарҳи` va `Жами` avtomatik hisoblanadi (`552328.77`).
+- ⚠️ **`ққс, Миқдор` ҚҚСсиз holatda BO'SH qoladi** (`0` emas). M8c spec §1 uni `0n` deb kutadi — forma tekshiruvi bo'sh
+  qiymatni nol deb qabul qilishi kerak, aks holda **har faktura** `FORM_UNEXPECTED_VALUE` bilan to'xtaydi.
+- Bu sessiyada "Диққат!" modali **umuman chiqmadi** (ilova ikkala holatni ko'taradi).
+
+### S2a — МХИК avtoto'ldirgichi belgilarni yo'qotadi (qo'shimcha, 2026-10-13)
+Har belgi server qidiruvini va qayta render'ni qo'zg'atadi; 60–80 ms/belgi tezlikda kod **chala** tushadi va ro'yxat
+filtrlanmay qoladi (767 → 158 variant). Birinchi variantni ko'r-ko'rona bosish **noto'g'ri mahsulot** tanlaydi: ҚҚС 12%
+bo'lib qoladi, Имтиёз ustuni chiqmaydi, `Жами` 618 608.22 bo'ladi (552 328.77 o'rniga). Shuning uchun 6-qadam: yozgandan
+keyin **input qiymati kod bilan aynan tengligi tekshiriladi**, teng bo'lmasa `clear` + qayta yozish (chegaralangan urinish),
+so'ng **aynan bitta** variant kutiladi. Spec §4 dagi birlik/ҚҚС/Имтиёз tekshiruvi — oxirgi to'siq (u bu holatni ushlaydi).
+
+### S5a — sessiya muddati
+Didox sessiyasi bir necha soatdan keyin tugaydi va `/create_document` login sahifasiga qaytaradi (ilova baribir har
+firma uchun qaytadan kiradi — `resetSession()` + `loginFirm`).
+
+### S3 — "Товарни келиб чиқиши"
+`ORIGIN_SERVICE_LABEL = "Хизмат кўрсатиш"`. Variantlar: Ўзи ишлаб чиқарган · **Олди-сотди** (sukut) · Хизмат кўрсатиш ·
+Иштирок этмайман. Input `role=combobox` va `Mui-disabled` (qidiruv yo'q) — **ro'yxat `.MuiInputBase-root` ni haqiqiy
+sichqoncha bilan bosganda ochiladi**, variantlar `li[role=option].select-v2__option`.
+
+### S4 — saqlash va qoralama ro'yxati
+- **Saqlash endpoint'i:** `POST https://api.didox.uz/v1/documents/002/create/uz` → `classifyRequest` = **allow**
+  (segmentlarida `sign|tosign|send` yo'q). Sahifa `api.`/`api2.`/`gnk-api.`/`metrics.didox.uz` bilan ishlaydi — hammasi ruxsat.
+  Bloklanganlar (`googletagmanager`, `fonts.googleapis.com`, `api-maps.yandex.ru`, `cnt0.www.uz`) **hech narsani buzmadi**.
+- Saqlagach `/documents/new/draft?tab=all&page=1&limit=20` ga o'tadi va **yangi qator qayta yuklamasdan ko'rinadi**.
+- Ro'yxat ustunlari (0-dan; v2 da boshida **checkbox ustuni** qo'shilgan): `0` checkbox · `1` xavf · `2` holat ·
+  `3` tur · `4` kontragent (nom+STIR bitta matnda) · `5` hujjat № va sana · `6` shartnoma № va sana · `7` ҚҚСсиз ·
+  `8` ҚҚС bilan · `9` ҚҚС. Holat katagida `div.doc-status.doc-status--white|--red` (matnsiz) — `parse.ts` mantiqi o'zgarmaydi.
+- `?partner=<STIR>` filtri va `limit=100` ishlaydi; holat tablari: Барчаси / Яратилган / Ўчирилган.
+- Summalar: `552 328.77` (bo'shliq ming ajratgich, nuqta), nol — `0`.
+- **UUIDv1 vaqti tekshirildi:** saqlash 09:32:29–30Z, ID vaqti `09:32:30.776Z` (farq ~1 s). Haqiqiy qatorlarda
+  `parseListRow` + `matchOwnDraft` ishlatildi — **aynan bitta** moslik, o'chirilgan (red) va rekvizitsiz qatorlar rad etildi.
+- Qoralama sahifasi: endi **to'g'ridan-to'g'ri URL bilan ochiladi** (§2a dagi "Хато" yo'q). Tugmalar: Назад · Ўзгартириш ·
+  Нусха олиш · ⛔Имзолаш · Ўчириш · Сақлаб қолиш. O'chirish: `.modal-container` "Амални тасдиқланг" →
+  `.button--dark-red.alert-modal__button` → holat `.doc-status--red` "Қоралама ўчирилди".
+
+### S5 — sessiya va til
+- `persist:` partitsiyada Didox sessiyasi ilova qayta ishga tushsa ham saqlanadi → har firma uchun `resetSession()` shart.
+- `document.documentElement.lang` = **`ru`**, lekin UI o'zbekcha kirill — til **hisob profilidan** keladi (localStorage/cookie'da
+  emas). Ya'ni kirill matnga tayangan locator'lar shu profil sozlamasiga bog'liq. **Ochiq savol (Sir):** tilni majburlash
+  (profil sozlamasi) yoki tilga bog'liq bo'lmagan locator'lar.
+
+### S6 — oyna
+- `setEnabled(false)` oynada **ham** `sendInputEvent` sichqoncha bosishi va klaviatura yozuvi sahifaga yetadi (tekshirildi).
+- `capturePage` ishlaydi (xato screenshot'i olindi). **Ochiq:** `backgroundThrottling`, ekran uyqusi, yopilgan/fon oyna — c1 da.
+
+### S7 — tashlangan forma
+Server-tomon avto-saqlash **yo'q**: to'ldirilgan, lekin saqlanmagan forma yopilgandan keyin ro'yxat 13 ta bo'lib qoldi;
+bitta saqlashdan keyin 14 ta bo'ldi. Sinov qoralamasi (summa `552328.77`, izoh "SINOV") **o'chirildi**; "Имзолаш" bosilmadi.
+
+### c1 gate'idan chiqqan topilmalar (2026-10-13)
+
+1. **Yopilgan oyna = to'xtatilgan oyna.** macOS'da Didox oynasi boshqa oyna (ilovaning o'z dialogi) bilan yopilsa,
+   `document.visibilityState` **`hidden`** bo'ladi va Chromium `sendInputEvent` klaviatura hodisalarini sahifaga
+   bermaydi — gate ikki marta shu sababdan yiqildi (`0_.__.____`, keyin `__.__.____`). Yechim: oynada
+   `backgroundThrottling: false` + `app.commandLine` ga `disable-backgrounding-occluded-windows` va
+   `disable-renderer-backgrounding`, oyna ochilganda `moveTop()`. Shundan keyin yopilgan holatda ham `visible`.
+2. **"Диққат!" modali** forma yuklangandan **~2.2 s keyin** chiqadi va **o'zi yopilmaydi**. Tuzilishi:
+   `div.blackout.main-alert > div.alert-app` (`.alert-app__title--info`, `.alert-app__text`,
+   `.alert-app__btn > button.alert-app__button` "Ёпиш") — oldingi locator `.modal-container/.alert-modal` ni
+   qidirgani uchun uni **topmagan**. Modal ochiq turganda forma maydonlariga yozib bo'lmaydi.
+3. **Kontragent nomi boshqa ustunda.** STIR — "Контрагент маълумотлари" ustunida; nom/bank/direktor esa
+   **"Ҳамкорингизнинг Корхонаси"** ustunida to'ladi (sotuvchiniki — "Ташкилот").
+4. **МХИК tanlangach maydonlar ketma-ket to'ladi** (birlik → ҚҚС → имтиёз): darhol o'qilsa ҚҚС hali `12%` bo'lib
+   turadi. Har birini alohida kutish kerak.
+5. **"Акциз" yorlig'i ikki marta uchraydi** (hujjat va qator darajasida) — "yagona moslik" qoidasi ishlamaydi;
+   tekshiruv "shu yorliqdagi birortasi ham belgilanmagan" shaklida.
+6. To'liq zanjir shu tuzatishlardan keyin real Didox'da o'tdi: forma → saqlash → ID (`locateDraftId`) → o'chirish.
+
+### Spike davomida kiritilgan tuzatishlar
+`eimzo/client.ts` (Origin) · `didox/locators.ts` (`keyPicker`, `selectedKeyInn`, `byExactTextJs`) ·
+`didox/view.ts` (`type` to'liq tugma ketma-ketligi, `clear` `selectAll()`). Desktop 344 test yashil, typecheck toza.
+
+### c1 uchun qolgan savollar
+1. `ққс, Миқдор` bo'shligi — spec §1 tekshiruvini moslash (bloklovchi).
+2. UI tili siyosati (yuqorida).
+3. jsdom drift-fixture uchun `jsdom` paketi desktop'ga qo'shiladimi (hozir yo'q) — Sir qarori.
+4. `backgroundThrottling` / ekran uyqusi (S6 qoldig'i).
+
 ## 3. Ochiq savollar
 1. ~~Raqam/sanasiz saqlash~~ — ha (§2a). 2. ~~Kontragent avto-to'ldirish~~ — ha. 3. ~~Ўлчов бирлиги~~ — "xizmat (so'm)".
 4. ~~Qoralama ID~~ — Қоралама ro'yxatidan (§2a).
 5. "Excel юклаш" — ko'p qoralamani bir yo'la yuklash formadan ishonchliroqmi?
 6. ~~E-IMZO avtomatik parol spike~~ — **ishladi** (§1b).
-7. "Товарни келиб чиқиши" ro'yxatida "Хизмат кўрсатиш" varianti matni aniq qanday (keyingi sinovda).
+7. ~~"Товарни келиб чиқиши" varianti matni~~ — `"Хизмат кўрсатиш"` (§2c, S3).
 8. "Нусха олиш" — o'tgan oy qoralamasidan nusxa olib faqat narx/izohni o'zgartirish formadan soddaroqmi?

@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 8c — qoralama yaratish (**c0 qabul qilindi**; keyingi qadam — spike S1–S7 Sir bilan, so'ng c1)
+**Joriy modul:** 8c — qoralama yaratish (**c1 gate o'tdi 2026-10-13**; keyingi qadam — Sir qarori: c2 / M8d / to'xtatish)
 **Oxirgi yangilanish:** 2026-10-13
 
 ## Modullar
@@ -18,7 +18,7 @@
 | 5 | Stavkani o'zgartirish | Buxgalter yangi stavka kiritadi, u qachondan amal qilishini ko'radi | standard | accepted | FR-5.1–5.5; API unit 64 + e2e 86, web 81; brauzerda 15.03→01.04, retroaktiv ogohlantirish, aprel 16% va o'chirish tekshirildi | 2026-10-07 |
 | 6 | Excel eksport | Buxgalter oylik hisobotni .xlsx qilib yuklab oladi | standard | accepted | FR-6.1–6.4; API unit 68 + e2e 91 (fayl qayta o'qilib tiyinigacha solishtiriladi), web 82; haqiqiy fayl dev serverdan yuklab tekshirildi | 2026-10-07 |
 | 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | accepted | FR-7.1–7.5; API unit 97 + e2e 101, web 95; brauzerda etalon yanvar, nusxalash, belgilash/409/olib tashlash | 2026-10-07 |
-| 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | in-progress | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni); FR-8.2 parol ombori (safeStorage) + M8b avto-kirish/"Kirishni tekshirish" qurildi; **M8c spec v5 Sir gate'idan o'tdi (2026-10-13)**, **c0 qabul qilindi (2026-10-13)** (SRS deltalari, `api/jwt`+`api/client`, `didox/money`+`parse`+`journal`+`skips`, `engine` (qulf/heartbeat/kritik bo'lim), `Page` kengayishi, `run.ts` refaktor — desktop 331 test, api 130+125 e2e, typecheck toza); keyin spike S1–S7 → c1 (1 faktura gate) → c2 | |
+| 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | in-progress (c1 gate o'tdi) | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni); FR-8.2 parol ombori (safeStorage) + M8b avto-kirish/"Kirishni tekshirish" qurildi; **M8c spec v5 Sir gate'idan o'tdi (2026-10-13)**, **c0 qabul qilindi (2026-10-13)** (SRS deltalari, `api/jwt`+`api/client`, `didox/money`+`parse`+`journal`+`skips`, `engine` (qulf/heartbeat/kritik bo'lim), `Page` kengayishi, `run.ts` refaktor — desktop 331 test, api 130+125 e2e, typecheck toza); keyin spike S1–S7 → c1 (1 faktura gate) → c2 | |
 | 9a | Lokal PGlite baza | Ilova serversiz lokal fayl-bazada ishlaydi | standard | accepted | PGlite adapter, dastur ichi migratsiya (ledger+rollback+snapshot), persistensiya; e2e PGlite'da ham 110 yashil | 2026-10-12 |
 | 9b | Electron qobig'i | Ilova desktop dastur sifatida ochiladi | complex | o'zak accepted | Electron 44, child-process Nest (PGlite), first-run parol, macOS qadoqlash (dir), kunlik zaxira, `productName`; **qoldi:** Windows NSIS + gate (A1/A2), imzolash; A3 qo'lda yangilash (qaror); dmg/ikona/hajm bajarildi (A5) | |
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
@@ -39,7 +39,8 @@ Hajm: `trivial | standard | complex`
   o'tmagan — M8c-spec S1). **M8c: spec v5 — `docs/plans/M8c-spec.md` (yagona manba), Sir tasdiqladi (2026-10-13).**
   **c0 qurildi va qabul qilindi (2026-10-13)** (quyidagi qaror jurnaliga qara). Keyingi qadam — **spike S1–S7 Sir bilan,
   real Didox** (kodsiz, DevTools):
-  natijalar `docs/research/didox-flow.md §2c` ga, so'ng c1 bitta faktura (`DIDOX_MAX_INVOICES=1`, gate) → c2 ko'p faktura/tiklash/UI (gate).
+  **spike bajarildi (2026-10-13) — `docs/research/didox-flow.md §2c`**; keyingi qadam — c1 bitta faktura
+  (`DIDOX_MAX_INVOICES=1`, gate) → c2 ko'p faktura/tiklash/UI (gate).
   API tayyor: `PUT /invoices/:month/:contractId/draft` (`source`, `expectedAmount` majburiy, 409 AMOUNT_CHANGED/CONFIRMATION_REQUIRED/DRAFT_CHANGED).
 - **Ishga tushirish:** web `pnpm dev:api` (3000) + `pnpm dev:web` (5173, band bo'lsa launch.json autoPort); desktop
   `pnpm dev:desktop` (tsc + electron; ma'lumot `~/Library/Application Support/Moliyaviy yordam`). Dev login —
@@ -53,6 +54,53 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-13 — **M8c c1 GATE O'TDI (Sir bilan, real Didox).** Ilova Fakturalar sahifasidagi tugmadan bitta fakturani
+  (sentabr 2026, 1 315 068.49) o'zi yaratdi: Didox'ga ERI bilan kirdi, formani to'ldirdi, "Сақлаб қолиш" bosdi,
+  qoralama ID'sini ro'yxatdan topdi va ilovada `source: didox` bilan belgiladi; qayta bosilganda hech narsa
+  yaratilmadi. Sir qoralamani Didox'da maydonma-maydon tekshirdi (§9.1 ga mos). Qurilgan: forma/ro'yxat locator'lari
+  (sanitizatsiya qilingan DOM fixture'lari + jsdom testlari), `steps/create-draft.ts` (0–13), `create-drafts.ts`
+  (orkestratsiya, firma-stop, FR-8.8), runner `createDrafts`/`status` (bloklamaydi, `runId` darhol qaytadi), IPC +
+  preload, web tugma + `DidoxRunDialog` (tasdiq → jonli log → xulosa). Testlar: desktop 434, web 185, api 130 + 125 e2e.
+  **Gate yo'lida topilgan va tuzatilgan beshta nosozlik** (tafsilot: `docs/research/didox-flow.md §2c`):
+  (1) **yopilgan oyna to'xtatiladi** — ilovaning dialogi Didox oynasini yopganda `visibilityState: hidden` bo'lib,
+  klaviatura hodisalari sahifaga yetmay qolgan (`backgroundThrottling: false` + `disable-backgrounding-occluded-windows`
+  va `disable-renderer-backgrounding` + `moveTop()`); (2) "Диққат!" modali ~2.2 s da chiqadi, o'zi yopilmaydi va eski
+  locator unga mos emas edi (`.blackout.main-alert > .alert-app`) — endi ochilishda ham, to'ldirish davomida kech
+  chiqsa ham yopiladi; (3) kontragent nomi boshqa ustunda ("Ҳамкорингизнинг Корхонаси"); (4) МХИК tanlangach
+  birlik/ҚҚС/имтиёз ketma-ket to'ladi — har biri alohida kutiladi; (5) "Акциз" yorlig'i ikki marta uchraydi.
+  Qo'shimcha: har maydon yozilgach o'qib tekshiriladi va kerak bo'lsa qayta yoziladi, oxirgi urinishda klaviaturasiz
+  qo'yiladi (jonli logda aytiladi). Sinov ma'lumoti (BIG WORLD RETAIL, shartnoma 12/25) Sir bazasida qoldi — kerak
+  bo'lmasa o'chiriladi
+- 2026-10-13 — **M8 doirasi bo'yicha Sir qarori: c1 tugatiladi, so'ng qayta baholanadi.** Sabab (ochiq muhokama):
+  ilovaning asosiy maqsadi (aniq foiz, qoldiq, hisobot) allaqachon bajarilgan; M8 — qulaylik qatlami, imzolashni
+  baribir buxgalter qiladi, va bu — birovning UI'siga bog'liq yagona qism (spike kuni Didox uchta narsani o'zgartirgan).
+  Shuning uchun c1 (bitta faktura, qo'lda ishga tushirish) real gate'da sinaladi → tezlik va ishonchlilik ko'rinadi →
+  **c2 va M8d haqida qaror shundan keyin**
+- 2026-10-13 — **Sir qarorlari (spike'dan keyin, c1 oldidan):** (1) `ққс, Миқдор` bo'sh bo'lsa **faqat `ққс, %` = ҚҚСсиз
+  bo'lganda** `0n` deb qabul qilinadi (spec §1 yangilandi); (2) desktop'ga **`jsdom`** dev-dependency qo'shiladi — c1 da
+  locator'lar sanitizatsiya qilingan drift-fixture ustida testdan o'tadi; (3) UI tili bo'yicha **kirill matniga tayanib
+  davom** etiladi (topilmasa aniq xato + firma-stop), tilni majburlash c2/M8d ga qoldirildi
+- 2026-10-13 — **Spike S1–S7 o'tkazildi (Sir bilan, real Didox + E-IMZO) — natijalar `docs/research/didox-flow.md §2c`.**
+  **S1 YASHIL:** M8b login gate Electron 44 da to'liq o'tdi (ilova kalitni tanladi, parolni E-IMZO oynasiga o'zi yozdi,
+  kirdi, firmani tasdiqladi). Yo'lda **Didox login va hujjatlar sahifasi qayta dizayn qilingani** aniqlandi va **besh
+  tuzatish** kiritildi: (1) `eimzo/client.ts` — E-IMZO kalitlar ro'yxatini `Origin` sarlavhasisiz bermaydi (`-1022`,
+  "Domen null uchun API-kalit yaroqsiz") → `Origin: http://localhost` (apikey kerak emas; §1a dagi eski yozuv noto'g'ri
+  edi); (2) `keyPicker` → `.certs-trigger`; (3) `selectedKeyInn` → `.certs-trigger__inn` (ochiq menyu eski
+  `.certs-select__*` klasslarini saqlagan); (4) `byExactTextJs` faqat **bir xil selektorga mos** avlodni hisobga oladi —
+  Didox tugma matnini `<span>` ga o'rab qo'ygan, "Кириш" topilmay qolgandi; (5) `view.ts`: `type()` har belgi uchun
+  `keyDown+char+keyUp` yuboradi (faqat `char` bilan niqobli sana va МХИК avtoto'ldirgichi **jim e'tiborsiz qoldiradi**),
+  `clear()` sintetik Cmd+A o'rniga `webContents.selectAll()` ishlatadi (eskisi maydonni tozalamasdi — summa qo'shilib
+  ketish xavfi). Har bir tuzatish haqiqiy sahifada ishlab chiqarish kodi bilan tekshirildi.
+  **Spike javoblari (c1 uchun):** `ORIGIN_SERVICE_LABEL = "Хизмат кўрсатиш"`; `DIDOX_DECIMAL_SEP = '.'` (Нарҳ `552328.77`
+  yoziladi va shunday qaytadi); МХИК to'liq kodga **bitta** variant, tanlangach ўлчов/ҚҚСсиз/Имтиёз 102898 o'zi qo'yiladi;
+  jadval ustunlari **sarlavha matni bo'yicha** topilishi shart (Имтиез ustuni qo'shilib indekslar siljiydi); saqlash
+  endpoint'i `POST api.didox.uz/v1/documents/002/create/uz` → `classifyRequest` **allow**, bloklangan tashqi hostlar
+  sahifani buzmaydi; saqlagach ro'yxat **o'zi yangilanadi**, `?partner=`/`limit=100` ishlaydi; UUIDv1 vaqti soat bilan
+  ~1 s farq qildi va haqiqiy qatorlarda `parseListRow`/`matchOwnDraft` **aynan bitta** moslik berdi; `setEnabled(false)`
+  oynada bosish/yozish ishlaydi; tashlangan forma server'da saqlanmaydi. Sinov qoralamasi yaratildi → **o'chirildi**
+  (Имзолаш bosilmadi). **c1 ni bloklaydigan ochiq band:** ҚҚСсиз holatda `ққс, Миқдор` maydoni **bo'sh** qoladi (`0` emas) —
+  spec §1 forma tekshiruvi buni nol deb qabul qilishi kerak. Boshqa ochiqlar: UI tili hisob profilidan keladi (kirill
+  locator'lar shunga bog'liq); jsdom fixture uchun paket qo'shish — Sir qarori. Testlar: desktop 344, api 130 + 125 e2e, web 178
 - 2026-10-13 — **M8c c0 qabul qilindi — Sir.** Keyingi qadam: spike S1–S7 (Sir bilan, real Didox, kodsiz) → c1
 - 2026-10-13 — **M8c c0 poydevori qurildi (Opus, TDD).** Sir spec v5 ni tasdiqladi → c0 Didox'ga tegmasdan qurildi:
   SRS deltalari (FR-8.4 bloklamaydi + `expectedAmount`; FR-8.5 karantin → "e'tibor kerak" + o'tkazib yuborish belgisi +

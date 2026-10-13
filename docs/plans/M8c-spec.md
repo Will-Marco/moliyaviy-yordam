@@ -39,8 +39,11 @@ Yangi: `api/jwt.ts`, `api/client.ts`, `didox/money.ts`, `didox/parse.ts`, `didox
     `sep` — spike S2 natijasi (konstanta `DIDOX_DECIMAL_SEP`, sukut `.`).
   - Qo'riqchi test (`money.spec.ts`): `src/didox/**` va `src/api/**` ichida `Number(`, `parseFloat(`, `parseInt(` chaqiruvi yo'q
     (sana raqamlari uchun `Number` kerak bo'lsa — `didox/parse.ts` ichida `digits()` yordamchisi, test istisnosi aniq ro'yxatda).
-- Forma tekshiruvi (8-qadam): `Нарҳ`, `етказиб бериш нарҳи`, `Жами` har biri `parseDidoxMoney` → `=== amountTiyin`; `ққс миқдор` → `0n`.
+- Forma tekshiruvi (8-qadam): `Нарҳ`, `етказиб бериш нарҳи`, `Жами` har biri `parseDidoxMoney` → `=== amountTiyin`.
   Birortasi `null` yoki farq → `FORM_UNEXPECTED_VALUE` (firma-stop). Qoralama ro'yxati ustuni [7] ham shu parser bilan.
+- **`ққс, Миқдор` (Sir, 2026-10-13, spike §2c):** Didox bu maydonni ҚҚСсиз holatda **bo'sh** qoldiradi, `0` yozmaydi.
+  Shuning uchun avval `ққс, %` ustuni `ҚҚСсиз` ekani tekshiriladi; **faqat shunda** bo'sh `ққс, Миқдор` `0n` deb qabul
+  qilinadi. `ққс, %` boshqa qiymatda bo'lsa yoki maydonda o'qib bo'lmaydigan matn tursa → `FORM_UNEXPECTED_VALUE`.
 
 ## 2. Journal — `userData/didox-runs/<runId>.json` (FR-8.7, review B1.3/B2)
 
@@ -251,7 +254,11 @@ shuni aytadi ("Didox Қоралама'sini tekshiring").
 kalit menyusi namunasi). `FakePage.waitFor` **poll qiladi** (javob funksiyasi ketma-ket chaqiriladi, `pause` soxta soat bilan) —
 "avto to'ladi" tarmoqlari testlanadi. `FakePage` `clear`/`reload`/`selectOption` yozib boradi.
 
-## 10. Spike — real Didox, M8b real gate'dan keyin, Electron 44 (M3, M7)
+## 10. Spike — **bajarildi 2026-10-13**, natijalar [didox-flow.md §2c](../research/didox-flow.md)
+
+> S1–S7 yopildi (S6 dan `backgroundThrottling`/ekran uyqusi c1 ga qoldi). Spike davomida M8b/c0 da besh tuzatish:
+> E-IMZO `Origin`, `keyPicker`/`selectedKeyInn` (Didox login sahifasi qayta dizayn), `byExactTextJs`, `Page.type`
+> (`keyDown+char+keyUp`), `Page.clear` (`webContents.selectAll()`). Quyidagi jadval — tarix uchun.
 
 Bir sessiya, Sir bilan, kodsiz (DevTools/kuzatuv), natija `docs/research/didox-flow.md §2c` ga; firma rekvizitlari yozilmaydi; fixture
 HTML **sanitizatsiya** (nom/STIR/direktor → placeholder). Windows (eski "7") — **M8d** (Sir, M9 qarori).
