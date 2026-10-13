@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('desktop', {
     checkLogin: (tin) => ipcRenderer.invoke('didox:check-login', tin),
     createDrafts: (opts) => ipcRenderer.invoke('didox:create-drafts', opts),
     status: () => ipcRenderer.invoke('didox:status'),
+    listRuns: (opts) => ipcRenderer.invoke('didox:list-runs', opts ?? {}),
+    getRun: (runId) => ipcRenderer.invoke('didox:get-run', runId),
+    invoiceFlags: (month) => ipcRenderer.invoke('didox:invoice-flags', month),
+    skipInvoice: (opts) => ipcRenderer.invoke('didox:skip-invoice', opts),
+    resolveNeedsCheck: (opts) => ipcRenderer.invoke('didox:resolve-needs-check', opts),
+    openDiagnostics: () => ipcRenderer.invoke('didox:open-diagnostics'),
     cancel: () => ipcRenderer.invoke('didox:cancel'),
     onProgress: (callback) => {
       const listener = (_event, progress) => callback(progress)

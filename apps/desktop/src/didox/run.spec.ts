@@ -453,3 +453,96 @@ describe('createDidoxRunner.createDrafts', () => {
     await expect(runner.status()).resolves.toBeNull()
   })
 })
+
+describe('what the invoices page reads (c2)', () => {
+  const invoice = {
+    contractId: 'c-1',
+    contractNumber: '12/25',
+    contractSignedOn: '2026-09-01',
+    borrowerTin: '300000002',
+    borrowerName: 'BETA TRADE MCHJ',
+    lineName: 'Foiz',
+    amount: '552328.77',
+  }
+
+  /** A real journal and a real skip store on disk: these wrappers exist to put the two together. */
+  async function withStores() {
+    const { mkdtemp } = await import('node:fs/promises')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { createJournal } = await import('./journal.js')
+    const { createSkipStore } = await import('./skips.js')
+    const dir = await mkdtemp(join(tmpdir(), 'didox-flags-'))
+    const journal = createJournal({ dir, nowMs: () => Date.parse('2026-10-13T09:00:00.000Z'), randomHex: () => 'a1b2' })
+    const skips = createSkipStore({ file: join(dir, 'skips.json') })
+    const drafts = {
+      api: { listInvoices: vi.fn(), markDraft: vi.fn() } as never,
+      journal,
+      skips,
+    }
+    return { journal, skips, drafts }
+  }
+
+  const flagged = async (journal: Awaited<ReturnType<typeof withStores>>['journal']) => {
+    const run = await journal.start({
+      month: '2026-09',
+      trigger: 'manual',
+      firms: [{ tin: TIN, name: 'ALFA', invoices: [invoice] }],
+    })
+    await run.setInvoice(TIN, 'c-1', { state: 'saving', savingAt: '2026-10-13T08:00:00.000Z' })
+    await run.setInvoice(TIN, 'c-1', { state: 'needs_check', code: 'SAVED_ID_UNKNOWN', message: 'topilmadi' })
+    await run.finish('done')
+    return run.runId
+  }
+
+  it('shows why an invoice needs attention and which invoices are being skipped, in one answer', async () => {
+    const { journal, drafts } = await withStores()
+    await flagged(journal)
+    const { runner } = setup({ drafts })
+    await runner.skipInvoice({ month: '2026-09', contractId: 'c-2', skip: true })
+
+    const flags = await runner.invoiceFlags('2026-09')
+
+    expect(flags['c-1']).toMatchObject({ code: 'SAVED_ID_UNKNOWN', message: 'topilmadi' })
+    expect(flags['c-2']).toMatchObject({ skipped: { at: expect.any(String) } })
+  })
+
+  it('takes the skip off again', async () => {
+    const { drafts } = await withStores()
+    const { runner } = setup({ drafts })
+    await runner.skipInvoice({ month: '2026-09', contractId: 'c-2', skip: true })
+
+    await runner.skipInvoice({ month: '2026-09', contractId: 'c-2', skip: false })
+
+    expect(await runner.invoiceFlags('2026-09')).toEqual({})
+  })
+
+  it('drops the attention flag when the accountant has dealt with it, and keeps the run', async () => {
+    const { journal, drafts } = await withStores()
+    const runId = await flagged(journal)
+    const { runner } = setup({ drafts })
+
+    await runner.resolveNeedsCheck({ month: '2026-09', contractId: 'c-1' })
+
+    expect(await runner.invoiceFlags('2026-09')).toEqual({})
+    expect((await runner.getRun(runId))?.firms[0]?.invoices[0]).toMatchObject({ state: 'needs_check', resolved: true })
+  })
+
+  it('lists the month\'s runs for the history card', async () => {
+    const { journal, drafts } = await withStores()
+    await flagged(journal)
+    const { runner } = setup({ drafts })
+
+    const runs = await runner.listRuns({ month: '2026-09', limit: 5 })
+
+    expect(runs).toHaveLength(1)
+    expect(runs[0]).toMatchObject({ month: '2026-09', status: 'done', counts: expect.objectContaining({ needsCheck: 1 }) })
+  })
+
+  it('answers with nothing in a build without the draft side', async () => {
+    const { runner } = setup()
+    expect(await runner.invoiceFlags('2026-09')).toEqual({})
+    expect(await runner.listRuns({})).toEqual([])
+    expect(await runner.getRun('2026-10-13T09-00-00.000Z-a1b2')).toBeNull()
+  })
+})

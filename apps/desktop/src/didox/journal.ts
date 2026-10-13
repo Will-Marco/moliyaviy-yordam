@@ -33,6 +33,8 @@ export interface InvoiceEntry {
   candidateIds?: string[]
   code?: string
   message?: string
+  /** "Hal qilindi": the accountant has dealt with this one, so it no longer asks for attention (§7). */
+  resolved?: boolean
   screenshot?: string | null
   steps?: { step: string; status: 'done' | 'failed'; at: string }[]
 }
@@ -106,6 +108,16 @@ export interface NeedsCheckEntry {
   runId: string
   firmTin: string
   invoice: InvoiceEntry
+}
+
+/** What the invoices page shows on a row: why it needs attention, from the run that last said so. */
+export interface InvoiceFlag {
+  runId: string
+  code: string
+  message: string
+  didoxId?: string
+  candidateIds?: string[]
+  at: string
 }
 
 /** What the journal needs of the API client. */
@@ -416,13 +428,61 @@ export function createJournal({
       return result
     },
 
+    /**
+     * The draft this run found for an invoice an earlier run could not identify (§5). The id is written down
+     * before anything is sent: `flushIdFound` is what tells the API about it, in one place for every path.
+     */
+    async attachFoundId(runId: string, tin: string, contractId: string, didoxId: string): Promise<void> {
+      await edit(runId, (j) => patchInvoice(j, tin, contractId, { state: 'id_found', didoxId }))
+    },
+
+    /** Same invoice, still unidentified: only the reason is refreshed, so the accountant reads today's story. */
+    async refreshNeedsCheck(runId: string, tin: string, contractId: string, message: string): Promise<void> {
+      await edit(runId, (j) => patchInvoice(j, tin, contractId, { state: 'needs_check', message }))
+    },
+
+    /** "Hal qilindi" — the accountant has dealt with it; the record stays, the flag goes. */
+    async resolveNeedsCheck(runId: string, tin: string, contractId: string): Promise<void> {
+      await edit(runId, (j) => {
+        findInvoice(j, tin, contractId).resolved = true
+      })
+    },
+
+    /**
+     * What each invoice of `month` is flagged with, newest run first — the page reads this next to the API's own
+     * draft state. Resolved entries and invoices that ended well carry no flag.
+     */
+    async flags(month: string): Promise<Record<string, InvoiceFlag>> {
+      const runs = (await loadAll()).filter((j) => j.month === month)
+      const flags: Record<string, InvoiceFlag> = {}
+      for (const journal of runs) {
+        for (const firm of journal.firms) {
+          for (const invoice of firm.invoices) {
+            if (invoice.state !== 'needs_check' || invoice.resolved) {
+              delete flags[invoice.contractId] // a later run settled it
+              continue
+            }
+            flags[invoice.contractId] = {
+              runId: journal.runId,
+              code: invoice.code ?? 'UNEXPECTED',
+              message: invoice.message ?? '',
+              ...(invoice.didoxId === undefined ? {} : { didoxId: invoice.didoxId }),
+              ...(invoice.candidateIds === undefined ? {} : { candidateIds: invoice.candidateIds }),
+              at: journal.finishedAt ?? journal.startedAt,
+            }
+          }
+        }
+      }
+      return flags
+    },
+
     /** Invoices of `month` whose save started but whose draft was never identified — §5 may still find it. */
     async findNeedsCheck(month: string): Promise<NeedsCheckEntry[]> {
       const runs = (await loadAll()).filter((j) => j.month === month && j.status !== 'running')
       return runs.flatMap((j) =>
         j.firms.flatMap((firm) =>
           firm.invoices
-            .filter((i) => i.state === 'needs_check' && !!i.savingAt && !i.didoxId)
+            .filter((i) => i.state === 'needs_check' && !i.resolved && !!i.savingAt && !i.didoxId)
             .map((invoice) => ({ runId: j.runId, firmTin: firm.tin, invoice })),
         ),
       )

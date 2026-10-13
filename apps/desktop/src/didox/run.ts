@@ -14,8 +14,9 @@ import {
   type StepErrorCode,
 } from './contract.js'
 import { type CreateDraftsDeps, planRun, runPlan, type StartOptions } from './create-drafts.js'
+import type { SkipStore } from './skips.js'
 import { createRunEngine, RunBusyError, type RunContext } from './engine.js'
-import type { RunJournal } from './journal.js'
+import type { InvoiceFlag, RunJournal } from './journal.js'
 
 /** The Didox window as the runner sees it (view.ts implements it with Electron). */
 export interface DidoxWindow {
@@ -33,7 +34,10 @@ export interface DidoxWindow {
 export type CheckLoginResult = { ok: true } | { ok: false; code: string; message: string; screenshot?: string | null }
 
 /** Everything `createDrafts` needs that the runner itself does not already have (M8c §3). */
-export type DraftsDeps = Pick<CreateDraftsDeps, 'api' | 'journal' | 'skips' | 'maxInvoices' | 'nowMs'>
+export type DraftsDeps = Pick<CreateDraftsDeps, 'api' | 'journal' | 'maxInvoices' | 'nowMs'> & {
+  /** The run planner only reads the flags; the IPC layer sets and clears them (§7). */
+  skips: SkipStore
+}
 
 /** Start of a draft run: the run id is returned at once and the work goes on in the background (§3). */
 export type StartDraftsResult = { ok: true; runId: string } | { ok: false; code: string; message: string }
@@ -335,10 +339,49 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
     return deps.drafts.journal.read(lastRun)
   }
 
+  /* What the invoices page reads next to the API's own draft state (§7). */
+
+  const listRuns = async (opts: { month?: string; limit?: number } = {}) =>
+    deps.drafts ? deps.drafts.journal.list(opts) : []
+
+  const getRun = async (runId: string) => (deps.drafts ? deps.drafts.journal.read(runId) : null)
+
+  const invoiceFlags = async (month: string): Promise<Record<string, InvoiceFlag & { skipped?: { at: string } }>> => {
+    if (!deps.drafts) return {}
+    const [needsCheck, skipped] = await Promise.all([deps.drafts.journal.flags(month), deps.drafts.skips.list(month)])
+    const flags: Record<string, InvoiceFlag & { skipped?: { at: string } }> = {}
+    for (const [contractId, flag] of Object.entries(needsCheck)) flags[contractId] = flag
+    for (const [contractId, flag] of Object.entries(skipped)) {
+      flags[contractId] = { ...(flags[contractId] ?? ({} as InvoiceFlag)), skipped: { at: flag.at } }
+    }
+    return flags
+  }
+
+  const skipInvoice = async ({ month, contractId, skip }: { month: string; contractId: string; skip: boolean }) => {
+    if (!deps.drafts) return
+    if (skip) await deps.drafts.skips.set(month, contractId)
+    else await deps.drafts.skips.remove(month, contractId)
+  }
+
+  /** "Hal qilindi": the flag goes, the record stays, and the API is not touched (FR-8.5). */
+  const resolveNeedsCheck = async ({ month, contractId }: { month: string; contractId: string }) => {
+    if (!deps.drafts) return
+    const flag = (await deps.drafts.journal.flags(month))[contractId]
+    if (!flag) return
+    const run = await deps.drafts.journal.read(flag.runId)
+    const firm = run?.firms.find((f) => f.invoices.some((i) => i.contractId === contractId))
+    if (firm) await deps.drafts.journal.resolveNeedsCheck(flag.runId, firm.tin, contractId)
+  }
+
   return {
     checkLogin,
     createDrafts,
     status,
+    listRuns,
+    getRun,
+    invoiceFlags,
+    skipInvoice,
+    resolveNeedsCheck,
     /** Ends the current run's waits early; the window closes and the run reports CANCELLED. */
     cancel: (): void => engine.cancel(),
     busy: (): boolean => engine.busy(),

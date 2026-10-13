@@ -8,6 +8,7 @@ import type { DidoxWindow } from './run.js'
 import type { RunContext } from './engine.js'
 import type { FirmPlan, InvoicePlan, Journal, RunHandle } from './journal.js'
 import type { SkipStore } from './skips.js'
+import { draftKey, matchOwnDraft, openDraftList, savedWindow } from './draft-list.js'
 import { createDraft } from './steps/create-draft.js'
 
 /**
@@ -62,6 +63,7 @@ const SESSION_TIMEOUT_MS = 60_000
 /** Between two invoices and between two firms: the page is driven at human speed (§3). */
 const PAUSE_INVOICE_MS = 2_000
 const PAUSE_FIRM_MS = 3_000
+const LIST_TIMEOUT_MS = 20_000
 
 /** Why a firm never got as far as Didox. The invoice entries say the same thing, so the summary is self-explaining. */
 const KEY_PROBLEMS: Record<Exclude<KeyStatus['status'], 'ok'>, DidoxCode> = {
@@ -231,6 +233,8 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
   await handle.setFirm(firm.tin, { status: 'running' })
   progress({ firmTin: firm.tin, step: 'login', status: 'done' })
 
+  await recover(deps, plan, firm, win, progress)
+
   /*
    * What the API says now wins over the plan: while the window was opening the accountant may have marked an invoice
    * by hand or changed an amount. Nothing is in Didox yet, so following the fresh list cannot contradict it.
@@ -309,6 +313,56 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
   await handle.setFirm(firm.tin, { status: 'done' })
   progress({ firmTin: firm.tin, step: 'firm', status: 'done' })
   return null
+}
+
+/**
+ * An earlier run saved a draft and could not name it (§5). Now that this firm is logged in anyway, its own list is
+ * read once more: a single row that fits the invoice and the minutes around that save is the draft, and the id is
+ * written down for `flushIdFound` to send. Anything else only refreshes the reason. Nothing is created here, and a
+ * draft that appeared outside this app is never claimed — that is what the tight window and the four-field key are for.
+ */
+async function recover(
+  deps: CreateDraftsDeps,
+  plan: RunPlan,
+  firm: FirmPlan,
+  win: DidoxWindow,
+  progress: (e: Omit<ProgressEvent, 'runId'>) => void,
+): Promise<void> {
+  const open = (await deps.journal.findNeedsCheck(plan.month)).filter((entry) => entry.firmTin === firm.tin)
+  if (!open.length) return
+  progress({ firmTin: firm.tin, step: 'recover', status: 'running' })
+  let found = 0
+  for (const { runId, invoice } of open) {
+    if (!invoice.savingAt) continue
+    try {
+      const rows = await openDraftList(win.page, invoice.borrowerTin, LIST_TIMEOUT_MS)
+      const match = matchOwnDraft(rows, draftKey(invoice), savedWindow(invoice.savingAt))
+      if (match.kind === 'one') {
+        await deps.journal.attachFoundId(runId, firm.tin, invoice.contractId, match.id)
+        found++
+      } else {
+        await deps.journal.refreshNeedsCheck(
+          runId,
+          firm.tin,
+          invoice.contractId,
+          match.kind === 'many'
+            ? `Bir nechta mos qoralama topildi (${match.ids.length}) — qaysi biri ekanini tanlang`
+            : "Didox ro'yxatida bu faktura qoralamasi topilmadi — Қоралама'ni tekshiring",
+        )
+      }
+    } catch (error) {
+      // Recovery is a bonus, not the job: a list that cannot be read leaves the invoice exactly as it was.
+      const message = error instanceof Error ? error.message : didoxMessage('UNEXPECTED')
+      await deps.journal.refreshNeedsCheck(runId, firm.tin, invoice.contractId, message).catch(() => undefined)
+    }
+  }
+  if (found) await deps.journal.flushIdFound({ markDraft: deps.api.markDraft }).catch(() => undefined)
+  progress({
+    firmTin: firm.tin,
+    step: 'recover',
+    status: 'done',
+    message: found ? `${found} ta qoralama topildi` : undefined,
+  })
 }
 
 /** A firm that never reached Didox: its invoices say why, so the summary needs no second source. */

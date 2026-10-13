@@ -133,8 +133,8 @@ async function launchApp(): Promise<void> {
       api: createApiClient({ baseUrl, secret: config.jwtSecret }),
       journal: createJournal({ dir: join(userData(), 'didox-runs') }),
       skips: createSkipStore({ file: join(userData(), 'didox-skips.json') }),
-      // c1 default: one invoice per run. Raising it is a deliberate act (`DIDOX_MAX_INVOICES`), not an oversight.
-      maxInvoices: Number.isFinite(configured) && configured > 0 ? configured : 1,
+      // c2: a run takes the month's invoices; `DIDOX_MAX_INVOICES` caps it for a careful first run.
+      ...(Number.isFinite(configured) && configured > 0 ? { maxInvoices: configured } : {}),
     }
     didox = createDidoxRunner({
       listKeys: createKeyReader(),
@@ -147,7 +147,7 @@ async function launchApp(): Promise<void> {
       onProgress: sendProgress(() => appWin),
       drafts,
     })
-    registerIpc(() => appWin, new URL(baseUrl).origin, join(userData(), 'backups'), eri, didox)
+    registerIpc(() => appWin, new URL(baseUrl).origin, join(userData(), 'backups'), join(userData(), 'didox-diagnostics'), eri, didox)
     ipcRegistered = true
     /*
      * A run that the app died in the middle of is closed now, while nothing else is going on: its interrupted save

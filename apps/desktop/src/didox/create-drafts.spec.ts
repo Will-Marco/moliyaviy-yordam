@@ -10,6 +10,7 @@ import { StepError } from './contract.js'
 import { type CreateDraftsDeps, planRun, runPlan } from './create-drafts.js'
 import type { RunContext } from './engine.js'
 import { createJournal, type RunJournal } from './journal.js'
+import * as L from './locators.js'
 import type { DidoxWindow } from './run.js'
 import { FakePage } from './testing/fake-page.js'
 
@@ -47,7 +48,11 @@ const okKey = (tin: string): [string, KeyStatus] => [
 ]
 
 let dir: string
+let clockMs = Date.parse('2026-10-13T09:00:00.000Z')
+let hex = 'a1b2'
 beforeEach(async () => {
+  clockMs = Date.parse('2026-10-13T09:00:00.000Z')
+  hex = 'a1b2'
   dir = await mkdtemp(join(tmpdir(), 'didox-run-'))
   createDraftMock.mockReset()
   createDraftMock.mockResolvedValue({ kind: 'marked', didoxId: DRAFT_ID })
@@ -75,7 +80,7 @@ function harness(over: Partial<CreateDraftsDeps> & { draft?: () => Promise<unkno
       listInvoices: vi.fn(async () => list(over.rows ?? [apiRow()])),
       markDraft: vi.fn(async (): Promise<MarkDraftResult> => ({ ok: true, row: apiRow() })),
     },
-    journal: createJournal({ dir, nowMs: () => Date.parse('2026-10-13T09:00:00.000Z'), randomHex: () => 'a1b2' }),
+    journal: createJournal({ dir, nowMs: () => clockMs, randomHex: () => hex }),
     skips: { list: vi.fn(async () => ({})) },
     listKeys: vi.fn(async (tins: string[]) => new Map(tins.map(okKey))),
     eri: { withPassword: vi.fn(async (_tin, use) => use('parol')), markRejected: vi.fn(async () => undefined) },
@@ -327,5 +332,94 @@ describe('runPlan', () => {
 
       expect(outcome).toMatchObject({ status: 'cancelled' })
     })
+  })
+})
+
+describe('recovering a draft an earlier run could not name (§5)', () => {
+  /* The id Didox gave the c1 gate's draft; it carries 2026-10-13T12:07:19Z, moments after the save below. */
+  const LOST_DRAFT = 'A374C0AAC6FE11F19862FA163EA3FD69'
+  const SAVED_AT = '2026-10-13T12:07:00.000Z'
+
+  /** A finished run that saved a draft for c-1 and never identified it; today's run is about c-2. */
+  async function earlierRun(h: Harness) {
+    const handle = await h.deps.journal.start({
+      month: MONTH,
+      trigger: 'manual',
+      firms: [
+        {
+          tin: LENDER_A.tin,
+          name: LENDER_A.name,
+          invoices: [
+            {
+              contractId: 'c-1',
+              contractNumber: '12/25',
+              contractSignedOn: '2026-09-01',
+              borrowerTin: BORROWER.tin,
+              borrowerName: BORROWER.name,
+              lineName: 'Foiz',
+              amount: '552328.77',
+            },
+          ],
+        },
+      ],
+    })
+    await handle.setInvoice(LENDER_A.tin, 'c-1', { state: 'saving', savingAt: SAVED_AT })
+    await handle.setInvoice(LENDER_A.tin, 'c-1', {
+      state: 'needs_check',
+      code: 'SAVED_ID_UNKNOWN',
+      message: "Saqlangan qoralama ro'yxatda topilmadi",
+    })
+    await handle.finish('done')
+    clockMs += 60_000
+    hex = 'b2c3'
+    return handle.runId
+  }
+
+  const listRow = (over: { id?: string; amount?: string } = {}) => ({
+    href: `/documents/${over.id ?? LOST_DRAFT}/1`,
+    statusClass: 'doc-status doc-status--white',
+    counterparty: `"BETA TRADE" MCHJ${BORROWER.tin}`,
+    contract: '12/25 01.09.2026',
+    amount: over.amount ?? '552 328.77',
+  })
+
+  /** Today's run has its own invoice to do, so recovery is extra work on the side, as it is in a real month. */
+  const today = () => harness({ rows: [apiRow({ contractId: 'c-2' })] })
+
+  it('writes down the draft it recognises and tells the API about it', async () => {
+    const h = today()
+    const earlier = await earlierRun(h)
+    h.page.on(L.listReady.js, true).on(L.listRows.js, [listRow()])
+
+    await run(h)
+
+    expect((await h.deps.journal.read(earlier))?.firms[0]?.invoices[0]).toMatchObject({
+      state: 'marked',
+      didoxId: LOST_DRAFT,
+    })
+    expect(await h.deps.journal.flags(MONTH)).toEqual({})
+  })
+
+  it('leaves the invoice flagged, with a fresher reason, when nothing fits', async () => {
+    const h = today()
+    await earlierRun(h)
+    h.page.on(L.listReady.js, true).on(L.listRows.js, [])
+
+    await run(h)
+
+    expect((await h.deps.journal.flags(MONTH))['c-1']).toMatchObject({
+      code: 'SAVED_ID_UNKNOWN',
+      message: expect.stringContaining('topilmadi'),
+    })
+  })
+
+  it('never claims a draft whose amount is not this invoice\'s', async () => {
+    const h = today()
+    await earlierRun(h)
+    h.page.on(L.listReady.js, true).on(L.listRows.js, [listRow({ amount: '1 000 000.00' })])
+
+    await run(h)
+
+    expect(Object.keys(await h.deps.journal.flags(MONTH))).toEqual(['c-1'])
   })
 })

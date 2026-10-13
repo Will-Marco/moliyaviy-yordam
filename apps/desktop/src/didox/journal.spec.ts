@@ -444,3 +444,60 @@ describe('findNeedsCheck — what the next run may recover (§3.4)', () => {
     expect(await j.findNeedsCheck('2026-08')).toEqual([])
   })
 })
+
+describe('needs-check flags and recovery (c2)', () => {
+  const needsCheck = async () => {
+    const j = journal()
+    const run = await j.start({ month: '2026-09', trigger: 'manual', firms: [firm('300000001')] })
+    await run.setInvoice('300000001', 'c1', { state: 'saving', savingAt: '2026-10-13T09:32:00.000Z' })
+    await run.setInvoice('300000001', 'c1', { state: 'needs_check', code: 'SAVED_ID_UNKNOWN', message: 'topilmadi' })
+    await run.finish('done')
+    return { j, runId: run.runId }
+  }
+
+  it('shows the invoice as needing attention, with what the run knew', async () => {
+    const { j } = await needsCheck()
+
+    const flags = await j.flags('2026-09')
+
+    expect(flags.c1).toMatchObject({ code: 'SAVED_ID_UNKNOWN', message: 'topilmadi', at: expect.any(String) })
+  })
+
+  it('drops the flag once the accountant says it is dealt with, and keeps the record', async () => {
+    const { j, runId } = await needsCheck()
+
+    await j.resolveNeedsCheck(runId, '300000001', 'c1')
+
+    expect(await j.flags('2026-09')).toEqual({})
+    expect((await j.read(runId))?.firms[0]?.invoices[0]).toMatchObject({ state: 'needs_check', resolved: true })
+    expect(await j.findNeedsCheck('2026-09')).toEqual([]) // a resolved one is not searched for again either
+  })
+
+  it('writes down a draft a later run identified, for flushIdFound to send', async () => {
+    const { j, runId } = await needsCheck()
+
+    await j.attachFoundId(runId, '300000001', 'c1', 'A'.repeat(32))
+
+    expect((await j.read(runId))?.firms[0]?.invoices[0]).toMatchObject({ state: 'id_found', didoxId: 'A'.repeat(32) })
+    expect(await j.flags('2026-09')).toEqual({})
+  })
+
+  it('refreshes the reason when the draft is still not found', async () => {
+    const { j, runId } = await needsCheck()
+
+    await j.refreshNeedsCheck(runId, '300000001', 'c1', 'bugun ham topilmadi')
+
+    expect((await j.flags('2026-09')).c1?.message).toBe('bugun ham topilmadi')
+  })
+
+  it('lets a later run settle what an earlier one flagged', async () => {
+    const { j } = await needsCheck()
+    now += 60_000 // a second run needs its own id, which is built from the clock
+    const second = await j.start({ month: '2026-09', trigger: 'manual', firms: [firm('300000001')] })
+    await second.setInvoice('300000001', 'c1', { state: 'saving', savingAt: '2026-10-13T10:00:00.000Z' })
+    await second.setInvoice('300000001', 'c1', { state: 'id_found', didoxId: 'B'.repeat(32) })
+    await second.finish('done')
+
+    expect(await j.flags('2026-09')).toEqual({})
+  })
+})

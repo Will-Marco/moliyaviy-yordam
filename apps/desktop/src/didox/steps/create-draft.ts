@@ -4,7 +4,8 @@ import { humanPauseMs, step, type StepContext } from '../driver.js'
 import type { InvoiceEntry, InvoicePatch } from '../journal.js'
 import * as L from '../locators.js'
 import { DIDOX_DECIMAL_SEP, formatForDidox, parseDidoxMoney, tiyinOf } from '../money.js'
-import { matchOwnDraft, monthStartMs, parseListRow, type RawListRow } from '../parse.js'
+import { draftKey, dottedDate, openDraftList, readDraftRows, savedWindow } from '../draft-list.js'
+import { matchOwnDraft, monthStartMs } from '../parse.js'
 
 /**
  * One invoice, from "is something like this already there?" to "the app owns this draft" (M8c §4, FR-8.4).
@@ -71,9 +72,6 @@ const LOCATE_GAP_MS = 3_000
  */
 const FILL_TRIES = 3
 const FIELD_SETTLE_MS = 600
-/** How far around `savingAt` this run's own draft may be (§5). */
-const WINDOW_BEFORE_MS = 2n * 60n * 1000n
-const WINDOW_AFTER_MS = 5n * 60n * 1000n
 
 /** What the row must say once the МХИК has been chosen (spike §2c S2). */
 const DOC_TYPES = ['Ҳисоб-фактура актсиз', 'Стандарт']
@@ -105,12 +103,7 @@ export async function createDraft(opts: CreateDraftOptions): Promise<DraftOutcom
   const pause = () => page.pause(humanPauseMs(opts.random))
   const run = <T>(name: string, fn: () => Promise<T>) => step(name, page, ctx, fn)
   const amountTiyin = tiyinOf(item.amount)
-  const key = {
-    borrowerTin: item.borrowerTin,
-    contractNumber: item.contractNumber,
-    contractDate: dotted(item.contractSignedOn),
-    amountTiyin,
-  }
+  const key = draftKey(item)
 
   const note = (message: string) => ctx.onProgress?.({ firmTin: ctx.tin, step: 'fill', status: 'running', message })
   /** Closes Didox's notice if it is covering the form; says whether there was one. */
@@ -129,9 +122,7 @@ export async function createDraft(opts: CreateDraftOptions): Promise<DraftOutcom
 
   /* 0 — is a draft like this one already in Didox? Only a person may decide what to do with it. */
   const similar = await run('similarCheck', async () => {
-    await page.goto(L.draftListUrl(item.borrowerTin))
-    await page.waitFor(L.listReady.js, { timeoutMs: LIST_TIMEOUT_MS, what: L.listReady.what })
-    const rows = await readRows(page)
+    const rows = await openDraftList(page, item.borrowerTin, LIST_TIMEOUT_MS)
     const match = matchOwnDraft(rows, key, {
       // Drafts for this month are made once it is over; anything older belongs to another month (§5).
       fromMs: monthStartMs(month, 1n),
@@ -168,7 +159,7 @@ export async function createDraft(opts: CreateDraftOptions): Promise<DraftOutcom
   await run('fillContract', async () => {
     await pause()
     const number = item.contractNumber
-    const date = dotted(item.contractSignedOn)
+    const date = dottedDate(item.contractSignedOn)
     await fillUntil(page, L.formField(HEAD_CONTRACT_NUMBER), number, (v) => v === number, 'shartnoma raqami', number, note, closeNotice)
     // Didox's own mask turns the digits into `dd.mm.yyyy`, so the digits go in and the dotted form comes back.
     await fillUntil(page, L.formField(HEAD_CONTRACT_DATE), digits(item.contractSignedOn), (v) => v === date, 'shartnoma sanasi', date, note, closeNotice)
@@ -295,18 +286,6 @@ export async function createDraft(opts: CreateDraftOptions): Promise<DraftOutcom
   }
 }
 
-/** Reads the list the way `parse.ts` wants it, and refuses a page that may be only part of the answer. */
-async function readRows(page: Page) {
-  const raw = await page.read<RawListRow[]>(L.listRows.js)
-  if (raw.length >= L.DRAFT_LIST_LIMIT) {
-    throw new StepError('LIST_TRUNCATED', `Qoralamalar ro'yxati to'liq emas (${raw.length} qator) — qidiruv ishonchsiz`)
-  }
-  return raw.flatMap((row) => {
-    const parsed = parseListRow(row)
-    return parsed ? [parsed] : []
-  })
-}
-
 type Located =
   | { kind: 'one'; id: string }
   | { kind: 'needs_check'; code: DidoxCode; message: string; candidateIds?: string[] }
@@ -321,23 +300,23 @@ async function locateDraft(
   key: Parameters<typeof matchOwnDraft>[1],
   savingAt: string,
 ): Promise<Located> {
-  const anchor = BigInt(Date.parse(savingAt))
-  const window = { fromMs: anchor - WINDOW_BEFORE_MS, toMs: anchor + WINDOW_AFTER_MS, unknownTime: 'exclude' as const }
+  const window = savedWindow(savingAt)
   let last: Located = {
     kind: 'needs_check',
     code: 'SAVED_ID_UNKNOWN',
     message: "Saqlangan qoralama ro'yxatda topilmadi — Didox Қоралама'sini tekshiring",
   }
   for (let attempt = 0; attempt < LOCATE_TRIES; attempt++) {
-    if (attempt === 0) await page.goto(L.draftListUrl(item.borrowerTin))
-    else {
-      await page.pause(LOCATE_GAP_MS)
-      await page.reload()
-    }
-    await page.waitFor(L.listReady.js, { timeoutMs: LIST_TIMEOUT_MS, what: L.listReady.what })
     let rows
     try {
-      rows = await readRows(page)
+      if (attempt === 0) {
+        rows = await openDraftList(page, item.borrowerTin, LIST_TIMEOUT_MS)
+      } else {
+        await page.pause(LOCATE_GAP_MS)
+        await page.reload()
+        await page.waitFor(L.listReady.js, { timeoutMs: LIST_TIMEOUT_MS, what: L.listReady.what })
+        rows = await readDraftRows(page)
+      }
     } catch (error) {
       if (error instanceof StepError && error.code === 'LIST_TRUNCATED') {
         return { kind: 'needs_check', code: 'LIST_TRUNCATED', message: error.message }
@@ -475,9 +454,8 @@ const unexpectedValue = (what: string, want: string, got: string | null) =>
     `Didox formasida "${what}" kutilganidek emas (kutilgan: ${want}, bor: ${got === null ? 'topilmadi' : got || "bo'sh"})`,
   )
 
-/** `yyyy-mm-dd` → `ddmmyyyy` for typing (Didox's mask adds the dots) and `dd.mm.yyyy` for reading back. */
+/** `yyyy-mm-dd` → `ddmmyyyy` for typing; Didox's mask adds the dots (`dottedDate` reads them back). */
 const digits = (signedOn: string) => `${signedOn.slice(8, 10)}${signedOn.slice(5, 7)}${signedOn.slice(0, 4)}`
-const dotted = (signedOn: string) => `${signedOn.slice(8, 10)}.${signedOn.slice(5, 7)}.${signedOn.slice(0, 4)}`
 
 /**
  * Two firm names mean the same firm when one contains the other once the legal form and the punctuation are gone:

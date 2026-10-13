@@ -6,7 +6,7 @@ import { parseAlias } from '../eimzo/alias.js'
 import { createEimzoClient, EimzoError } from '../eimzo/client.js'
 import { type KeyStatus, matchKeys } from '../eimzo/match.js'
 import type { ProgressEvent } from '../didox/contract.js'
-import type { RunJournal } from '../didox/journal.js'
+import type { RunJournal, RunSummary } from '../didox/journal.js'
 import type { CheckLoginResult, StartDraftsResult } from '../didox/run.js'
 import type { EriStore, PasswordStatus } from '../secrets/eri-store.js'
 import { isTrustedSender } from './trust.js'
@@ -53,8 +53,17 @@ export interface DidoxIpc {
   checkLogin(tin: string): Promise<CheckLoginResult>
   createDrafts(opts: { month: string; lenderIds: string[] | 'all' }): Promise<StartDraftsResult>
   status(): Promise<RunJournal | null>
+  listRuns(opts: { month?: string; limit?: number }): Promise<RunSummary[]>
+  getRun(runId: string): Promise<RunJournal | null>
+  invoiceFlags(month: string): Promise<Record<string, unknown>>
+  skipInvoice(opts: { month: string; contractId: string; skip: boolean }): Promise<void>
+  resolveNeedsCheck(opts: { month: string; contractId: string }): Promise<void>
   cancel(): void
 }
+
+/** Run ids are built from a timestamp and four hex characters (journal.ts). */
+const RUN_ID = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z-[0-9a-f]{4}$/
+const MAX_RUNS_LISTED = 50
 
 const MONTH = /^\d{4}-(?:0[1-9]|1[0-2])$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -77,6 +86,7 @@ export function registerIpc(
   getAppWindow: () => BrowserWindow | null,
   origin: string,
   backupsDir: string,
+  diagnosticsDir: string,
   eri: EriStore,
   didox?: DidoxIpc,
 ): void {
@@ -177,6 +187,58 @@ export function registerIpc(
   ipcMain.handle(
     'didox:status',
     guarded(async (): Promise<RunJournal | null> => (didox ? didox.status() : null)),
+  )
+  ipcMain.handle(
+    'didox:list-runs',
+    guarded(async (payload: unknown): Promise<RunSummary[]> => {
+      const { month, limit } = (payload ?? {}) as { month?: unknown; limit?: unknown }
+      if (month !== undefined && (typeof month !== 'string' || !MONTH.test(month))) throw new Error('Invalid month')
+      if (limit !== undefined && (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > MAX_RUNS_LISTED)) {
+        throw new Error('Invalid limit')
+      }
+      if (!didox) return []
+      return didox.listRuns({ ...(month === undefined ? {} : { month }), ...(limit === undefined ? {} : { limit }) })
+    }),
+  )
+  ipcMain.handle(
+    'didox:get-run',
+    guarded(async (runId: unknown): Promise<RunJournal | null> => {
+      if (typeof runId !== 'string' || !RUN_ID.test(runId)) throw new Error('Invalid runId')
+      return didox ? didox.getRun(runId) : null
+    }),
+  )
+  ipcMain.handle(
+    'didox:invoice-flags',
+    guarded(async (month: unknown): Promise<Record<string, unknown>> => {
+      if (typeof month !== 'string' || !MONTH.test(month)) throw new Error('Invalid month')
+      return didox ? didox.invoiceFlags(month) : {}
+    }),
+  )
+  ipcMain.handle(
+    'didox:skip-invoice',
+    guarded(async (payload: unknown): Promise<void> => {
+      const { month, contractId, skip } = (payload ?? {}) as { month?: unknown; contractId?: unknown; skip?: unknown }
+      if (typeof month !== 'string' || !MONTH.test(month)) throw new Error('Invalid month')
+      if (typeof contractId !== 'string' || !UUID.test(contractId)) throw new Error('Invalid contractId')
+      if (typeof skip !== 'boolean') throw new Error('Invalid skip')
+      await didox?.skipInvoice({ month, contractId, skip })
+    }),
+  )
+  ipcMain.handle(
+    'didox:resolve-needs-check',
+    guarded(async (payload: unknown): Promise<void> => {
+      const { month, contractId } = (payload ?? {}) as { month?: unknown; contractId?: unknown }
+      if (typeof month !== 'string' || !MONTH.test(month)) throw new Error('Invalid month')
+      if (typeof contractId !== 'string' || !UUID.test(contractId)) throw new Error('Invalid contractId')
+      await didox?.resolveNeedsCheck({ month, contractId })
+    }),
+  )
+  ipcMain.handle(
+    'didox:open-diagnostics',
+    guarded(async (): Promise<void> => {
+      const error = await shell.openPath(diagnosticsDir)
+      if (error) throw new Error(error)
+    }),
   )
   ipcMain.handle(
     'didox:cancel',
