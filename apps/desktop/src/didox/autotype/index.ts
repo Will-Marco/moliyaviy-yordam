@@ -1,8 +1,10 @@
 import { spawn as nodeSpawn } from 'node:child_process'
 import type { AutotypePreflightResult, AutotypeResult } from '../contract.js'
-import { preflightOnDarwin, type SpawnLike, typeOnDarwin } from './darwin.js'
+import { preflightOnDarwin, typeOnDarwin } from './darwin.js'
+import type { SpawnLike } from './typist.js'
+import { preflightOnWindows, typeOnWindows } from './win32.js'
 
-export { AutotypeCancelledError, type SpawnLike } from './darwin.js'
+export { AutotypeCancelledError, type SpawnLike } from './typist.js'
 
 /**
  * Types the firm's ERI password into E-IMZO's password dialog, once (plan B3). The app never signs: this only
@@ -19,15 +21,19 @@ export async function typeEimzoPassword(
   if (platform === 'darwin') {
     return typeOnDarwin(password, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal, spawn })
   }
-  // win32: SendInput + KEYEVENTF_UNICODE via PowerShell, after the Windows spike (M8d).
+  if (platform === 'win32') {
+    return typeOnWindows(password, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal, spawn })
+  }
   throw new Error(`E-IMZO parolini avtomatik yozish bu tizimda hali yo'q (${platform})`)
 }
 
-/** Run before the Didox window opens; reads only. Non-macOS is `unsupported` until the Windows typist exists. */
+/** Run before the Didox window opens; reads only. Anything but macOS and Windows is `unsupported`. */
 export async function autotypePreflight(
   opts: { platform?: NodeJS.Platform; spawn?: SpawnLike } = {},
 ): Promise<AutotypePreflightResult> {
   const platform = opts.platform ?? process.platform
-  if (platform !== 'darwin') return 'unsupported'
-  return preflightOnDarwin({ spawn: opts.spawn ?? nodeSpawn })
+  const spawn = opts.spawn ?? nodeSpawn
+  if (platform === 'darwin') return preflightOnDarwin({ spawn })
+  if (platform === 'win32') return preflightOnWindows({ spawn })
+  return 'unsupported'
 }

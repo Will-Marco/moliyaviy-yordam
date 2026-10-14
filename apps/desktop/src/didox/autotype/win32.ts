@@ -1,0 +1,34 @@
+import type { AutotypePreflightResult, AutotypeResult } from '../contract.js'
+import { EIMZO_PREFLIGHT_PS, typistScript } from './powershell.js'
+import { runPreflight, runTypist, type SpawnLike } from './typist.js'
+
+/*
+ * The Windows typist (M8d). Same promises as the macOS one, kept by different machinery: PowerShell sends the
+ * characters with SendInput and KEYEVENTF_UNICODE, which carries the character rather than a key position — so
+ * the keyboard layout cannot change the password and, unlike macOS, there is nothing to check about it and no
+ * Accessibility permission to be granted.
+ *
+ * The password reaches the script on stdin only. Nothing about it is ever on the command line, where another user
+ * of the machine could read it out of the process list.
+ */
+
+const POWERSHELL = 'powershell.exe'
+/** No profile, no prompts, and the machine's execution policy does not decide whether the accountant can log in. */
+const PS_FLAGS = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command'] as const
+
+export function typeOnWindows(
+  password: string,
+  { dialogTimeoutMs, signal, spawn }: { dialogTimeoutMs: number; signal: AbortSignal; spawn: SpawnLike },
+): Promise<AutotypeResult> {
+  return runTypist(password, {
+    dialogTimeoutMs,
+    signal,
+    spawn,
+    typist: { command: POWERSHELL, args: [...PS_FLAGS, typistScript(dialogTimeoutMs)] },
+  })
+}
+
+/** Reads only: whether an E-IMZO window is already open. Types nothing and carries no password. */
+export function preflightOnWindows({ spawn }: { spawn: SpawnLike }): Promise<AutotypePreflightResult> {
+  return runPreflight({ spawn, typist: { command: POWERSHELL, args: [...PS_FLAGS, EIMZO_PREFLIGHT_PS] } })
+}

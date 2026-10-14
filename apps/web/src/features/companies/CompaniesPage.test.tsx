@@ -224,14 +224,24 @@ describe('CompaniesPage', () => {
       expect(await checkButton('GAMMA')).toBeDisabled() // expired key
     })
 
-    it('is disabled outside macOS, saying why', async () => {
+    /* The app can type the ERI password on macOS and on Windows (apps/desktop/src/didox/autotype). */
+    it('is offered on Windows as well', async () => {
       desktopWithDidox()
       vi.stubGlobal('desktop', { ...window.desktop!, platform: 'win32' })
       renderWithProviders(<CompaniesPage />)
       const button = await checkButton(alfa.name)
-      expect(await within(button.closest('tr')!).findByText('Parol bor')).toBeInTheDocument() // key data loaded
+      expect(await within(button.closest('tr')!).findByText('Parol bor')).toBeInTheDocument()
+      expect(button).toBeEnabled()
+    })
+
+    it('is disabled where it cannot type at all, saying why', async () => {
+      desktopWithDidox()
+      vi.stubGlobal('desktop', { ...window.desktop!, platform: 'linux' })
+      renderWithProviders(<CompaniesPage />)
+      const button = await checkButton(alfa.name)
+      expect(await within(button.closest('tr')!).findByText('Parol bor')).toBeInTheDocument()
       expect(button).toBeDisabled()
-      expect(button).toHaveAttribute('title', "Hozircha faqat macOS'da ishlaydi")
+      expect(button).toHaveAttribute('title', 'Bu tizimda ishlamaydi (macOS yoki Windows kerak)')
     })
 
     it('tells what to do about a wrong keyboard layout', async () => {

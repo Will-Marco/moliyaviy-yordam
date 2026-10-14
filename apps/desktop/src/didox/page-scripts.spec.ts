@@ -7,7 +7,6 @@ import {
   pollScript,
   readScript,
   screenshotName,
-  selectAllModifier,
   staleScreenshots,
   valueScript,
 } from './page-scripts.js'
@@ -169,10 +168,3 @@ describe('valueScript (M8c §9)', () => {
   })
 })
 
-describe('selectAllModifier', () => {
-  it('uses the platform\'s own select-all', () => {
-    expect(selectAllModifier('darwin')).toBe('cmd')
-    expect(selectAllModifier('win32')).toBe('control')
-    expect(selectAllModifier('linux')).toBe('control')
-  })
-})

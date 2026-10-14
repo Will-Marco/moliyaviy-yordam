@@ -28,6 +28,12 @@ const migrationsDir = res ? join(res, 'migrations') : resolve(here, '../../api/p
  * macOS backgrounds a window the moment another one covers it, and a backgrounded renderer drops the synthetic
  * keystrokes the Didox form is filled with (c1 gate). Both switches must be set before the app is ready.
  */
+/*
+ * Windows shows a notification only for an app it can name, and it names it by this id — which must match the one
+ * the installer registers (electron-builder's appId). Without it the monthly reminder would be dropped silently.
+ */
+app.setAppUserModelId('uz.moliyaviyyordam.desktop')
+
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 

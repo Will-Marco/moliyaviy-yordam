@@ -36,7 +36,7 @@ const HINTS: Record<string, string> = {
   ACCESSIBILITY_DENIED:
     "System Settings → Privacy & Security → Accessibility bo'limida «Moliyaviy yordam»ga ruxsat bering va qayta tekshiring.",
   EIMZO_DIALOG_OPEN: "Ochiq turgan E-IMZO oynasini yoping, so'ng qayta tekshiring.",
-  PLATFORM_UNSUPPORTED: "Hozircha bu imkoniyat faqat macOS'da ishlaydi.",
+  PLATFORM_UNSUPPORTED: "Bu imkoniyat faqat macOS va Windows'da ishlaydi.",
   EIMZO_NOT_RUNNING: "E-IMZO dasturini ishga tushiring va qayta tekshiring.",
   TIMEOUT: "Didox javobi kechikdi — birozdan keyin qayta urinib ko'ring.",
   RUN_IN_PROGRESS: 'Boshqa tekshiruv tugashini kuting.',

@@ -228,12 +228,12 @@ describe('typeEimzoPassword on macOS', () => {
 })
 
 describe('typeEimzoPassword elsewhere', () => {
-  it.each<NodeJS.Platform>(['win32', 'linux'])('throws on %s without spawning anything', async (platform) => {
+  it('throws on a platform with no typist, without spawning anything', async () => {
     const { calls, spawn } = fakeSpawn()
     const signal = new AbortController().signal
-    await expect(typeEimzoPassword(PASSWORD, { dialogTimeoutMs: 20_000, signal, platform, spawn })).rejects.toThrow(
-      platform,
-    )
+    await expect(
+      typeEimzoPassword(PASSWORD, { dialogTimeoutMs: 20_000, signal, platform: 'linux', spawn }),
+    ).rejects.toThrow('linux')
     expect(calls).toHaveLength(0)
   })
 })
@@ -266,9 +266,9 @@ describe('autotypePreflight', () => {
     await expect(second).rejects.toThrow()
   })
 
-  it.each<NodeJS.Platform>(['win32', 'linux'])('is unsupported on %s without spawning', async (platform) => {
+  it('is unsupported on a platform with no typist, without spawning', async () => {
     const { calls, spawn } = fakeSpawn()
-    await expect(autotypePreflight({ platform, spawn })).resolves.toBe('unsupported')
+    await expect(autotypePreflight({ platform: 'linux', spawn })).resolves.toBe('unsupported')
     expect(calls).toHaveLength(0)
   })
 })

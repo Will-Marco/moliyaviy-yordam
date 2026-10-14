@@ -162,5 +162,3 @@ export function setValueScript(snippet: string, text: string): string {
 })()`
 }
 
-/** Select-all is Cmd+A on macOS, Ctrl+A elsewhere; a field is emptied the way a person empties it. */
-export const selectAllModifier = (platform: string): 'cmd' | 'control' => (platform === 'darwin' ? 'cmd' : 'control')

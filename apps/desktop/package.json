@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Moliyaviy yordam — desktop shell (Electron). Boots the API in a child process on a local PGlite database.",
+  "description": "Moliyaviy yordam \u2014 desktop shell (Electron). Boots the API in a child process on a local PGlite database.",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -13,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepackage": "node scripts/prepare-resources.mjs",
     "pack:mac": "pnpm build && pnpm prepackage && electron-builder --mac --dir",
-    "pack:mac:dmg": "pnpm build && pnpm prepackage && electron-builder --mac dmg"
+    "pack:mac:dmg": "pnpm build && pnpm prepackage && electron-builder --mac dmg",
+    "pack:win": "pnpm build && pnpm prepackage && electron-builder --win"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",

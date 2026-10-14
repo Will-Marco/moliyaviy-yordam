@@ -18,6 +18,9 @@ import { ImportCompaniesDialog } from './ImportCompaniesDialog'
 
 type DialogState = { open: false } | { open: true; company?: Company }
 
+/** Where the app can type the ERI password into E-IMZO's own window (apps/desktop/src/didox/autotype). */
+const TYPIST_PLATFORMS = ['darwin', 'win32']
+
 export function CompaniesPage() {
   const companies = useCompanies()
   const [dialog, setDialog] = useState<DialogState>({ open: false })
@@ -31,10 +34,10 @@ export function CompaniesPage() {
   const [checkFor, setCheckFor] = useState<Company | null>(null)
   // Older desktop builds have no Didox bridge: no column then.
   const canCheck = !!desktop?.didox
-  // The E-IMZO typist exists only for macOS so far (Windows after its spike, M8d).
+  // The E-IMZO typist is written for macOS and Windows; anywhere else the app cannot type the password.
   const checkBlocker = (tin: string) =>
-    desktop?.platform !== 'darwin'
-      ? "Hozircha faqat macOS'da ishlaydi"
+    !TYPIST_PLATFORMS.includes(desktop?.platform ?? '')
+      ? "Bu tizimda ishlamaydi (macOS yoki Windows kerak)"
       : keys?.[tin]?.status !== 'ok'
         ? 'Amaldagi ERI kaliti kerak'
         : passwords?.[tin] !== 'set'

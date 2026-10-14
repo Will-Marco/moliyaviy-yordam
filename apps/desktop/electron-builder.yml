@@ -21,3 +21,14 @@ mac:
   category: public.app-category.finance
   target:
     - dmg # pack:mac passes --dir for a quick unpacked build
+win:
+  # The accountant's machine is Windows; NSIS is the installer they expect (one file, double-click, no store).
+  target:
+    - nsis
+  # Unsigned for now, like the mac build: there is no code-signing certificate yet, so SmartScreen will warn once.
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  # The app keeps its data in %APPDATA%; an upgrade installs over the old one and leaves that alone.
+  deleteAppDataOnUninstall: false

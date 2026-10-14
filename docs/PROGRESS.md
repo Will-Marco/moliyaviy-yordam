@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 8d — jadval (**macOS qismi qurildi va gate'dan o'tdi 2026-10-14**; qoldi: Windows adapteri va qadoqlangan ilovada bildirishnoma tekshiruvi)
+**Joriy modul:** 8d — Windows (**kod yozildi 2026-10-14; Windows PC'da sinash qoldi**)
 **Oxirgi yangilanish:** 2026-10-13
 
 ## Modullar
@@ -54,6 +54,16 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-14 — **Sir qarorlari: A varianti bekor, asosiysi — Windows.** (1) Didox'ga parol bilan kirish **amalga
+  oshirilmaydi** (buxgalterda bunday imkon yo'q) — ya'ni ERI kaliti bilan kirish yagona yo'l va E-IMZO parol oynasi
+  har kirishda qisqa vaqt ekranda ko'rinadi; (2) macOS'da bildirishnoma ishlamasligi **qabul qilindi** (tray yetarli);
+  (3) **ishlash kerak bo'lgan tizim — Windows**. Shunga ko'ra qurildi: `autotype/win32.ts` + `powershell.ts` —
+  PowerShell `SendInput` + `KEYEVENTF_UNICODE` (klaviatura tartibiga bog'liq emas, shuning uchun Windows'da "layout"
+  tekshiruvi yo'q; Accessibility kabi ruxsat ham kerak emas), parol faqat **stdin** orqali, exit kodlari macOS
+  bilan bir xil; umumiy qism `autotype/typist.ts` ga ajratildi (ikki nusxa nozik mantiq bo'lmasin).
+  Qo'shimcha: `app.setAppUserModelId` (Windows bildirishnomasi uchun shart), `pack:win` + NSIS konfiguratsiyasi,
+  Firmalar sahifasidagi "faqat macOS" to'sig'i olib tashlandi (endi macOS **va** Windows). Testlar: desktop 495,
+  web 196, api 130. **Tekshirilmagan:** PowerShell skriptining o'zi — Windows PC kerak (M8d gate)
 - 2026-10-14 — **Qadoqlangan ilova tekshiruvi (M8d va'dalari).** `pack:mac` bilan yig'ilgan `.app` Sir tomonidan
   Finder'dan ochildi: **tray ishladi** va kutayotgan oy uning menyusida ko'rindi; **bildirishnoma chiqmadi**
   (imzosiz ilova — macOS uni bildirishnoma markaziga qo'ymaydi; SRS FR-8.10 ga izoh qo'shildi). Accessibility
