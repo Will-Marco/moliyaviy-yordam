@@ -170,6 +170,9 @@ export function runTypist(
     } catch {
       return fail(new Error("E-IMZO parol yozuvchisini ishga tushirib bo'lmadi"))
     }
+    // One line per attempt, so "the password did not go in" can be followed in the log at all — and so a log with
+    // no line at all says the build running is not this one.
+    console.info(`[autotype] parol yozuvchisi ishga tushdi (${typist.command})`)
 
     timer = setTimeout(
       () => {
@@ -198,6 +201,7 @@ export function runTypist(
         // A verdict the app understands is reported as itself; what the script said besides goes to the log,
         // where it is the difference between "a window was open" and knowing which one. Not once typing has
         // started: from there the app says only that a person must look.
+        console.info(`[autotype] natija: ${result}`)
         if (!typing) note(`${out.split(TYPING_MARKER).join(' ')} ${err}`)
         return settle(() => ok(result))
       }
