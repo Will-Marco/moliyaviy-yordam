@@ -248,6 +248,9 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - FR-8.10 — **Jadval (M8d).** Har oy 1-kuni 06:00 (Asia/Tashkent) o'tgan oy uchun avtomatik — **faqat shartlar bajarilsa**:
   ekran qulflanmagan, foydalanuvchi band emas, E-IMZO ishlayapti, kalit tashuvchi ulangan, OS ruxsatlari bor. Bajarilmasa —
   bildirishnoma ("Didox qoralamalari kutmoqda") va ilova ochilganda / kompyuter uyg'onganda / qulf ochilganda davom etadi.
+  ⚠️ **Bildirishnoma imzolashga bog'liq (o'lchandi 2026-10-14):** imzosiz ilovadan macOS bildirishnomani rad etadi —
+  dev'da ham, qadoqlangan `.app` da ham chiqmadi. Shuning uchun kutayotgan oy **tray menyusi va tooltip'iga** ham
+  yoziladi (ruxsat talab qilmaydi, ishlashi tasdiqlangan). Apple Developer ID bilan imzolangach qayta tekshiriladi.
   Vaqtinchalik xatolar uchun 07:00 va 08:00 da faqat o'sha fakturalar qayta uriniladi (kirish xatolari va karantin bundan
   mustasno). Ilova tray'da yashaydi va tizim bilan birga ishga tushadi. Natija vaqti kafolatlanmaydi.
 - *Acceptance (modul):* 2 firma × bir nechta faktura → "Didox'da qoralamalarni yaratish" → Didox Қоралама'dagi qoralamalar

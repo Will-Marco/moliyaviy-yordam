@@ -54,6 +54,12 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-14 — **Qadoqlangan ilova tekshiruvi (M8d va'dalari).** `pack:mac` bilan yig'ilgan `.app` Sir tomonidan
+  Finder'dan ochildi: **tray ishladi** va kutayotgan oy uning menyusida ko'rindi; **bildirishnoma chiqmadi**
+  (imzosiz ilova — macOS uni bildirishnoma markaziga qo'ymaydi; SRS FR-8.10 ga izoh qo'shildi). Accessibility
+  ruxsati **so'ralmadi**, chunki `ready()` birinchi shartda ("foydalanuvchi band") to'xtaydi — ya'ni ruxsat faqat
+  haqiqiy urinish paytida, buxgalter kompyuterdan uzoqda bo'lganda so'raladi va **ko'rilmay qolishi mumkin**.
+  Taklif (Sir qaroriga): ruxsatni birinchi ishga tushirishda yoki Firmalar sahifasida oldindan so'rash
 - 2026-10-14 — **M8d (macOS) qurildi va real sinovdan o'tdi.** Oy 1-kuni 06:00 (Toshkent) tugagan oy uchun ilova
   o'zi urinadi — faqat buxgalter klaviaturadan uzoq bo'lsa (3 daq harakatsizlik), ekran qulfsiz, E-IMZO ishlasa va
   ruxsatlar bo'lsa; aks holda oy "kutmoqda" deb belgilanadi (07:00/08:00 da va keyin soatiga bir marta qayta
