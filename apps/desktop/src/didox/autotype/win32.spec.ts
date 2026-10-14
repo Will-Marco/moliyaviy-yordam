@@ -22,12 +22,16 @@ class FakeChild extends EventEmitter {
     on: () => undefined,
   }
   stdout = new EventEmitter()
+  stderr = new EventEmitter()
   kill(): boolean {
     this.killed = true
     return true
   }
   startedTyping() {
     this.stdout.emit('data', Buffer.from(`${TYPING_MARKER}\n`))
+  }
+  complains(text: string) {
+    this.stderr.emit('data', Buffer.from(text))
   }
   exit(code: number | null) {
     this.emit('close', code, null)
@@ -109,6 +113,32 @@ describe('the Windows typist', () => {
     const typing = typeOnWindows(spawn)
     children[0]!.startedTyping()
     children[0]!.exit(EXIT.FOCUS_LOST)
+
+    await expect(typing).resolves.toBe('interrupted')
+  })
+
+  /*
+   * PowerShell ends with its own exit code 1 when something in the script fails, and the Windows gate met exactly
+   * that: a number with no story. What it printed about itself is part of the message now.
+   */
+  it('says what the script complained about when it died on its own terms', async () => {
+    const { children, spawn } = fakeSpawn()
+
+    const typing = typeOnWindows(spawn)
+    children[0]!.complains("Add-Type : Cannot add type.\nAt line:6 char:1")
+    children[0]!.exit(1)
+
+    await expect(typing).rejects.toThrow(/Cannot add type/)
+  })
+
+  /* Once the password may be on screen, the only thing reported is that a person must look — not a stray message. */
+  it('keeps a complaint out of the way once typing has started', async () => {
+    const { children, spawn } = fakeSpawn()
+
+    const typing = typeOnWindows(spawn)
+    children[0]!.startedTyping()
+    children[0]!.complains('nimadir')
+    children[0]!.exit(1)
 
     await expect(typing).resolves.toBe('interrupted')
   })
@@ -215,7 +245,7 @@ describe('the PowerShell script', () => {
   it('finds the dialog by E-IMZO having a visible window at all', () => {
     expect(script).not.toContain('MainWindowTitle')
     expect(script).not.toContain('MainWindowHandle')
-    expect(script).toContain('EnumWindows')
+    expect(script).toContain('GetTopWindow')
     expect(script).toContain('IsWindowVisible')
   })
 

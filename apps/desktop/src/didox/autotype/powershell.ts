@@ -38,7 +38,6 @@ $EIMZO_NAMES = @(${EIMZO_PROCESS_NAMES.map((n) => `'${n}'`).join(', ')})
 $EIMZO_PATHS = @(${EIMZO_PATH_PATTERNS.map((p) => `'${p}'`).join(', ')})
 
 Add-Type -Namespace Win -Name Api -MemberDefinition @'
-public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
 [StructLayout(LayoutKind.Sequential)]
 public struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
 [StructLayout(LayoutKind.Explicit, Size = 40)]
@@ -46,28 +45,20 @@ public struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(8)] public
 [DllImport("user32.dll", SetLastError = true)] public static extern uint SendInput(uint n, INPUT[] inputs, int size);
 [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-[DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc callback, IntPtr lParam);
+[DllImport("user32.dll")] public static extern IntPtr GetTopWindow(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hWnd, uint command);
 [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr hWnd, out int processId);
 '@
 
-# Script scope, because the callback below is invoked by EnumWindows and reaches the script's variables, not a
-# function's locals.
+# The windows are walked with GetTopWindow + GetWindow rather than EnumWindows: EnumWindows needs a callback, and a
+# callback means handing PowerShell a delegate for unmanaged code to call back into — one more thing that can fail
+# for its own reasons in a script whose job is to type a password. This loop asks the same question with nothing
+# but function calls.
+$GW_HWNDNEXT = 2
 $script:eimzoOwners = @{}
 $script:eimzoWindows = New-Object System.Collections.ArrayList
 
-$script:collectEimzo = [Win.Api+EnumProc] {
-  param($hWnd, $lParam)
-  if ([Win.Api]::IsWindowVisible($hWnd)) {
-    $owner = 0
-    [void][Win.Api]::GetWindowThreadProcessId($hWnd, [ref]$owner)
-    if ($script:eimzoOwners.ContainsKey($owner)) { [void]$script:eimzoWindows.Add($hWnd) }
-  }
-  return $true
-}
-
-# Fills $script:eimzoWindows with E-IMZO's visible windows. Returns nothing: collections are read back by the two
-# helpers below, so no pipeline unrolling can turn a list into its elements.
 # Is this java process E-IMZO? Its own binary is the first answer; a machine where E-IMZO runs on a system-wide
 # Java has that binary outside E-IMZO's folder, and then the command line is what names it. Neither readable means
 # "not E-IMZO": nothing is typed into a window whose owner could not be identified.
@@ -91,13 +82,24 @@ function Test-EimzoProcess($proc) {
   return $false
 }
 
+# Fills $script:eimzoWindows with E-IMZO's visible windows. Returns nothing: the two helpers below read the list,
+# so no pipeline unrolling can turn it into its elements.
 function Find-EimzoWindows {
   $script:eimzoOwners = @{}
   foreach ($proc in Get-Process -Name $EIMZO_NAMES -ErrorAction SilentlyContinue) {
     if (Test-EimzoProcess $proc) { $script:eimzoOwners[$proc.Id] = $true }
   }
   $script:eimzoWindows.Clear()
-  [void][Win.Api]::EnumWindows($script:collectEimzo, [IntPtr]::Zero)
+  if ($script:eimzoOwners.Count -eq 0) { return }
+  $hWnd = [Win.Api]::GetTopWindow([IntPtr]::Zero)
+  while ($hWnd -ne [IntPtr]::Zero) {
+    if ([Win.Api]::IsWindowVisible($hWnd)) {
+      $owner = 0
+      [void][Win.Api]::GetWindowThreadProcessId($hWnd, [ref]$owner)
+      if ($script:eimzoOwners.ContainsKey($owner)) { [void]$script:eimzoWindows.Add($hWnd) }
+    }
+    $hWnd = [Win.Api]::GetWindow($hWnd, $GW_HWNDNEXT)
+  }
 }
 
 function Get-EimzoWindowCount {

@@ -12,6 +12,7 @@ import { CLOSE_WAIT_MS, EXIT, TYPING_MARKER } from './jxa.js'
 export interface ChildLike {
   stdin: { write(chunk: string): unknown; end(): unknown; on(event: 'error', listener: (err: Error) => void): unknown } | null
   stdout: { on(event: 'data', listener: (chunk: Buffer | string) => void): unknown } | null
+  stderr?: { on(event: 'data', listener: (chunk: Buffer | string) => void): unknown } | null
   on(event: 'error', listener: (err: Error) => void): unknown
   on(event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown
   kill(signal?: NodeJS.Signals): boolean
@@ -21,7 +22,7 @@ export interface ChildLike {
 export type SpawnLike = (
   command: string,
   args: readonly string[],
-  options: { stdio: ['pipe' | 'ignore', 'pipe' | 'ignore', 'ignore'] },
+  options: { stdio: ['pipe' | 'ignore', 'pipe' | 'ignore', 'pipe' | 'ignore'] },
 ) => ChildLike
 
 /** The run was cancelled before typing started: nothing was typed and the typist was killed. */
@@ -60,6 +61,19 @@ const KILL_MARGIN_MS = 30_000
 const PER_CHAR_MS = 1_000
 const MAX_PASSWORD_CHARS = 256
 const PREFLIGHT_TIMEOUT_MS = 15_000
+/*
+ * A typist that dies on its own terms (PowerShell's exit code 1, osascript's error) says why on stderr, and
+ * without it such a failure is a number with no story — the Windows gate hit exactly that. It is read only while
+ * nothing has been typed yet: from the TYPING marker on, the password may be on screen and the only thing the app
+ * reports is that a person must look. The scripts never print the password; this keeps the tail short anyway.
+ */
+const MAX_COMPLAINT_CHARS = 600
+
+/** The last, most relevant part of what the script complained about, on one line. */
+function complaint(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  return flat.length > MAX_COMPLAINT_CHARS ? `…${flat.slice(-MAX_COMPLAINT_CHARS)}` : flat
+}
 
 export interface TypistCommand {
   command: string
@@ -104,11 +118,15 @@ export function runTypist(
     }
     /** Before typing: an Error with `message`. After: `interrupted`, the login must be looked at by a person. */
     const unconfirmed = (message: string) =>
-      settle(() => (typing ? ok('interrupted') : fail(new Error(message))))
+      settle(() => {
+        if (typing) return ok('interrupted')
+        const why = complaint(err)
+        return fail(new Error(why ? `${message}: ${why}` : message))
+      })
 
     let child: ChildLike
     try {
-      child = spawn(typist.command, typist.args, { stdio: ['pipe', 'pipe', 'ignore'] })
+      child = spawn(typist.command, typist.args, { stdio: ['pipe', 'pipe', 'pipe'] })
     } catch {
       return fail(new Error("E-IMZO parol yozuvchisini ishga tushirib bo'lmadi"))
     }
@@ -123,9 +141,15 @@ export function runTypist(
     signal.addEventListener('abort', onAbort, { once: true })
 
     let out = ''
+    let err = ''
     child.stdout?.on('data', (chunk) => {
       out += String(chunk)
       if (out.includes(TYPING_MARKER)) typing = true
+    })
+    // Dropped the moment typing starts: after that nothing but "a person must look" is reported anyway.
+    child.stderr?.on('data', (chunk) => {
+      if (typing) err = ''
+      else err = (err + String(chunk)).slice(-MAX_COMPLAINT_CHARS * 2)
     })
     child.on('error', () => unconfirmed("E-IMZO parol yozuvchisini ishga tushirib bo'lmadi"))
     child.on('close', (code, exitSignal) => {
@@ -157,7 +181,7 @@ export function runPreflight({ spawn, typist }: { spawn: SpawnLike; typist: Typi
     }
     let child: ChildLike
     try {
-      child = spawn(typist.command, typist.args, { stdio: ['ignore', 'ignore', 'ignore'] })
+      child = spawn(typist.command, typist.args, { stdio: ['ignore', 'ignore', 'pipe'] })
     } catch {
       return fail(new Error("E-IMZO tekshiruvini ishga tushirib bo'lmadi"))
     }
@@ -165,11 +189,18 @@ export function runPreflight({ spawn, typist }: { spawn: SpawnLike; typist: Typi
       child.kill('SIGKILL')
       settle(() => fail(new Error('E-IMZO tekshiruvi javob bermadi')))
     }, PREFLIGHT_TIMEOUT_MS)
+    // The preflight carries no password, so what it says about itself can always be passed on.
+    let err = ''
+    child.stderr?.on('data', (chunk) => {
+      err = (err + String(chunk)).slice(-MAX_COMPLAINT_CHARS * 2)
+    })
     child.on('error', () => settle(() => fail(new Error("E-IMZO tekshiruvini ishga tushirib bo'lmadi"))))
     child.on('close', (code, exitSignal) => {
       const result = code === null ? undefined : PREFLIGHT[code]
       if (result) return settle(() => ok(result))
-      settle(() => fail(new Error(`E-IMZO tekshiruvi kutilmagan holatda tugadi (${exitSignal ?? `kod ${code}`})`)))
+      const why = complaint(err)
+      const how = `${exitSignal ?? `kod ${code}`}`
+      settle(() => fail(new Error(`E-IMZO tekshiruvi kutilmagan holatda tugadi (${how})${why ? `: ${why}` : ''}`)))
     })
   })
 }

@@ -84,7 +84,8 @@ describe('typeEimzoPassword on macOS', () => {
     expect(call.args).toEqual(['-l', 'JavaScript', '-e', EIMZO_TYPIST_JXA, '45000'])
     expect(call.args.some((a) => a.includes(PASSWORD))).toBe(false)
     expect(JSON.stringify(call.options)).not.toContain(PASSWORD)
-    expect(call.options).toEqual({ stdio: ['pipe', 'pipe', 'ignore'] })
+    // stderr is read so a script that dies on its own terms can say why; it is dropped once typing has started.
+    expect(call.options).toEqual({ stdio: ['pipe', 'pipe', 'pipe'] })
   })
 
   it.each<[number, AutotypeResult]>([
@@ -251,7 +252,7 @@ describe('autotypePreflight', () => {
 
     await expect(pending).resolves.toBe(result)
     expect(calls[0]!.args).toEqual(['-l', 'JavaScript', '-e', EIMZO_PREFLIGHT_JXA])
-    expect(calls[0]!.options).toEqual({ stdio: ['ignore', 'ignore', 'ignore'] })
+    expect(calls[0]!.options).toEqual({ stdio: ['ignore', 'ignore', 'pipe'] })
   })
 
   it('throws on an unknown exit or a spawn error', async () => {

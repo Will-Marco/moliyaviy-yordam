@@ -4,7 +4,8 @@ import { runPreflight, runTypist, type SpawnLike } from './typist.js'
 
 /**
  * Types the ERI password into E-IMZO's own dialog via System Events (JXA). The password goes only to the child's
- * stdin — never argv or env — and no error message carries it (osascript's stderr is not even read).
+ * stdin — never argv or env. The script's own complaints (osascript's stderr) are read, but only while nothing has
+ * been typed yet: from the TYPING marker on, the one thing reported is that a person must look.
  */
 export function typeOnDarwin(
   password: string,
