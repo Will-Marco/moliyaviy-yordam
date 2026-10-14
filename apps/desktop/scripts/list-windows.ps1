@@ -55,3 +55,31 @@ Get-Process |
   Where-Object { $_.MainWindowHandle -ne 0 } |
   Select-Object Id, ProcessName, MainWindowTitle |
   Format-Table -AutoSize
+
+Write-Output '--- E-IMZO jarayonlari (ilova oyna egasini shunday aniqlaydi) ---'
+# The app only types into a window whose owning process it can tie to E-IMZO: the executable's path or the command
+# line has to name it. This prints both, and the verdict, so a machine where the install is named differently says
+# so instead of looking like "the dialog never appeared".
+$patterns = @('*E-IMZO*', '*EIMZO*')
+$java = Get-Process -Name javaw, java -ErrorAction SilentlyContinue
+if (-not $java) {
+  Write-Output 'javaw/java jarayoni topilmadi — E-IMZO ishlab turmagan boladi.'
+} else {
+  foreach ($proc in $java) {
+    $path = $null
+    try { $path = $proc.Path } catch { $path = '(o-qib bo-lmadi)' }
+    $cmd = $null
+    try {
+      $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId = $($proc.Id)" -ErrorAction Stop).CommandLine
+    } catch { $cmd = '(o-qib bo-lmadi)' }
+    $matched = $false
+    foreach ($pattern in $patterns) {
+      if (($path -like $pattern) -or ($cmd -like $pattern)) { $matched = $true }
+    }
+    Write-Output ''
+    Write-Output ("PID         : " + $proc.Id)
+    Write-Output ("Fayl yo-li  : " + $path)
+    Write-Output ("Buyruq satri: " + $cmd)
+    Write-Output ("E-IMZO deb tanildi: " + $(if ($matched) { 'HA' } else { 'YO-Q  <-- muammo shu' }))
+  }
+}
