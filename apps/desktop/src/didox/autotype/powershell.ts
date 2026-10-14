@@ -53,6 +53,10 @@ public struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(8)] public
 [DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr hWnd, out int processId);
 [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextLengthW(IntPtr hWnd);
 [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr hWnd, System.Text.StringBuilder text, int count);
+[DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+[DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
+[DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
 // SendInput's cbSize, worked out here: PowerShell picks Marshal.SizeOf(object) for a type literal and then fails
 // on it ("cannot marshal System.RuntimeType"), which is what stopped the Windows gate. C# has no such doubt.
 public static int InputSize() { return Marshal.SizeOf(typeof(INPUT)); }
@@ -116,9 +120,7 @@ function Find-EimzoWindows {
 # verdict is unarguable and unexplainable at once.
 function Write-EimzoWindows {
   foreach ($hWnd in $script:eimzoWindows) {
-    $title = New-Object System.Text.StringBuilder 256
-    [void][Win.Api]::GetWindowTextW($hWnd, $title, 256)
-    [Console]::Error.WriteLine("E-IMZO oynasi: '" + $title.ToString() + "'")
+    [Console]::Error.WriteLine("E-IMZO oynasi: " + (Get-WindowTitle $hWnd))
   }
 }
 
@@ -137,6 +139,50 @@ function Get-EimzoWindowHandle {
 function Test-Foreground([IntPtr]$hWnd) {
   if ($hWnd -eq [IntPtr]::Zero) { return $false }
   return ([Win.Api]::GetForegroundWindow()) -eq $hWnd
+}
+
+function Get-WindowTitle([IntPtr]$hWnd) {
+  if ($hWnd -eq [IntPtr]::Zero) { return '(oyna yo-q)' }
+  $title = New-Object System.Text.StringBuilder 256
+  [void][Win.Api]::GetWindowTextW($hWnd, $title, 256)
+  $owner = 0
+  [void][Win.Api]::GetWindowThreadProcessId($hWnd, [ref]$owner)
+  $name = '(?)'
+  try { $name = (Get-Process -Id $owner -ErrorAction Stop).ProcessName } catch { $name = '(?)' }
+  return ($name + " '" + $title.ToString() + "'")
+}
+
+<#
+  Windows only lets the process that already holds the foreground move it (SPI_GETFOREGROUNDLOCKTIMEOUT), and this
+  script is a child process of the app, not the foreground. So SetForegroundWindow alone returns false and E-IMZO's
+  dialog stays behind the app's own window — which is where the Windows gate stopped: the dialog appeared, the
+  password went nowhere.
+
+  Attaching to the dialog's own input queue borrows that right for a moment; it is how the automation tools on this
+  platform all do it. Nothing is typed unless the dialog really ends up in front: the check after this is what
+  decides, not whether these calls returned true.
+#>
+function Set-Foreground([IntPtr]$hWnd) {
+  $SW_RESTORE = 9
+  $ourThread = [Win.Api]::GetCurrentThreadId()
+  $owner = 0
+  $windowThread = [uint32][Win.Api]::GetWindowThreadProcessId($hWnd, [ref]$owner)
+  for ($try = 0; $try -lt 3; $try++) {
+    $attached = $false
+    if ($windowThread -ne 0 -and $windowThread -ne $ourThread) {
+      $attached = [Win.Api]::AttachThreadInput($ourThread, $windowThread, $true)
+    }
+    try {
+      [void][Win.Api]::ShowWindow($hWnd, $SW_RESTORE)
+      [void][Win.Api]::BringWindowToTop($hWnd)
+      [void][Win.Api]::SetForegroundWindow($hWnd)
+    } finally {
+      if ($attached) { [void][Win.Api]::AttachThreadInput($ourThread, $windowThread, $false) }
+    }
+    Start-Sleep -Milliseconds 200
+    if (Test-Foreground $hWnd) { return $true }
+  }
+  return $false
 }
 `
 
@@ -207,9 +253,11 @@ while ((Get-Date) -lt $deadline) {
 }
 if ($dialog -eq [IntPtr]::Zero) { exit $EXIT_NO_DIALOG }
 
-[void][Win.Api]::SetForegroundWindow($dialog)
-Start-Sleep -Milliseconds 300
-if (-not (Test-Foreground $dialog)) { exit $EXIT_NOT_FOCUSED }
+if (-not (Set-Foreground $dialog)) {
+  [Console]::Error.WriteLine("E-IMZO oynasi oldinga chiqmadi: " + (Get-WindowTitle $dialog))
+  [Console]::Error.WriteLine("Fokusda turgan oyna: " + (Get-WindowTitle ([Win.Api]::GetForegroundWindow())))
+  exit $EXIT_NOT_FOCUSED
+}
 
 # From here the password may reach the screen: the marker tells the app that a silent death is "interrupted".
 Write-Output '${TYPING_MARKER}'

@@ -283,6 +283,22 @@ describe('the PowerShell script', () => {
     expect(script).toContain('E-IMZO')
   })
 
+  /*
+   * Windows only lets the foreground process move the foreground window, and the typist is a child process, so
+   * SetForegroundWindow on its own left E-IMZO's dialog behind the app's window — the gate's dialog appeared and
+   * the password went nowhere. The input-queue attach is what borrows that right.
+   */
+  it('borrows the right to bring the dialog forward, and says who held the focus if it could not', () => {
+    expect(script).toContain('AttachThreadInput')
+    expect(script).toContain('Fokusda turgan oyna')
+  })
+
+  /* Typing still waits on the dialog being in front — the attach only tries to make that true. */
+  it('types only once the dialog is really in front', () => {
+    expect(script).toMatch(/if \(-not \(Set-Foreground \$dialog\)\) \{/)
+    expect(script.indexOf('$EXIT_NOT_FOCUSED')).toBeLessThan(script.indexOf(TYPING_MARKER))
+  })
+
   it('presses Return once, and Escape only when the password was refused', () => {
     expect(script.split('Send-Key 0x0D')).toHaveLength(2)
     expect(script.split('Send-Key 0x1B')).toHaveLength(2)
