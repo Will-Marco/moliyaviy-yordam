@@ -14,7 +14,14 @@ import { runPreflight, runTypist, type SpawnLike } from './typist.js'
 
 const POWERSHELL = 'powershell.exe'
 /** No profile, no prompts, and the machine's execution policy does not decide whether the accountant can log in. */
-const PS_FLAGS = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command'] as const
+const PS_FLAGS = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand'] as const
+
+/**
+ * `-EncodedCommand` takes the script as base64 UTF-16LE. The scripts hold double quotes (the C# that declares
+ * SendInput) and newlines, and `-Command` would hand those to PowerShell's own re-parsing of the raw command
+ * line — encoding leaves nothing to re-parse and nothing to quote.
+ */
+export const encodeCommand = (script: string): string => Buffer.from(script, 'utf16le').toString('base64')
 
 export function typeOnWindows(
   password: string,
@@ -24,11 +31,11 @@ export function typeOnWindows(
     dialogTimeoutMs,
     signal,
     spawn,
-    typist: { command: POWERSHELL, args: [...PS_FLAGS, typistScript(dialogTimeoutMs)] },
+    typist: { command: POWERSHELL, args: [...PS_FLAGS, encodeCommand(typistScript(dialogTimeoutMs))] },
   })
 }
 
 /** Reads only: whether an E-IMZO window is already open. Types nothing and carries no password. */
 export function preflightOnWindows({ spawn }: { spawn: SpawnLike }): Promise<AutotypePreflightResult> {
-  return runPreflight({ spawn, typist: { command: POWERSHELL, args: [...PS_FLAGS, EIMZO_PREFLIGHT_PS] } })
+  return runPreflight({ spawn, typist: { command: POWERSHELL, args: [...PS_FLAGS, encodeCommand(EIMZO_PREFLIGHT_PS)] } })
 }

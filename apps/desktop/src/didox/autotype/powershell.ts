@@ -53,28 +53,43 @@ function Test-Foreground($proc) {
   return ([Win.Api]::GetForegroundWindow()) -eq $proc.MainWindowHandle
 }
 
+# PowerShell hands out a *copy* of a struct-typed field, so writing through one (an INPUT's .ki.wScan) lands on the
+# copy and is lost. The nested struct is therefore built on its own and assigned whole.
+$INPUT_SIZE = [System.Runtime.InteropServices.Marshal]::SizeOf([Win.Api+INPUT])
+
+function New-KeyInput([ushort]$vk, [ushort]$scan, [uint32]$flags) {
+  $ki = New-Object Win.Api+KEYBDINPUT
+  $ki.wVk = $vk
+  $ki.wScan = $scan
+  $ki.dwFlags = $flags
+  $ki.time = 0
+  $ki.dwExtraInfo = [IntPtr]::Zero
+  $one = New-Object Win.Api+INPUT
+  $one.type = 1                        # INPUT_KEYBOARD
+  $one.ki = $ki
+  return $one
+}
+
+function Send-Pair($down, $up) {
+  $pair = [Win.Api+INPUT[]]::new(2)
+  $pair[0] = $down
+  $pair[1] = $up
+  return [Win.Api]::SendInput(2, $pair, $INPUT_SIZE)
+}
+
 function Send-Char([char]$c) {
-  $down = New-Object Win.Api+INPUT
-  $down.type = 1
-  $down.ki.wScan = [ushort]$c
-  $down.ki.dwFlags = 0x0004            # KEYEVENTF_UNICODE
-  $up = New-Object Win.Api+INPUT
-  $up.type = 1
-  $up.ki.wScan = [ushort]$c
-  $up.ki.dwFlags = 0x0004 -bor 0x0002  # UNICODE | KEYUP
-  $sent = [Win.Api]::SendInput(2, @($down, $up), [System.Runtime.InteropServices.Marshal]::SizeOf($down))
-  if ($sent -ne 2) { exit $EXIT_FAILED }
+  $UNICODE = 0x0004
+  $KEYUP = 0x0002
+  # KEYEVENTF_UNICODE carries the character in wScan, so the keyboard layout cannot change the password.
+  $down = New-KeyInput 0 ([ushort]$c) $UNICODE
+  $up = New-KeyInput 0 ([ushort]$c) ($UNICODE -bor $KEYUP)
+  if ((Send-Pair $down $up) -ne 2) { exit $EXIT_FAILED }
 }
 
 function Send-Key([ushort]$vk) {
-  $down = New-Object Win.Api+INPUT
-  $down.type = 1
-  $down.ki.wVk = $vk
-  $up = New-Object Win.Api+INPUT
-  $up.type = 1
-  $up.ki.wVk = $vk
-  $up.ki.dwFlags = 0x0002              # KEYUP
-  [void][Win.Api]::SendInput(2, @($down, $up), [System.Runtime.InteropServices.Marshal]::SizeOf($down))
+  $down = New-KeyInput $vk 0 0
+  $up = New-KeyInput $vk 0 0x0002      # KEYUP
+  [void](Send-Pair $down $up)
 }
 
 # A window that was already open is not ours to type into: the app never types into a dialog it did not expect.

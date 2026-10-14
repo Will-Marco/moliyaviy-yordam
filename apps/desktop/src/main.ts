@@ -60,6 +60,12 @@ function startApi(config: AppConfig): Promise<string> {
     const child = fork(apiEntry, [], {
       stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
       env: {
+        /*
+         * The system environment comes along. On Windows a child started with a scrubbed environment has no
+         * SystemRoot, TEMP or APPDATA, and Node needs them: without SystemRoot its crypto and DNS fail to load,
+         * and PGlite has nowhere to put its temporary files. The settings below are what this install adds.
+         */
+        ...process.env,
         ELECTRON_RUN_AS_NODE: '1',
         DB_DRIVER: 'pglite',
         PGLITE_DATA_DIR: join(userData(), 'db'),
@@ -255,7 +261,14 @@ function startSchedule(journal: ReturnType<typeof createJournal>): void {
 /** A tray icon, so the app can keep its schedule with no window open (FR-8.10). */
 function createTray(): void {
   if (tray) return
-  tray = new Tray(join(assets, 'trayTemplate.png'))
+  /*
+   * macOS tints a template image (black on transparent) to the menu bar; Windows draws the file as it is, and a
+   * black glyph on Windows 11's dark taskbar is an icon nobody can see — so Windows gets a white one with a dark
+   * outline, which stands out on a light taskbar too.
+   */
+  tray = new Tray(join(assets, process.platform === 'win32' ? 'trayWin.png' : 'trayTemplate.png'))
+  // Windows opens a tray menu on right-click only; a left click there is expected to open the app.
+  if (process.platform === 'win32') tray.on('click', () => void open())
   refreshTray()
 }
 

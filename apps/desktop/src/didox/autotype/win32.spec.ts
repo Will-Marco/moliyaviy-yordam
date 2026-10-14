@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { autotypePreflight, type SpawnLike, typeEimzoPassword } from './index.js'
 import { EXIT, TYPING_MARKER } from './jxa.js'
 import { EIMZO_PREFLIGHT_PS, typistScript } from './powershell.js'
+import { encodeCommand } from './win32.js'
 
 /*
  * The Windows typist is driven on a fake child: what matters here is the contract it is spoken to with — the
@@ -60,6 +61,8 @@ describe('the Windows typist', () => {
     expect(calls[0]?.command).toBe('powershell.exe')
     expect(calls[0]?.args.join(' ')).not.toContain(PASSWORD)
     expect(calls[0]?.args).toContain('-NonInteractive')
+    // The script travels encoded, so PowerShell has no raw command line to re-parse (and no quotes to lose).
+    expect(calls[0]?.args.at(-1)).toBe(encodeCommand(typistScript(20_000)))
   })
 
   it('passes the password on stdin, once', async () => {
@@ -142,7 +145,7 @@ describe('the Windows preflight', () => {
     children[0]!.exit(EXIT.OK)
 
     await expect(check).resolves.toBe('ok')
-    expect(calls[0]?.args.at(-1)).toBe(EIMZO_PREFLIGHT_PS)
+    expect(calls[0]?.args.at(-1)).toBe(encodeCommand(EIMZO_PREFLIGHT_PS))
   })
 
   it('refuses to start while an E-IMZO window is open', async () => {
@@ -187,6 +190,15 @@ describe('the PowerShell script', () => {
     for (const code of [EXIT.NO_DIALOG, EXIT.NOT_FOCUSED, EXIT.REJECTED, EXIT.FOCUS_LOST, EXIT.DIALOG_ALREADY_OPEN]) {
       expect(script).toContain(String(code))
     }
+  })
+
+  /*
+   * PowerShell returns a copy of a struct-typed field, so `$input.ki.wScan = x` writes to the copy: SendInput would
+   * then send a keystroke carrying no character at all, and the password would never reach E-IMZO.
+   */
+  it('never writes through a struct field, because PowerShell would lose it', () => {
+    expect(script).not.toMatch(/\$\w+\.ki\.\w+\s*=/)
+    expect(script).toContain('$one.ki = $ki')
   })
 
   it('presses Return once, and Escape only when the password was refused', () => {
