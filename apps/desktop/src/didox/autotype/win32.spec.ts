@@ -267,6 +267,16 @@ describe('the PowerShell script', () => {
     expect(script).toContain('IsWindowVisible')
   })
 
+  /*
+   * E-IMZO keeps visible windows of its own with no title (a Java app's tray-icon frame among them). Counting
+   * those as the password dialog made every run refuse to start — "E-IMZO'da ochiq oyna bor" — so a window only
+   * counts once it has a title, which is what the W0 measurement actually showed.
+   */
+  it('counts only a window that has a title', () => {
+    expect(script).toContain('GetWindowTextLengthW')
+    expect(script).toMatch(/IsWindowVisible\(\$hWnd\) -and/)
+  })
+
   /* The password goes into a window of E-IMZO's own process, or nowhere: an unidentified owner stops the run. */
   it('types only into a window it could tie to E-IMZO', () => {
     expect(script).toContain('Test-EimzoProcess')

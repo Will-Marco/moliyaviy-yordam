@@ -51,6 +51,8 @@ public struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(8)] public
 [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hWnd, uint command);
 [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr hWnd, out int processId);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextLengthW(IntPtr hWnd);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr hWnd, System.Text.StringBuilder text, int count);
 // SendInput's cbSize, worked out here: PowerShell picks Marshal.SizeOf(object) for a type literal and then fails
 // on it ("cannot marshal System.RuntimeType"), which is what stopped the Windows gate. C# has no such doubt.
 public static int InputSize() { return Marshal.SizeOf(typeof(INPUT)); }
@@ -98,12 +100,25 @@ function Find-EimzoWindows {
   if ($script:eimzoOwners.Count -eq 0) { return }
   $hWnd = [Win.Api]::GetTopWindow([IntPtr]::Zero)
   while ($hWnd -ne [IntPtr]::Zero) {
-    if ([Win.Api]::IsWindowVisible($hWnd)) {
+    # A title is what tells the dialog from a helper window: a Java app keeps visible, title-less windows of its
+    # own (the tray icon's frame among them), and the gate's W0 measurement — which listed titled windows only —
+    # is what "E-IMZO has no window until it asks for something" was measured on.
+    if ([Win.Api]::IsWindowVisible($hWnd) -and ([Win.Api]::GetWindowTextLengthW($hWnd) -gt 0)) {
       $owner = 0
       [void][Win.Api]::GetWindowThreadProcessId($hWnd, [ref]$owner)
       if ($script:eimzoOwners.ContainsKey($owner)) { [void]$script:eimzoWindows.Add($hWnd) }
     }
     $hWnd = [Win.Api]::GetWindow($hWnd, $GW_HWNDNEXT)
+  }
+}
+
+# Said on stderr when a run stops because something of E-IMZO's was already on screen: without the titles, that
+# verdict is unarguable and unexplainable at once.
+function Write-EimzoWindows {
+  foreach ($hWnd in $script:eimzoWindows) {
+    $title = New-Object System.Text.StringBuilder 256
+    [void][Win.Api]::GetWindowTextW($hWnd, $title, 256)
+    [Console]::Error.WriteLine("E-IMZO oynasi: '" + $title.ToString() + "'")
   }
 }
 
@@ -175,7 +190,10 @@ function Send-Key([ushort]$vk) {
 }
 
 # A window that was already open is not ours to type into: the app never types into a dialog it did not expect.
-if ((Get-EimzoWindowCount) -gt 0) { exit $EXIT_DIALOG_ALREADY_OPEN }
+if ((Get-EimzoWindowCount) -gt 0) {
+  Write-EimzoWindows
+  exit $EXIT_DIALOG_ALREADY_OPEN
+}
 
 $password = [Console]::In.ReadToEnd()
 if ([string]::IsNullOrEmpty($password)) { exit $EXIT_FAILED }
@@ -218,7 +236,10 @@ exit $EXIT_REJECTED
  * input and the unicode keystrokes ignore the layout, so only a dialog that is already open can stop a run here.
  */
 export const EIMZO_PREFLIGHT_PS = String.raw`${COMMON_PS}
-if ((Get-EimzoWindowCount) -gt 0) { exit ${EXIT.DIALOG_ALREADY_OPEN} }
+if ((Get-EimzoWindowCount) -gt 0) {
+  Write-EimzoWindows
+  exit ${EXIT.DIALOG_ALREADY_OPEN}
+}
 exit ${EXIT.OK}
 `
 

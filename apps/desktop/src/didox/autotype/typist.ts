@@ -94,6 +94,12 @@ function fromClixml(text: string): string {
     .replace(/&(lt|gt|quot|apos|amp);/g, (entity) => XML_ENTITIES[entity] ?? entity)
 }
 
+/** Keeps what a script said about a verdict the app already understands: nowhere to report it, worth knowing. */
+function note(text: string): void {
+  const said = complaint(text)
+  if (said) console.warn(`[autotype] ${said}`)
+}
+
 /** The first, most telling part of what the script complained about, on one line. */
 function complaint(text: string): string {
   const flat = fromClixml(text).replace(/\s+/g, ' ').trim()
@@ -179,7 +185,12 @@ export function runTypist(
     child.on('error', () => unconfirmed("E-IMZO parol yozuvchisini ishga tushirib bo'lmadi"))
     child.on('close', (code, exitSignal) => {
       const result = code === null ? undefined : (typing ? AFTER_TYPING : BEFORE_TYPING)[code]
-      if (result) return settle(() => ok(result))
+      if (result) {
+        // A verdict the app understands is reported as itself; what the script said besides goes to the log,
+        // where it is the difference between "a window was open" and knowing which one.
+        note(err)
+        return settle(() => ok(result))
+      }
       unconfirmed(`E-IMZO parol yozuvchisi kutilmagan holatda tugadi (${exitSignal ?? `kod ${code}`})`)
     })
 
@@ -222,7 +233,10 @@ export function runPreflight({ spawn, typist }: { spawn: SpawnLike; typist: Typi
     child.on('error', () => settle(() => fail(new Error("E-IMZO tekshiruvini ishga tushirib bo'lmadi"))))
     child.on('close', (code, exitSignal) => {
       const result = code === null ? undefined : PREFLIGHT[code]
-      if (result) return settle(() => ok(result))
+      if (result) {
+        note(err)
+        return settle(() => ok(result))
+      }
       const why = complaint(err)
       const how = `${exitSignal ?? `kod ${code}`}`
       settle(() => fail(new Error(`E-IMZO tekshiruvi kutilmagan holatda tugadi (${how})${why ? `: ${why}` : ''}`)))
