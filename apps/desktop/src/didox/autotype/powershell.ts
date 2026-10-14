@@ -13,22 +13,32 @@ import { CLOSE_WAIT_MS, EXIT, TYPING_MARKER } from './jxa.js'
  * the focus moving, or E-IMZO refusing the password — each has its own exit code.
  */
 
-/** E-IMZO runs on the JRE, so its window belongs to a java process; the title is the stable part. */
-const EIMZO_WINDOW_TITLES = ['E-IMZO', 'Kalit parolini kiriting', 'Введите пароль ключа']
+/*
+ * How the password dialog is recognised. Measured on a real Windows machine (2026-10-14, Windows gate W0):
+ *
+ *   - while E-IMZO sits in the tray it has **no visible window at all**;
+ *   - when it asks for the key password, a window of its `javaw` process appears — but it is *not* that process's
+ *     main window (`MainWindowHandle` is 0 and the process is missing from `Get-Process` main-window listings),
+ *     and its title is a countdown ("Отмена через 55 секунд") that changes every second.
+ *
+ * So the dialog cannot be found by title or by main window. It is found the way macOS finds it: E-IMZO owns no
+ * window until it asks for something, so *a visible window of E-IMZO* is the dialog.
+ *
+ * The password may only ever be typed into a window owned by E-IMZO's own binary, so the owning process must be
+ * one of these names *and* live in an E-IMZO directory. A process whose path cannot be read is not E-IMZO as far
+ * as this script is concerned: it is left alone, and the run stops rather than typing somewhere unknown.
+ */
+const EIMZO_PROCESS_NAMES = ['javaw', 'java']
+const EIMZO_PATH_PATTERNS = ['*E-IMZO*', '*EIMZO*']
 
-const TYPIST_PS = String.raw`
+/** Win32 bindings and the E-IMZO window lookup, shared by the typist and the preflight. Reads only. */
+const COMMON_PS = String.raw`
 $ErrorActionPreference = 'Stop'
-$timeoutMs = [int]'__TIMEOUT_MS__'
-$titles = @(${EIMZO_WINDOW_TITLES.map((t) => `'${t}'`).join(', ')})
-$EXIT_TYPED = ${EXIT.TYPED}
-$EXIT_NO_DIALOG = ${EXIT.NO_DIALOG}
-$EXIT_NOT_FOCUSED = ${EXIT.NOT_FOCUSED}
-$EXIT_REJECTED = ${EXIT.REJECTED}
-$EXIT_FOCUS_LOST = ${EXIT.FOCUS_LOST}
-$EXIT_DIALOG_ALREADY_OPEN = ${EXIT.DIALOG_ALREADY_OPEN}
-$EXIT_FAILED = ${EXIT.FAILED}
+$EIMZO_NAMES = @(${EIMZO_PROCESS_NAMES.map((n) => `'${n}'`).join(', ')})
+$EIMZO_PATHS = @(${EIMZO_PATH_PATTERNS.map((p) => `'${p}'`).join(', ')})
 
 Add-Type -Namespace Win -Name Api -MemberDefinition @'
+public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
 [StructLayout(LayoutKind.Sequential)]
 public struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
 [StructLayout(LayoutKind.Explicit, Size = 40)]
@@ -36,22 +46,87 @@ public struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(8)] public
 [DllImport("user32.dll", SetLastError = true)] public static extern uint SendInput(uint n, INPUT[] inputs, int size);
 [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr hWnd, System.Text.StringBuilder text, int count);
+[DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc callback, IntPtr lParam);
+[DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr hWnd, out int processId);
 '@
 
-function Get-EimzoWindow {
-  foreach ($p in Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }) {
-    foreach ($t in $titles) {
-      if ($p.MainWindowTitle -and $p.MainWindowTitle.Contains($t)) { return $p }
-    }
+# Script scope, because the callback below is invoked by EnumWindows and reaches the script's variables, not a
+# function's locals.
+$script:eimzoOwners = @{}
+$script:eimzoWindows = New-Object System.Collections.ArrayList
+
+$script:collectEimzo = [Win.Api+EnumProc] {
+  param($hWnd, $lParam)
+  if ([Win.Api]::IsWindowVisible($hWnd)) {
+    $owner = 0
+    [void][Win.Api]::GetWindowThreadProcessId($hWnd, [ref]$owner)
+    if ($script:eimzoOwners.ContainsKey($owner)) { [void]$script:eimzoWindows.Add($hWnd) }
   }
-  return $null
+  return $true
 }
 
-function Test-Foreground($proc) {
-  if (-not $proc) { return $false }
-  return ([Win.Api]::GetForegroundWindow()) -eq $proc.MainWindowHandle
+# Fills $script:eimzoWindows with E-IMZO's visible windows. Returns nothing: collections are read back by the two
+# helpers below, so no pipeline unrolling can turn a list into its elements.
+# Is this java process E-IMZO? Its own binary is the first answer; a machine where E-IMZO runs on a system-wide
+# Java has that binary outside E-IMZO's folder, and then the command line is what names it. Neither readable means
+# "not E-IMZO": nothing is typed into a window whose owner could not be identified.
+function Test-EimzoProcess($proc) {
+  $path = $null
+  try { $path = $proc.Path } catch { $path = $null }
+  if ($path) {
+    foreach ($pattern in $EIMZO_PATHS) {
+      if ($path -like $pattern) { return $true }
+    }
+  }
+  $cmd = $null
+  try {
+    $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId = $($proc.Id)" -ErrorAction Stop).CommandLine
+  } catch { $cmd = $null }
+  if ($cmd) {
+    foreach ($pattern in $EIMZO_PATHS) {
+      if ($cmd -like $pattern) { return $true }
+    }
+  }
+  return $false
 }
+
+function Find-EimzoWindows {
+  $script:eimzoOwners = @{}
+  foreach ($proc in Get-Process -Name $EIMZO_NAMES -ErrorAction SilentlyContinue) {
+    if (Test-EimzoProcess $proc) { $script:eimzoOwners[$proc.Id] = $true }
+  }
+  $script:eimzoWindows.Clear()
+  [void][Win.Api]::EnumWindows($script:collectEimzo, [IntPtr]::Zero)
+}
+
+function Get-EimzoWindowCount {
+  Find-EimzoWindows
+  return $script:eimzoWindows.Count
+}
+
+# The dialog's own handle, or IntPtr.Zero.
+function Get-EimzoWindowHandle {
+  Find-EimzoWindows
+  if ($script:eimzoWindows.Count -eq 0) { return [IntPtr]::Zero }
+  return [IntPtr]$script:eimzoWindows[0]
+}
+
+function Test-Foreground([IntPtr]$hWnd) {
+  if ($hWnd -eq [IntPtr]::Zero) { return $false }
+  return ([Win.Api]::GetForegroundWindow()) -eq $hWnd
+}
+`
+
+const TYPIST_PS = String.raw`${COMMON_PS}
+$timeoutMs = [int]'__TIMEOUT_MS__'
+$EXIT_TYPED = ${EXIT.TYPED}
+$EXIT_NO_DIALOG = ${EXIT.NO_DIALOG}
+$EXIT_NOT_FOCUSED = ${EXIT.NOT_FOCUSED}
+$EXIT_REJECTED = ${EXIT.REJECTED}
+$EXIT_FOCUS_LOST = ${EXIT.FOCUS_LOST}
+$EXIT_DIALOG_ALREADY_OPEN = ${EXIT.DIALOG_ALREADY_OPEN}
+$EXIT_FAILED = ${EXIT.FAILED}
 
 # PowerShell hands out a *copy* of a struct-typed field, so writing through one (an INPUT's .ki.wScan) lands on the
 # copy and is lost. The nested struct is therefore built on its own and assigned whole.
@@ -93,39 +168,41 @@ function Send-Key([ushort]$vk) {
 }
 
 # A window that was already open is not ours to type into: the app never types into a dialog it did not expect.
-if (Get-EimzoWindow) { exit $EXIT_DIALOG_ALREADY_OPEN }
+if ((Get-EimzoWindowCount) -gt 0) { exit $EXIT_DIALOG_ALREADY_OPEN }
 
 $password = [Console]::In.ReadToEnd()
 if ([string]::IsNullOrEmpty($password)) { exit $EXIT_FAILED }
 
 $deadline = (Get-Date).AddMilliseconds($timeoutMs)
-$proc = $null
+$dialog = [IntPtr]::Zero
 while ((Get-Date) -lt $deadline) {
-  $proc = Get-EimzoWindow
-  if ($proc) { break }
+  $dialog = Get-EimzoWindowHandle
+  if ($dialog -ne [IntPtr]::Zero) { break }
   Start-Sleep -Milliseconds 250
 }
-if (-not $proc) { exit $EXIT_NO_DIALOG }
+if ($dialog -eq [IntPtr]::Zero) { exit $EXIT_NO_DIALOG }
 
-[void][Win.Api]::SetForegroundWindow($proc.MainWindowHandle)
+[void][Win.Api]::SetForegroundWindow($dialog)
 Start-Sleep -Milliseconds 300
-if (-not (Test-Foreground $proc)) { exit $EXIT_NOT_FOCUSED }
+if (-not (Test-Foreground $dialog)) { exit $EXIT_NOT_FOCUSED }
 
 # From here the password may reach the screen: the marker tells the app that a silent death is "interrupted".
 Write-Output '${TYPING_MARKER}'
 foreach ($c in $password.ToCharArray()) {
-  if (-not (Test-Foreground $proc)) { exit $EXIT_FOCUS_LOST }
+  if (-not (Test-Foreground $dialog)) { exit $EXIT_FOCUS_LOST }
   Send-Char $c
   Start-Sleep -Milliseconds 40
 }
-if (-not (Test-Foreground $proc)) { exit $EXIT_FOCUS_LOST }
+if (-not (Test-Foreground $dialog)) { exit $EXIT_FOCUS_LOST }
 Send-Key 0x0D                          # VK_RETURN
 
 # E-IMZO closes its window when the password was right; a window still there means it was refused.
-Start-Sleep -Milliseconds ${CLOSE_WAIT_MS}
-$still = Get-EimzoWindow
-if (-not $still) { exit $EXIT_TYPED }
-if (Test-Foreground $still) { Send-Key 0x1B }   # VK_ESCAPE, once
+$closeBy = (Get-Date).AddMilliseconds(${CLOSE_WAIT_MS})
+while ((Get-Date) -lt $closeBy) {
+  if ((Get-EimzoWindowCount) -eq 0) { exit $EXIT_TYPED }
+  Start-Sleep -Milliseconds 250
+}
+if (Test-Foreground $dialog) { Send-Key 0x1B }   # VK_ESCAPE, once
 exit $EXIT_REJECTED
 `
 
@@ -133,14 +210,8 @@ exit $EXIT_REJECTED
  * The preflight: everything that can be known before the Didox window opens. Windows asks for no permission to send
  * input and the unicode keystrokes ignore the layout, so only a dialog that is already open can stop a run here.
  */
-export const EIMZO_PREFLIGHT_PS = String.raw`
-$ErrorActionPreference = 'Stop'
-$titles = @(${EIMZO_WINDOW_TITLES.map((t) => `'${t}'`).join(', ')})
-foreach ($p in Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }) {
-  foreach ($t in $titles) {
-    if ($p.MainWindowTitle -and $p.MainWindowTitle.Contains($t)) { exit ${EXIT.DIALOG_ALREADY_OPEN} }
-  }
-}
+export const EIMZO_PREFLIGHT_PS = String.raw`${COMMON_PS}
+if ((Get-EimzoWindowCount) -gt 0) { exit ${EXIT.DIALOG_ALREADY_OPEN} }
 exit ${EXIT.OK}
 `
 

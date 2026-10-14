@@ -19,25 +19,19 @@
 Buyruqlar **PowerShell**'da bajariladi. Env o'zgaruvchisi PowerShell'da boshqacha yoziladi:
 `$env:NOM="1"` — `NOM=1 buyruq` emas.
 
-## 1. W0 — E-IMZO oynasini o'lchash (eng avval, 2 daqiqa)
+## 1. W0 — E-IMZO oynasini o'lchash — ✅ BAJARILDI (2026-10-14)
 
-Nega: PowerShell typist E-IMZO parol oynasini **sarlavhasi bo'yicha** topadi, va Windows'da o'sha sarlavha
-qanday bo'lishini biz hali ko'rmaganmiz. Taxmin bilan boshlamaymiz — avval o'lchaymiz.
+O'lchov `apps\desktop\scripts\list-windows.ps1` bilan qilindi. Natija (to'liq yozuv:
+`docs/research/e-imzo.md §9b`):
 
-```powershell
-cd <repo>
-# (a) E-IMZO ishlab turgan, lekin parol oynasi YO'Q holatda:
-powershell -NoProfile -ExecutionPolicy Bypass -File apps\desktop\scripts\list-windows.ps1
-```
+1. E-IMZO tray'da ishlab turganda uning **ko'rinadigan oynasi yo'q** — `javaw` ro'yxatda chiqmaydi.
+2. Parol so'raganda `javaw` oynasi paydo bo'ladi, lekin u **asosiy oyna emas** (`MainWindowHandle = 0`).
+3. Sarlavha — **hisoblagich**: `Отмена через 55 секунд`, har sekundda o'zgaradi.
 
-Keyin E-IMZO parol oynasini **qo'lda** chiqaring (masalan Didox'ga brauzerdan kirib, kalitni tanlang) va oyna
-ekranda turganda **yana** o'sha buyruqni ishga tushiring (ikkinchi PowerShell oynasidan).
-
-**Yuboring:** ikkala ro'yxatning natijasi (matn ko'rinishida). Shundan keyin kodda sarlavhalar aniq yoziladi.
-
-⚠️ Hozir kod shu uchta sarlavhani izlaydi: `E-IMZO`, `Kalit parolini kiriting`, `Введите пароль ключа`.
-Agar E-IMZO oddiy ishlab turganda ham sarlavhasida `E-IMZO` bo'lsa, ilova "parol oynasi allaqachon ochiq" deb
-o'ylab **ishni boshlamaydi** — W0 shuni aniqlaydi.
+Ya'ni kodda yozilgan uchta sarlavha bo'yicha izlash **hech qachon ishlamas edi** — ilova oynani topmasdan
+"parol oynasi chiqmadi" deb to'xtar edi. Tuzatildi: oyna macOS'dagi mantiq bilan topiladi — E-IMZO'ning
+ko'rinadigan oynasi bor-yo'qligi bo'yicha (`EnumWindows` + `IsWindowVisible` + oyna egasi E-IMZO jarayonimi).
+Parol faqat E-IMZO'ning o'z oynasiga tushadi: egasi aniqlanmasa — hech narsa yozilmaydi.
 
 ## 2. W1 — qurish va ishga tushirish
 

@@ -242,6 +242,29 @@ Xulosa: **06:00 da inson yo'q bo'lsa ERI-login amalda bajarilmaydi.** Xavfsiz di
 
 ---
 
+## 9b. Windows: parol oynasi qanday topiladi (o'lchangan, 2026-10-14, Windows gate W0)
+
+Haqiqiy Windows kompyuterida `apps/desktop/scripts/list-windows.ps1` bilan o'lchandi (barcha ko'rinadigan
+top-level oynalar + jarayonning asosiy oynasi):
+
+1. **E-IMZO tray'da ishlab turganda uning ko'rinadigan oynasi yo'q.** Ro'yxatda `javaw` umuman chiqmaydi.
+2. **Parol so'raganda `javaw` ning oynasi paydo bo'ladi**, lekin u o'sha jarayonning *asosiy* oynasi emas:
+   `MainWindowHandle = 0`, shuning uchun `Get-Process | Where MainWindowHandle -ne 0` ro'yxatida **yo'q**.
+3. **Oyna sarlavhasi — hisoblagich:** `Отмена через 55 секунд` (har sekundda o'zgaradi, tilga ham bog'liq).
+
+Natija: oynani **sarlavha bo'yicha** yoki **asosiy oyna bo'yicha** topish mumkin emas. Topish usuli macOS
+bilan bir xil mantiqqa keltirildi — *E-IMZO'ning ko'rinadigan oynasi bor-yo'qligi* (macOS'da
+`windowCount(E-IMZO) > 0`, Windows'da `EnumWindows` + `IsWindowVisible` + oyna egasi E-IMZO jarayonimi).
+
+Egasini aniqlash (parol faqat E-IMZO'ning o'z oynasiga tushishi uchun): jarayon nomi `javaw`/`java` **va**
+(bajariladigan fayl yo'li yoki buyruq satri `E-IMZO`/`EIMZO` ni o'z ichiga olsa). Ikkisi ham o'qilmasa — oyna
+E-IMZO'ning emas deb hisoblanadi va **hech narsa yozilmaydi** (run xavfsiz to'xtaydi).
+
+Yon ta'sir: buxgalter E-IMZO'ning **o'z oynasini** ochib qo'ysa, ilova "parol oynasi allaqachon ochiq" deb
+ishni boshlamaydi — macOS'dagi xatti-harakatning aynan o'zi, xavfsiz tomoni.
+
+Kod: `apps/desktop/src/didox/autotype/powershell.ts`, testlar `win32.spec.ts`.
+
 ## 10. Manbalar
 
 Rasmiy / birlamchi:

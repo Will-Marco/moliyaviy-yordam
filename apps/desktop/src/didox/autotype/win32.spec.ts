@@ -148,6 +148,12 @@ describe('the Windows preflight', () => {
     expect(calls[0]?.args.at(-1)).toBe(encodeCommand(EIMZO_PREFLIGHT_PS))
   })
 
+  it('looks for the dialog exactly the way the typist does', () => {
+    expect(EIMZO_PREFLIGHT_PS).toContain('Find-EimzoWindows')
+    expect(EIMZO_PREFLIGHT_PS).toContain('Get-EimzoWindowCount')
+    expect(typistScript(20_000)).toContain('Find-EimzoWindows')
+  })
+
   it('refuses to start while an E-IMZO window is open', async () => {
     const { children, spawn } = fakeSpawn()
 
@@ -199,6 +205,24 @@ describe('the PowerShell script', () => {
   it('never writes through a struct field, because PowerShell would lose it', () => {
     expect(script).not.toMatch(/\$\w+\.ki\.\w+\s*=/)
     expect(script).toContain('$one.ki = $ki')
+  })
+
+  /*
+   * Measured on a real Windows machine (gate W0, 2026-10-14): E-IMZO has no visible window until it asks for the
+   * key password, the dialog is not its process's main window, and its title counts seconds down
+   * ("Отмена через 55 секунд"). So neither the title nor the main window can find it.
+   */
+  it('finds the dialog by E-IMZO having a visible window at all', () => {
+    expect(script).not.toContain('MainWindowTitle')
+    expect(script).not.toContain('MainWindowHandle')
+    expect(script).toContain('EnumWindows')
+    expect(script).toContain('IsWindowVisible')
+  })
+
+  /* The password goes into a window of E-IMZO's own process, or nowhere: an unidentified owner stops the run. */
+  it('types only into a window it could tie to E-IMZO', () => {
+    expect(script).toContain('Test-EimzoProcess')
+    expect(script).toContain('E-IMZO')
   })
 
   it('presses Return once, and Escape only when the password was refused', () => {
