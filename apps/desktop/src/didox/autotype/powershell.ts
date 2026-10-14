@@ -118,9 +118,12 @@ function Find-EimzoWindows {
 
 # Said on stderr when a run stops because something of E-IMZO's was already on screen: without the titles, that
 # verdict is unarguable and unexplainable at once.
+# Written to stdout on purpose: PowerShell wraps its own error stream in a CLIXML envelope when stderr is
+# redirected, and a line put there arrives buried in XML. stdout is read as text, and the only thing the app looks
+# for in it is the TYPING marker.
 function Write-EimzoWindows {
   foreach ($hWnd in $script:eimzoWindows) {
-    [Console]::Error.WriteLine("E-IMZO oynasi: " + (Get-WindowTitle $hWnd))
+    Write-Output ("E-IMZO oynasi: " + (Get-WindowTitle $hWnd))
   }
 }
 
@@ -254,8 +257,8 @@ while ((Get-Date) -lt $deadline) {
 if ($dialog -eq [IntPtr]::Zero) { exit $EXIT_NO_DIALOG }
 
 if (-not (Set-Foreground $dialog)) {
-  [Console]::Error.WriteLine("E-IMZO oynasi oldinga chiqmadi: " + (Get-WindowTitle $dialog))
-  [Console]::Error.WriteLine("Fokusda turgan oyna: " + (Get-WindowTitle ([Win.Api]::GetForegroundWindow())))
+  Write-Output ("E-IMZO oynasi oldinga chiqmadi: " + (Get-WindowTitle $dialog))
+  Write-Output ("Fokusda turgan oyna: " + (Get-WindowTitle ([Win.Api]::GetForegroundWindow())))
   exit $EXIT_NOT_FOCUSED
 }
 

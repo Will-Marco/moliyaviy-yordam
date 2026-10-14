@@ -84,12 +84,21 @@ const XML_ENTITIES: Readonly<Record<string, string>> = {
   '&amp;': '&',
 }
 
+const CLIXML_OBJS = /<Objs[\s\S]*?<\/Objs>/g
+const CLIXML_TAIL = /<Objs[\s\S]*$/
+
 function fromClixml(text: string): string {
   if (!text.includes(CLIXML_HEAD)) return text
-  const fragments = [...text.matchAll(CLIXML_ERROR)].map((m) => m[1] ?? '')
-  if (fragments.length === 0) return ''
-  return fragments
-    .join('')
+  const errors: string[] = []
+  const keep = (block: string) => {
+    for (const found of block.matchAll(CLIXML_ERROR)) errors.push(found[1] ?? '')
+    return ' '
+  }
+  // What is not the envelope is plain text and worth keeping: the envelope holds progress records too, and taking
+  // only its error fragments threw away every line written beside it.
+  const plain = text.replace(CLIXML_OBJS, keep).replace(CLIXML_TAIL, keep).split(CLIXML_HEAD).join(' ')
+  return [plain, ...errors]
+    .join(' ')
     .replace(/_x000D_|_x000A_/g, ' ')
     .replace(/&(lt|gt|quot|apos|amp);/g, (entity) => XML_ENTITIES[entity] ?? entity)
 }
@@ -187,8 +196,9 @@ export function runTypist(
       const result = code === null ? undefined : (typing ? AFTER_TYPING : BEFORE_TYPING)[code]
       if (result) {
         // A verdict the app understands is reported as itself; what the script said besides goes to the log,
-        // where it is the difference between "a window was open" and knowing which one.
-        note(err)
+        // where it is the difference between "a window was open" and knowing which one. Not once typing has
+        // started: from there the app says only that a person must look.
+        if (!typing) note(`${out.split(TYPING_MARKER).join(' ')} ${err}`)
         return settle(() => ok(result))
       }
       unconfirmed(`E-IMZO parol yozuvchisi kutilmagan holatda tugadi (${exitSignal ?? `kod ${code}`})`)

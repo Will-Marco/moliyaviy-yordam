@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { autotypePreflight, type SpawnLike, typeEimzoPassword } from './index.js'
 import { EXIT, TYPING_MARKER } from './jxa.js'
 import { EIMZO_PREFLIGHT_PS, typistScript } from './powershell.js'
@@ -32,6 +32,9 @@ class FakeChild extends EventEmitter {
   }
   complains(text: string) {
     this.stderr.emit('data', Buffer.from(text))
+  }
+  says(text: string) {
+    this.stdout.emit('data', Buffer.from(`${text}\n`))
   }
   exit(code: number | null) {
     this.emit('close', code, null)
@@ -161,6 +164,24 @@ describe('the Windows typist', () => {
     await expect(typing).resolves.toBe('interrupted')
   })
 
+  /*
+   * The script's own diagnostics travel on stdout, and a verdict the app understands must still let them through:
+   * the first time the gate hit "a window was already open", the line naming the window was dropped on the floor.
+   */
+  it('logs what the script printed about a verdict it understands', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { children, spawn } = fakeSpawn()
+
+    const typing = typeOnWindows(spawn)
+    children[0]!.says("E-IMZO oynasi: javaw 'Otmena cherez 48 sekund'")
+    children[0]!.complains('#< CLIXML\n<Objs Version="1.1.0.1"><Obj S="progress" RefId="0"></Obj></Objs>')
+    children[0]!.exit(EXIT.DIALOG_ALREADY_OPEN)
+
+    await expect(typing).resolves.toBe('dialog_already_open')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("javaw 'Otmena cherez 48 sekund'"))
+    warn.mockRestore()
+  })
+
   it('kills the typist when the run is cancelled before it types', async () => {
     const controller = new AbortController()
     const { children, spawn } = fakeSpawn()
@@ -237,7 +258,7 @@ describe('the PowerShell script', () => {
   })
 
   it('says it has started before any character goes in', () => {
-    expect(script.indexOf(TYPING_MARKER)).toBeLessThan(script.indexOf('Send-Char $c'))
+    expect(script.indexOf(`Write-Output '${TYPING_MARKER}'`)).toBeLessThan(script.indexOf('Send-Char $c'))
   })
 
   it('embeds the exit codes it is read by', () => {
@@ -296,7 +317,7 @@ describe('the PowerShell script', () => {
   /* Typing still waits on the dialog being in front — the attach only tries to make that true. */
   it('types only once the dialog is really in front', () => {
     expect(script).toMatch(/if \(-not \(Set-Foreground \$dialog\)\) \{/)
-    expect(script.indexOf('$EXIT_NOT_FOCUSED')).toBeLessThan(script.indexOf(TYPING_MARKER))
+    expect(script.indexOf('exit $EXIT_NOT_FOCUSED')).toBeLessThan(script.indexOf(`Write-Output '${TYPING_MARKER}'`))
   })
 
   it('presses Return once, and Escape only when the password was refused', () => {
