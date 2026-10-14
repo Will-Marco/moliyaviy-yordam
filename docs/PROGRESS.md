@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 8c — qoralama yaratish (**c2 gate o'tdi 2026-10-13**; keyingi qadam — Sir qarori: M8d jadval yoki A varianti (Didox paroli))
+**Joriy modul:** 8d — jadval (**macOS qismi qurildi va gate'dan o'tdi 2026-10-14**; qoldi: Windows adapteri va qadoqlangan ilovada bildirishnoma tekshiruvi)
 **Oxirgi yangilanish:** 2026-10-13
 
 ## Modullar
@@ -54,6 +54,19 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-14 — **M8d (macOS) qurildi va real sinovdan o'tdi.** Oy 1-kuni 06:00 (Toshkent) tugagan oy uchun ilova
+  o'zi urinadi — faqat buxgalter klaviaturadan uzoq bo'lsa (3 daq harakatsizlik), ekran qulfsiz, E-IMZO ishlasa va
+  ruxsatlar bo'lsa; aks holda oy "kutmoqda" deb belgilanadi (07:00/08:00 da va keyin soatiga bir marta qayta
+  qaraladi, uyg'onish/qulf ochilishida ham). Didox'ga yetib borgan urinish oyni **yopadi** (topilgan muammo —
+  odamniki), uch urinishdan keyin jadval to'xtaydi. Ilova tray'da yashaydi, qadoqlangan versiyada tizim bilan
+  ishga tushadi. **Gate (Sir mashinasida, hech narsa bosilmadi):** sentabr "qarz" holatiga qaytarildi → ilova
+  o'zi run boshladi va 14 s da tugatdi; Didox'da kechagi ikki sinov qoralamasi turgani uchun **yangi qoralama
+  yaratmadi**, ikkala fakturani `SIMILAR_DRAFT_EXISTS` bilan "e'tibor kerak" qildi — ya'ni jadval ham,
+  takrorlanishdan himoya ham bir vaqtda tasdiqlandi. **Topilma:** macOS imzosiz dev ilovadan **bildirishnomani
+  rad etadi** (`UNErrorDomain error 1`), shuning uchun kutayotgan oy tray tooltip/menyusiga ham yoziladi;
+  qadoqlangan ilovada bildirishnoma ishlashini qadoqlash gate'i tekshiradi. **Dev eslatmasi:** Accessibility
+  ruxsati jarayonni **ishga tushirgan** ilovaga bog'lanadi (terminal), shuning uchun jadval sinovi Sir terminalidan
+  o'tkazildi; `DIDOX_SCHEDULE_CHECK_MS` — sinov uchun tekshiruv oralig'i. Testlar: desktop 479, web 195, api 130
 - 2026-10-13 — **M8c c2 GATE O'TDI.** Sir ilovadan ishga tushirdi: **2 ta qoralama yaratildi** (№ 12/25, 13/25),
   kalitsiz firma (SINOV BERUVCHI) "E-IMZO kaliti topilmadi" deb o'tkazildi va **birinchi firma davom etdi** (FR-8.8).
   Qolgan acceptance ssenariylari real Didox'da tekshirildi (Claude, Sir vaqtini olmasdan):

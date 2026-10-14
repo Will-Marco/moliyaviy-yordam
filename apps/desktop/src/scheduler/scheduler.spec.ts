@@ -138,6 +138,16 @@ describe('the monthly schedule', () => {
     expect(s.timers.at(-1)?.ms).toBe(60 * 60 * 1000) // 07:00 is an hour after 06:00
   })
 
+  /* The gate needs to watch the schedule decide for itself, which an hourly look makes impractical. */
+  it('can be told to look more often than the next slot', async () => {
+    const s = setup({ ready: async () => 'busy', maxWaitMs: 30_000 })
+
+    s.scheduler.start()
+    await s.settle()
+
+    expect(s.timers.at(-1)?.ms).toBe(30_000)
+  })
+
   it('stops looking when told to', async () => {
     const s = setup({ ready: async () => 'busy' })
     s.scheduler.start()

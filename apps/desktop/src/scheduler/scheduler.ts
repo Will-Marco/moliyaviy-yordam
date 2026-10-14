@@ -25,6 +25,11 @@ export interface SchedulerDeps {
   nowMs?: () => number
   /** Injected so tests do not wait: returns a cancel function. */
   timer?: (ms: number, fn: () => void) => () => void
+  /**
+   * Upper bound on the gap between two looks. Production leaves it alone (the next look is the next slot, or an
+   * hour); a gate run sets it short so the schedule can be watched making its own decision within a minute.
+   */
+  maxWaitMs?: number
 }
 
 const defaultTimer = (ms: number, fn: () => void) => {
@@ -65,7 +70,8 @@ export function createScheduler(deps: SchedulerDeps) {
   function schedule(): void {
     if (stopped) return
     cancelTimer?.()
-    const wait = Math.max(nextCheck(nowMs(), monthToBill(nowMs())) - nowMs(), 1000)
+    const planned = nextCheck(nowMs(), monthToBill(nowMs())) - nowMs()
+    const wait = Math.max(Math.min(planned, deps.maxWaitMs ?? planned), 1000)
     cancelTimer = timer(wait, () => void check())
   }
 

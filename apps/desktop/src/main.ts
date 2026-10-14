@@ -191,7 +191,10 @@ const NOT_READY: Record<Exclude<ReadyVerdict, 'ok'>, string> = {
 }
 
 function startSchedule(journal: ReturnType<typeof createJournal>): void {
+  // Dev/gate only: how often the schedule looks. Unset in production, where it follows the morning slots.
+  const checkEvery = Number.parseInt(process.env.DIDOX_SCHEDULE_CHECK_MS ?? '', 10)
   scheduler = createScheduler({
+    ...(Number.isFinite(checkEvery) && checkEvery >= 5_000 ? { maxWaitMs: checkEvery } : {}),
     attempts: async (month) =>
       (await journal.list({ month, limit: 50 })).map((run) => ({
         startedAt: run.startedAt,
@@ -199,6 +202,7 @@ function startSchedule(journal: ReturnType<typeof createJournal>): void {
         transient: !!run.failure && TRANSIENT.has(run.failure.code),
       })),
     start: async (month) => {
+      console.info(`[didox] jadval bo'yicha ishga tushirilmoqda: ${month}`)
       const result = await didox?.createDrafts({ month, lenderIds: 'all' })
       if (result?.ok) {
         waitingMonth = null
