@@ -69,10 +69,35 @@ const PREFLIGHT_TIMEOUT_MS = 15_000
  */
 const MAX_COMPLAINT_CHARS = 600
 
-/** The last, most relevant part of what the script complained about, on one line. */
+/*
+ * With stderr redirected, PowerShell does not write plain text: it writes a CLIXML envelope, and the message is
+ * spread over `<S S="Error">` fragments with newlines escaped. Read as it arrives it is a wall of XML, so the
+ * fragments are put back together.
+ */
+const CLIXML_HEAD = '#< CLIXML'
+const CLIXML_ERROR = /<S S="Error">([\s\S]*?)<\/S>/g
+const XML_ENTITIES: Readonly<Record<string, string>> = {
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&apos;': "'",
+  '&amp;': '&',
+}
+
+function fromClixml(text: string): string {
+  if (!text.includes(CLIXML_HEAD)) return text
+  const fragments = [...text.matchAll(CLIXML_ERROR)].map((m) => m[1] ?? '')
+  if (fragments.length === 0) return ''
+  return fragments
+    .join('')
+    .replace(/_x000D_|_x000A_/g, ' ')
+    .replace(/&(lt|gt|quot|apos|amp);/g, (entity) => XML_ENTITIES[entity] ?? entity)
+}
+
+/** The first, most telling part of what the script complained about, on one line. */
 function complaint(text: string): string {
-  const flat = text.replace(/\s+/g, ' ').trim()
-  return flat.length > MAX_COMPLAINT_CHARS ? `…${flat.slice(-MAX_COMPLAINT_CHARS)}` : flat
+  const flat = fromClixml(text).replace(/\s+/g, ' ').trim()
+  return flat.length > MAX_COMPLAINT_CHARS ? `${flat.slice(0, MAX_COMPLAINT_CHARS)}…` : flat
 }
 
 export interface TypistCommand {
@@ -149,7 +174,7 @@ export function runTypist(
     // Dropped the moment typing starts: after that nothing but "a person must look" is reported anyway.
     child.stderr?.on('data', (chunk) => {
       if (typing) err = ''
-      else err = (err + String(chunk)).slice(-MAX_COMPLAINT_CHARS * 2)
+      else if (err.length < MAX_COMPLAINT_CHARS * 8) err += String(chunk)
     })
     child.on('error', () => unconfirmed("E-IMZO parol yozuvchisini ishga tushirib bo'lmadi"))
     child.on('close', (code, exitSignal) => {
@@ -192,7 +217,7 @@ export function runPreflight({ spawn, typist }: { spawn: SpawnLike; typist: Typi
     // The preflight carries no password, so what it says about itself can always be passed on.
     let err = ''
     child.stderr?.on('data', (chunk) => {
-      err = (err + String(chunk)).slice(-MAX_COMPLAINT_CHARS * 2)
+      if (err.length < MAX_COMPLAINT_CHARS * 8) err += String(chunk)
     })
     child.on('error', () => settle(() => fail(new Error("E-IMZO tekshiruvini ishga tushirib bo'lmadi"))))
     child.on('close', (code, exitSignal) => {

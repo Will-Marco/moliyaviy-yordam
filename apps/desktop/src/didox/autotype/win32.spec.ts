@@ -131,6 +131,24 @@ describe('the Windows typist', () => {
     await expect(typing).rejects.toThrow(/Cannot add type/)
   })
 
+  /*
+   * What PowerShell says about itself arrives wrapped in CLIXML when stderr is redirected (the Windows gate's
+   * first readable failure came out of exactly this envelope). The message has to survive the unwrapping.
+   */
+  it('reads the message out of PowerShell\'s CLIXML envelope', async () => {
+    const { children, spawn } = fakeSpawn()
+
+    const typing = typeOnWindows(spawn)
+    children[0]!.complains(
+      '#< CLIXML\n<Objs Version="1.1.0.1"><Obj S="progress" RefId="0"><TN RefId="0"><T>PSCustomObject</T></TN></Obj>' +
+        '<S S="Error">Isklyuchenie pri vyzove &quot;SizeOf&quot;_x000D__x000A_</S>' +
+        '<S S="Error">stroka:99 znak:1_x000D__x000A_</S></Objs>',
+    )
+    children[0]!.exit(1)
+
+    await expect(typing).rejects.toThrow(/Isklyuchenie pri vyzove "SizeOf" stroka:99/)
+  })
+
   /* Once the password may be on screen, the only thing reported is that a person must look — not a stray message. */
   it('keeps a complaint out of the way once typing has started', async () => {
     const { children, spawn } = fakeSpawn()

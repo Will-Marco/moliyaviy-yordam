@@ -34,6 +34,8 @@ const EIMZO_PATH_PATTERNS = ['*E-IMZO*', '*EIMZO*']
 /** Win32 bindings and the E-IMZO window lookup, shared by the typist and the preflight. Reads only. */
 const COMMON_PS = String.raw`
 $ErrorActionPreference = 'Stop'
+# Redirected, PowerShell writes what it says about itself in the console's own code page; the app reads UTF-8.
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 $EIMZO_NAMES = @(${EIMZO_PROCESS_NAMES.map((n) => `'${n}'`).join(', ')})
 $EIMZO_PATHS = @(${EIMZO_PATH_PATTERNS.map((p) => `'${p}'`).join(', ')})
 
@@ -49,6 +51,9 @@ public struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(8)] public
 [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hWnd, uint command);
 [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr hWnd, out int processId);
+// SendInput's cbSize, worked out here: PowerShell picks Marshal.SizeOf(object) for a type literal and then fails
+// on it ("cannot marshal System.RuntimeType"), which is what stopped the Windows gate. C# has no such doubt.
+public static int InputSize() { return Marshal.SizeOf(typeof(INPUT)); }
 '@
 
 # The windows are walked with GetTopWindow + GetWindow rather than EnumWindows: EnumWindows needs a callback, and a
@@ -132,7 +137,7 @@ $EXIT_FAILED = ${EXIT.FAILED}
 
 # PowerShell hands out a *copy* of a struct-typed field, so writing through one (an INPUT's .ki.wScan) lands on the
 # copy and is lost. The nested struct is therefore built on its own and assigned whole.
-$INPUT_SIZE = [System.Runtime.InteropServices.Marshal]::SizeOf([Win.Api+INPUT])
+$INPUT_SIZE = [Win.Api]::InputSize()
 
 function New-KeyInput([ushort]$vk, [ushort]$scan, [uint32]$flags) {
   $ki = New-Object Win.Api+KEYBDINPUT
