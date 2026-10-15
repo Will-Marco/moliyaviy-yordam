@@ -14,7 +14,7 @@ import {
   StepError,
   type StepErrorCode,
 } from './contract.js'
-import { type CreateDraftsDeps, planRun, type RunPlan, runPlan, type StartOptions } from './create-drafts.js'
+import { type CreateDraftsDeps, planRun, type RunOutcome, type RunPlan, runPlan, type StartOptions } from './create-drafts.js'
 import { createRunEngine, RunBusyError, type RunContext } from './engine.js'
 import type { FlagSink, RunJournal, RunTrigger } from './journal.js'
 
@@ -74,6 +74,8 @@ export interface DidoxRunnerDeps {
 }
 
 const LOGOUT_TIMEOUT_MS = 30_000
+/** How long a finished run waits for its flags to reach the server before it reports itself over. */
+const FLAG_PUSH_WAIT_MS = 10_000
 /*
  * Review finding 1: the engine releases the lock when the work settles, and a hung *page* step is ended by closing
  * the Didox window. The steps before that window exists (E-IMZO list, keychain, preflight, clearing the session) have
@@ -325,16 +327,20 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
           return runPlan({ ...drafts, ...sharedDeps(), onProgress }, handle, plan, ctx)
         })
         .then(
-          (outcome) => handle.finish(outcome.status, outcome.failure),
-          (error: unknown) =>
-            handle.finish('failed', {
-              code: error instanceof RunBusyError ? 'RUN_IN_PROGRESS' : 'UNEXPECTED',
-              message: unexpected(error),
-            }),
+          (outcome) => outcome,
+          (error: unknown): RunOutcome => ({
+            status: 'failed',
+            failure: { code: error instanceof RunBusyError ? 'RUN_IN_PROGRESS' : 'UNEXPECTED', message: unexpected(error) },
+          }),
         )
-        // What needs a person is shown to every accountant as soon as the run is over; what cannot be sent now
-        // stays queued for the next run or the next time the app opens.
-        .then(() => drafts.journal.pushFlags(drafts.api))
+        .then(async (outcome) => {
+          /*
+           * What needs a person goes to the server before the run says it is over, so the page that re-reads the
+           * flags on "finished" shows them to every accountant. A slow server only delays them: they stay queued.
+           */
+          await within(drafts.journal.pushFlags(drafts.api), FLAG_PUSH_WAIT_MS, undefined)
+          await handle.finish(outcome.status, outcome.failure)
+        })
         .catch(() => undefined)
         .finally(() => {
           beat = () => undefined

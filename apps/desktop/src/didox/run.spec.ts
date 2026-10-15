@@ -417,7 +417,7 @@ describe('createDidoxRunner.createDrafts', () => {
     expect(d.spy.journal.flushIdFound).toHaveBeenCalled()
   })
 
-  it('sends queued flags to the server before it plans, and again once the run is over (M13)', async () => {
+  it('sends queued flags to the server before it plans, and again before the run reports itself over (M13)', async () => {
     const d = drafts()
     const { runner } = setup({ drafts: d.deps })
 
@@ -425,7 +425,20 @@ describe('createDidoxRunner.createDrafts', () => {
     expect(d.spy.journal.pushFlags).toHaveBeenCalledTimes(1)
 
     await vi.waitFor(() => expect(d.spy.handle.finish).toHaveBeenCalled())
-    await vi.waitFor(() => expect(d.spy.journal.pushFlags).toHaveBeenCalledTimes(2))
+    // The page re-reads the flags when it sees the run finished, so they must be on the server by then.
+    expect(d.spy.journal.pushFlags).toHaveBeenCalledTimes(2)
+    expect(d.spy.journal.pushFlags.mock.invocationCallOrder[1]).toBeLessThan(d.spy.handle.finish.mock.invocationCallOrder[0]!)
+  })
+
+  it('still finishes the run when the server does not take the flags', async () => {
+    const d = drafts()
+    d.spy.journal.pushFlags.mockResolvedValueOnce({ sent: 0, cleared: 0, left: 0, unauthorized: false })
+    d.spy.journal.pushFlags.mockRejectedValueOnce(new Error('server down'))
+    const { runner } = setup({ drafts: d.deps })
+
+    await runner.createDrafts({ month: '2026-09', lenderIds: 'all' })
+
+    await vi.waitFor(() => expect(d.spy.finished).toHaveLength(1))
   })
 
   it('reads the skips from the server: an invoice skipped there is not planned', async () => {
