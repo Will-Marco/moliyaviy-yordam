@@ -1,0 +1,6 @@
+# SITE_ADDRESS is the domain (hisob.example.uz): Caddy gets and renews its Let's Encrypt certificate and redirects
+# http to https by itself. "localhost" gives a local, self-signed certificate for trying the stack on a laptop.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	reverse_proxy api:3000
+}

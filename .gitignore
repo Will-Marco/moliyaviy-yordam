@@ -17,3 +17,6 @@ apps/desktop/dist/
 # local bundles (not part of the docs)
 docs/M8-toplam.md
 M8b-macOS/
+
+# server (M13): local dumps and secrets never go into git
+deploy/backups/
