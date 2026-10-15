@@ -28,10 +28,16 @@ Ikkisi ham versiya chiqarishi kerak. "not recognized" chiqsa — PowerShell'ni *
 (o'rnatuvchi PATH'ni yangilaydi, ochiq oyna buni bilmaydi).
 
 ### 1.4 pnpm
+Windows standart holatda PowerShell skriptlarini o'chirib qo'ygan, `npm` va `pnpm` esa shunday skript —
+avval shu foydalanuvchi uchun ruxsat beriladi (admin kerak emas; so'rasa `Y`):
+
 ```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 npm i -g pnpm@11
 pnpm -v
 ```
+
+Bu qadamsiz `npm` "npm.ps1 cannot be loaded because running scripts is disabled on this system" deb to'xtaydi.
 
 ### 1.5 E-IMZO
 Firmaning kaliti o'rnatilgan va E-IMZO **ishlab turgan** bo'lishi kerak (soat yonida ikonkasi bor).
@@ -47,7 +53,7 @@ pnpm install
 pnpm build
 ```
 
-- `pnpm install` — 2–5 daqiqa (Electron ~100 MB yuklanadi). Internet kerak.
+- `pnpm install` — 1–5 daqiqa. Internet kerak.
 - `pnpm build` — uch qismni (api, web, desktop) quradi. Oxirida xato bo'lmasligi kerak.
 
 Keyinchalik kodni yangilash:
@@ -63,6 +69,9 @@ pnpm build
 ```powershell
 pnpm dev:desktop
 ```
+
+Eng birinchi marta Electron'ning o'zi yuklanadi (~100 MB, 1–2 daqiqa, "Downloading Electron binary..."):
+`pnpm install` uni yuklamaydi. Internet kerak; keyingi safar bu bo'lmaydi.
 
 Birinchi ishga tushirishda **sozlash oynasi** chiqadi: login va parol o'ylab topib kiritasiz. Bu — **shu
 kompyuterdagi** ilovaga kirish paroli (Didox yoki E-IMZO paroli emas). Parol shu kompyuterda shifrlangan
@@ -124,6 +133,7 @@ Natija birinchi urinish bilan bir xil bo'lishi kerak.
 | Ko'rinishi | Ma'nosi / nima qilish |
 |---|---|
 | `git`/`node`/`pnpm` "not recognized" | PowerShell'ni yopib qayta ochish |
+| "…ps1 cannot be loaded because running scripts is disabled" | 1.4 dagi `Set-ExecutionPolicy` qatorini bajarish |
 | `pnpm install` yarmida uzildi | internetni tekshirib, qaytadan `pnpm install` |
 | "E-IMZO ishga tushirilmagan" | E-IMZO'ni ochish (tray'da turishi kerak) |
 | "parol oynasi allaqachon ochiq" | ochiq E-IMZO parol oynasini yopish; qaytarilsa — bu kod muammosi, menga ayting |
