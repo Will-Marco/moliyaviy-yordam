@@ -89,3 +89,55 @@ Joy tanlangach (Sir) — haftalik nusxa shu bo'limga qo'shiladi.
 | Parolni o'zgartirish | §2 dagidek yangi hash → `.env` → `docker compose up -d api` |
 | Loglar | `docker compose logs -f api` (yoki `caddy`, `db`) |
 | Zaxiradan tiklash | `docker compose stop api` → `docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < <dump>` → `docker compose start api` (avval yangi snapshot oling) |
+
+## 6. Ma'lumotni ko'chirish (13b, bir martalik)
+
+Desktop'dagi lokal bazadan serverga **faqat ma'lumot** ko'chadi (M13 §4.4): firmalar → shartnomalar → stavkalar,
+operatsiyalar, qoralama belgilari → Didox bayroqlari (`didox-skips.json` dagi o'tkazishlar va jurnaldagi hal
+qilinmagan `needs_check` lar). ID'lar o'zgarmaydi. Serverdagi baza §3 dagi `migrate deploy` dan keyin **bo'sh**
+bo'lishi shart — bo'sh bo'lmasa yuklash hech narsani o'zgartirmay to'xtaydi. Skript:
+`apps/api/scripts/migrate-data.ts` (repo va `pnpm install` qilingan kompyuterda, macOS/Linux terminalida).
+
+**1. Desktop kompyuterida (Sir huzurida, ma'lumot kiritish to'xtatilgan).** Ilovani yoping. Ma'lumot papkasini
+(`docs/runbooks/restore-backup.md` jadvalidagi joy) **nusxalang** — `db`, `didox-runs` va (bo'lsa)
+`didox-skips.json`; asl papkaga tegilmaydi va bir oy saqlanadi (M13 §6). Eksport **o'sha kompyuterda** qilinadi:
+desktop vaqtlarni kompyuter vaqt zonasida saqlagan, eksport ularni shu zona bo'yicha to'g'rilaydi.
+
+```bash
+node apps/api/scripts/migrate-data.ts export --userdata <nusxa papka> --install "<kompyuter nomi>" --out moliyaviy-export.sql
+```
+
+`--install` — bayroqlarda "qaysi kompyuter" bo'lib ko'rinadigan nom. Skript jadvallar bo'yicha qator sonini va
+ko'chmagan bayroqlarni (shartnomasi bazada yo'q) yozadi. Jurnalda ilova o'zi tugatadigan ish qolgan bo'lsa (yopilmay
+qolgan run, API'ga yuborilmagan Didox ID) — to'xtaydi: ilovani internet bilan bir marta ochib-yoping, qaytadan
+nusxalang. Fayl — butun baza: faqat egasi o'qiy oladi, ish tugagach o'chiriladi.
+
+**2. Serverda.** Faylni serverga o'tkazing (`scp moliyaviy-export.sql <server>:/opt/moliyaviy-yordam/deploy/`), keyin:
+
+```bash
+cd /opt/moliyaviy-yordam/deploy
+backup/pg-backup.sh pre-deploy
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < moliyaviy-export.sql
+```
+
+Hammasi bitta tranzaksiyada: oxirida `COMMIT` chiqadi. `Target database is not empty` — baza bo'sh emas, hech narsa
+yozilmadi (ikkinchi marta yuklash ham shunday to'xtaydi).
+
+**3. Tekshirish (13b gate: "serverdagi raqamlar bugungi bilan bir xil").** Nusxa turgan kompyuterda:
+
+```bash
+pnpm --filter api build
+TARGET_SECRET='<serverdagi .env dagi ROBOT_SECRET yoki JWT_SECRET>' \
+node apps/api/scripts/migrate-data.ts verify --userdata <nusxa papka> --install "<1-qadamdagi nom>" \
+  --target https://<domen> \
+  -- ssh <server> 'cd /opt/moliyaviy-yordam/deploy && docker compose exec -T db sh -c "psql -tA -U \$POSTGRES_USER -d \$POSTGRES_DB"'
+```
+
+Skript API'ni nusxaning **yana bir vaqtinchalik nusxasida** ko'taradi va ikkala API'dan bir xil narsani so'raydi:
+firmalar, shartnomalar (jami summalar, stavkalar, operatsiyalar), har oy uchun fakturalar, butun davr hisoboti; Didox
+bayroqlari fayllarning o'zi bilan, jadvallardagi qator soni `--` dan keyingi buyruq (serverdagi psql) bilan
+solishtiriladi. Natija **`verify: no differences`** bo'lishi kerak; har farq yo'li bilan chiqadi. Keyin brauzerda SRS
+raqamlarini ko'z bilan ham tekshiring (M13 §6).
+
+Lokal sinovda (`SITE_ADDRESS=localhost`) Caddy'ning o'z sertifikati uchun: `docker compose cp
+caddy:/data/caddy/pki/authorities/local/root.crt .` va `NODE_EXTRA_CA_CERTS=root.crt` bilan ishga tushiring.
