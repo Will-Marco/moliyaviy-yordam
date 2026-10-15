@@ -5,7 +5,7 @@ import { createApiClient } from './api/client.js'
 import { type Confirm, guardConfirm } from './bridge/confirm.js'
 import { createKeyReader, registerIpc, sendProgress } from './bridge/ipc.js'
 import { createDidoxRequests, type DidoxRequests } from './bridge/requests.js'
-import { isExternalWebUrl, isSameOrigin } from './bridge/trust.js'
+import { isExternalWebUrl, isPermissionAllowed, isSameOrigin } from './bridge/trust.js'
 import { type AppConfig, installLabel, loadConfig, robotTokenPath } from './config.js'
 import { autotypePreflight, typeEimzoPassword } from './didox/autotype/index.js'
 import { createJournal } from './didox/journal.js'
@@ -156,6 +156,11 @@ function wire(config: AppConfig): RobotKey {
     log: (message) => console.warn(message),
   })
   robotKey = robot
+  // Without handlers Electron grants every permission a page asks for; the app window's page is from the internet.
+  session.defaultSession.setPermissionRequestHandler((_contents, permission, grant, details) =>
+    grant(isPermissionAllowed(permission, details.requestingUrl, origin)),
+  )
+  session.defaultSession.setPermissionCheckHandler((_contents, permission, requestingOrigin) => isPermissionAllowed(permission, requestingOrigin, origin))
   // A login sets the server's session cookie: that is the moment the robot can get (or renew) its key.
   session.defaultSession.cookies.on('changed', (_event, cookie, _cause, removed) => {
     if (!removed && cookie.name === SESSION_COOKIE) void robot.ensure()

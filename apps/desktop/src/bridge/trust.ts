@@ -20,6 +20,15 @@ export function isExternalWebUrl(url: string): boolean {
   }
 }
 
+/**
+ * Browser permissions for pages in the app window's session (security review M2). The page is from the internet, so
+ * it gets none — no camera, microphone, location, notifications, devices or clipboard reading — except writing the
+ * clipboard, which the web app's copy buttons use (apps/web CopyButton), and only for the app's own origin.
+ */
+export function isPermissionAllowed(permission: string, requestingUrl: string, origin: string): boolean {
+  return permission === 'clipboard-sanitized-write' && isSameOrigin(requestingUrl, origin)
+}
+
 /** IPC handlers answer only the app window, and only while it shows the app's own origin. */
 export function isTrustedSender(
   sender: { senderId: number; frameUrl: string },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isExternalWebUrl, isTrustedSender } from './trust.js'
+import { isExternalWebUrl, isPermissionAllowed, isTrustedSender } from './trust.js'
 
 describe('isExternalWebUrl', () => {
   it('lets web links go to the browser', () => {
@@ -35,5 +35,20 @@ describe('isTrustedSender', () => {
 
   it('rejects a frame whose URL cannot be parsed', () => {
     expect(isTrustedSender({ senderId: 7, frameUrl: 'not a url' }, app)).toBe(false)
+  })
+})
+
+describe('isPermissionAllowed (security review M2)', () => {
+  it("lets the app's own pages write to the clipboard — the copy buttons on the invoices page", () => {
+    expect(isPermissionAllowed('clipboard-sanitized-write', 'https://moliya.example.uz/invoices', app.origin)).toBe(true)
+    expect(isPermissionAllowed('clipboard-sanitized-write', 'https://moliya.example.uz', app.origin)).toBe(true)
+  })
+
+  it('refuses everything else, and the clipboard to any other origin', () => {
+    for (const permission of ['clipboard-read', 'media', 'geolocation', 'notifications', 'openExternal', 'hid', 'serial', 'usb', 'fullscreen']) {
+      expect(isPermissionAllowed(permission, 'https://moliya.example.uz/', app.origin), permission).toBe(false)
+    }
+    expect(isPermissionAllowed('clipboard-sanitized-write', 'https://evil.example/', app.origin)).toBe(false)
+    expect(isPermissionAllowed('clipboard-sanitized-write', 'file:///index.html', app.origin)).toBe(false)
   })
 })
