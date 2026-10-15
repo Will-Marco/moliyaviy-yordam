@@ -15,11 +15,9 @@ const EIMZO_URL = 'ws://127.0.0.1:64646/service/cryptapi'
 
 /**
  * Bridge contract for `window.desktop.eri.listKeys`. Mirrored in apps/web/src/lib/desktop.ts — change both together.
- * No personal certificate data.
+ * No personal certificate data — not even the holder's job title, which the page never showed (security review L3).
  */
-export type EriKey =
-  | { status: 'ok' | 'expired' | 'unknown'; org: string | null; title: string | null; validTo: string | null }
-  | { status: 'missing' }
+export type EriKey = { status: 'ok' | 'expired' | 'unknown'; org: string | null; validTo: string | null } | { status: 'missing' }
 
 /** `passwords` is answered even when E-IMZO is down: it comes from the app's own encrypted store. */
 export type KeyReport = { passwords: Record<string, PasswordStatus> } & (
@@ -54,6 +52,8 @@ export interface DidoxIpc {
 /** Run ids are built from a timestamp and four hex characters (journal.ts). */
 const RUN_ID = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z-[0-9a-f]{4}$/
 const MAX_RUNS_LISTED = 50
+/** Each STIR is a lookup in E-IMZO and the password store; the companies page asks for its firms, not thousands. */
+const MAX_TINS = 200
 
 /** The runner's `onProgress`: forwards each step to the app window as `didox:progress` (if it is open). */
 export function sendProgress(getAppWindow: () => BrowserWindow | null): (e: ProgressEvent) => void {
@@ -108,7 +108,7 @@ export function registerIpc({ getAppWindow, origin, diagnosticsDir, eri, readKey
   ipcMain.handle(
     'eri:list-keys',
     guarded(async (tins: unknown): Promise<KeyReport> => {
-      if (!Array.isArray(tins) || tins.length > 1000 || !tins.every((t) => typeof t === 'string' && TIN.test(t))) {
+      if (!Array.isArray(tins) || tins.length > MAX_TINS || !tins.every((t) => typeof t === 'string' && TIN.test(t))) {
         throw new Error('Invalid STIR list')
       }
       let matched: Map<string, KeyStatus> | null = null
@@ -124,7 +124,7 @@ export function registerIpc({ getAppWindow, origin, diagnosticsDir, eri, readKey
       if (!matched) return { ...failure!, passwords }
       const keys: Record<string, EriKey> = {}
       for (const [tin, m] of matched) {
-        keys[tin] = m.status === 'missing' ? { status: 'missing' } : { status: m.status, org: m.key.org, title: m.key.title, validTo: m.key.validTo }
+        keys[tin] = m.status === 'missing' ? { status: 'missing' } : { status: m.status, org: m.key.org, validTo: m.key.validTo }
       }
       return { eimzo: 'ok', keys, passwords }
     }),

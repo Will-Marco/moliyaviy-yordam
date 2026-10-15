@@ -3,7 +3,7 @@
  * Mirrors the bridge contract in apps/desktop/src/bridge/ipc.ts — change both together.
  */
 export type EriKey =
-  | { status: 'ok' | 'expired' | 'unknown'; org: string | null; title: string | null; validTo: string | null }
+  | { status: 'ok' | 'expired' | 'unknown'; org: string | null; validTo: string | null }
   | { status: 'missing' }
 
 /** Saved ERI password per firm: `rejected` — E-IMZO refused it; `key_changed` — the firm got a new key since. */

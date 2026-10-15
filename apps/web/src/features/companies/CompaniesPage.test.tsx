@@ -48,8 +48,8 @@ describe('CompaniesPage', () => {
     const listKeys = vi.fn(async () => ({
       eimzo: 'ok',
       keys: {
-        '300000001': { status: 'ok', org: 'alfa savdo mchj', title: 'direktor', validTo: '2028-01-21T12:04:52' },
-        '300000002': { status: 'expired', org: 'beta', title: 'direktor', validTo: '2026-01-01T00:00:00' },
+        '300000001': { status: 'ok', org: 'alfa savdo mchj', validTo: '2028-01-21T12:04:52' },
+        '300000002': { status: 'expired', org: 'beta', validTo: '2026-01-01T00:00:00' },
         '300000003': { status: 'missing' },
       },
     }))
@@ -85,7 +85,7 @@ describe('CompaniesPage', () => {
   })
 
   describe('ERI password (desktop)', () => {
-    const okKey = { status: 'ok', org: 'alfa', title: 'direktor', validTo: '2028-01-21T12:04:52' }
+    const okKey = { status: 'ok', org: 'alfa', validTo: '2028-01-21T12:04:52' }
     const desktopWith = (passwords: Record<string, string>, extra: Record<string, unknown> = {}) => {
       const eri = {
         listKeys: vi.fn(async () => ({ eimzo: 'ok', keys: { '300000001': okKey }, passwords })),
@@ -194,7 +194,7 @@ describe('CompaniesPage', () => {
   })
 
   describe('Didox login check (desktop)', () => {
-    const okKey = { status: 'ok', org: 'alfa', title: 'direktor', validTo: '2028-01-21T12:04:52' }
+    const okKey = { status: 'ok', org: 'alfa', validTo: '2028-01-21T12:04:52' }
     const beta = { ...alfa, id: '0192f000-0000-7000-8000-000000000002', name: 'BETA', tin: '300000002' }
     const gamma = { ...alfa, id: '0192f000-0000-7000-8000-000000000003', name: 'GAMMA', tin: '300000003' }
 
