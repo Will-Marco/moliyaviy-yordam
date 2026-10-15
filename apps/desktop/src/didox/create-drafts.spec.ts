@@ -296,6 +296,67 @@ describe('runPlan', () => {
       expect(outcome).toMatchObject({ status: 'failed', failure: { code: 'API_UNAVAILABLE' } })
     })
 
+    it('stops the firm, not the run, when the invoice list cannot be read again', async () => {
+      const h = harness({ rows: [apiRow({ contractId: 'c-1' }), apiRow({ contractId: 'c-2', lender: LENDER_B })] })
+      h.deps.api.listInvoices = vi
+        .fn()
+        .mockResolvedValueOnce(list([apiRow({ contractId: 'c-1' }), apiRow({ contractId: 'c-2', lender: LENDER_B })]))
+        .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+        .mockResolvedValueOnce(list([apiRow({ contractId: 'c-1' }), apiRow({ contractId: 'c-2', lender: LENDER_B })]))
+
+      const { journal, outcome } = await run(h)
+
+      expect(outcome).toMatchObject({ status: 'done' })
+      expect(createDraftMock).toHaveBeenCalledTimes(1)
+      expect(journal.firms[0]).toMatchObject({ status: 'failed', code: 'API_UNAVAILABLE' })
+      expect(journal.firms[0]?.invoices[0]).toMatchObject({ state: 'skipped', code: 'API_UNAVAILABLE' })
+      expect(journal.firms[1]?.status).toBe('done')
+    })
+
+    it('stops the firm when the skip list cannot be read again', async () => {
+      const h = harness()
+      h.deps.skips.list = vi.fn().mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('EACCES'))
+
+      const { journal } = await run(h)
+
+      expect(createDraftMock).not.toHaveBeenCalled()
+      expect(journal.firms[0]).toMatchObject({ status: 'failed', code: 'API_UNAVAILABLE' })
+    })
+
+    it('does not create an invoice the accountant skipped after the plan was made', async () => {
+      const h = harness()
+      h.deps.skips.list = vi.fn().mockResolvedValueOnce({}).mockResolvedValueOnce({ 'c-1': { at: 'x' } })
+
+      const { journal } = await run(h)
+
+      expect(createDraftMock).not.toHaveBeenCalled()
+      expect(journal.firms[0]?.invoices[0]).toMatchObject({ state: 'skipped', code: 'SKIPPED_BY_USER' })
+    })
+
+    it('stops the firm after a saved draft that could not be marked, keeping its ID for later', async () => {
+      const h = harness({
+        rows: [apiRow({ contractId: 'c-1' }), apiRow({ contractId: 'c-2' }), apiRow({ contractId: 'c-3', lender: LENDER_B })],
+      })
+      createDraftMock.mockImplementation(async (opts: { item: { contractId: string }; journal: { setInvoice(p: object): Promise<unknown> } }) => {
+        if (opts.item.contractId !== 'c-1') return { kind: 'marked', didoxId: DRAFT_ID }
+        // What the real step leaves behind when the API stayed silent twice: the ID on disk, not yet in the API.
+        await opts.journal.setInvoice({ state: 'saving', savingAt: '2026-10-13T09:31:00.000Z' })
+        await opts.journal.setInvoice({ state: 'id_found', didoxId: DRAFT_ID })
+        return { kind: 'id_found', didoxId: DRAFT_ID }
+      })
+
+      const { journal, outcome } = await run(h)
+
+      expect(outcome).toMatchObject({ status: 'done' })
+      expect(createDraftMock.mock.calls.map(([opts]) => opts.item.contractId)).toEqual(['c-1', 'c-3'])
+      expect(journal.firms[0]).toMatchObject({ status: 'failed', code: 'API_UNAVAILABLE' })
+      expect(journal.firms[0]?.invoices).toMatchObject([
+        { contractId: 'c-1', state: 'id_found', didoxId: DRAFT_ID },
+        { contractId: 'c-2', state: 'skipped', code: 'API_UNAVAILABLE' },
+      ])
+      expect(journal.firms[1]?.status).toBe('done')
+    })
+
     it('writes the amount it actually used when the accountant changed it meanwhile', async () => {
       const h = harness()
       h.deps.api.listInvoices = vi

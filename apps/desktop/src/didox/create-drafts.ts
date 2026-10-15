@@ -65,6 +65,10 @@ const PAUSE_INVOICE_MS = 2_000
 const PAUSE_FIRM_MS = 3_000
 const LIST_TIMEOUT_MS = 20_000
 
+/** Why a firm stopped because the app's server could not be read or written mid-run (M13 §4.2). */
+const RELIST_FAILED = "Ilova serveridan fakturalar ro'yxatini qayta o'qib bo'lmadi — bu firma to'xtatildi, Didox'da hech narsa yaratilmadi"
+const MARK_LEFT = "Qoralama Didox'da saqlandi, lekin ilova serveriga yozib bo'lmadi — bu firma to'xtatildi, belgi keyingi ochilishda yuboriladi"
+
 /** Why a firm never got as far as Didox. The invoice entries say the same thing, so the summary is self-explaining. */
 const KEY_PROBLEMS: Record<Exclude<KeyStatus['status'], 'ok'>, DidoxCode> = {
   missing: 'KEY_MISSING',
@@ -237,20 +241,33 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
 
   /*
    * What the API says now wins over the plan: while the window was opening the accountant may have marked an invoice
-   * by hand or changed an amount. Nothing is in Didox yet, so following the fresh list cannot contradict it.
+   * by hand, skipped it or changed an amount. Nothing is in Didox yet, so following the fresh list cannot contradict it.
+   * A list that cannot be read stops the firm instead of falling back to the plan (M13 §4.2): with the data on a shared
+   * server another computer may have drafted or skipped an invoice since, and the old plan would draft it twice.
    */
-  let fresh
+  let fresh, skipped
   try {
     fresh = await deps.api.listInvoices(plan.month)
+    skipped = await deps.skips.list(plan.month)
   } catch {
-    fresh = null
+    if (ctx.signal.aborted) return { status: 'cancelled' }
+    await run.firmFailed(firm, 'API_UNAVAILABLE', RELIST_FAILED)
+    return null
   }
 
   const invoices = firm.invoices
   for (const [index, planned] of invoices.entries()) {
     if (ctx.signal.aborted) return { status: 'cancelled' }
-    const row = fresh?.rows.find((r) => r.contractId === planned.contractId)
-    if (fresh && !row) {
+    if (planned.contractId in skipped) {
+      await handle.setInvoice(firm.tin, planned.contractId, {
+        state: 'skipped',
+        code: 'SKIPPED_BY_USER',
+        message: didoxMessage('SKIPPED_BY_USER'),
+      })
+      continue
+    }
+    const row = fresh.rows.find((r) => r.contractId === planned.contractId)
+    if (!row) {
       await handle.setInvoice(firm.tin, planned.contractId, {
         state: 'skipped',
         code: 'NOTHING_TO_DO',
@@ -258,7 +275,7 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
       })
       continue
     }
-    if (row?.draft) {
+    if (row.draft) {
       await handle.setInvoice(firm.tin, planned.contractId, {
         state: 'skipped',
         code: 'ALREADY_DRAFTED',
@@ -266,7 +283,7 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
       })
       continue
     }
-    const amount = row?.amount ?? planned.amount
+    const amount = row.amount
     const entry = { ...findEntry(handle, firm.tin, planned.contractId)!, amount }
     const position = { invoiceIndex: index + 1, invoiceCount: invoices.length }
     progress({ firmTin: firm.tin, contractId: planned.contractId, ...position, step: 'invoice', status: 'running' })
@@ -298,6 +315,14 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
         ...(result.kind === 'marked' || result.kind === 'id_found' ? {} : { message: result.message }),
       })
       if (result.kind === 'run_failed') return { status: 'failed', failure: { code: result.code, message: result.message } }
+      if (result.kind === 'id_found') {
+        /*
+         * The draft is in Didox and its ID on disk for `flushIdFound`, but the server did not hear of it. Every further
+         * draft would be one more the other computers cannot see, so the firm stops here (M13 §4.2).
+         */
+        await run.firmFailed(firm, 'API_UNAVAILABLE', MARK_LEFT)
+        return null
+      }
     } catch (error) {
       if (ctx.signal.aborted) return { status: 'cancelled' }
       // A page that stopped looking like Didox: this firm is done, the next one still runs.

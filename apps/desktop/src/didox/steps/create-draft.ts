@@ -10,9 +10,9 @@ import { matchOwnDraft, monthStartMs } from '../parse.js'
 /**
  * One invoice, from "is something like this already there?" to "the app owns this draft" (M8c §4, FR-8.4).
  *
- * Two kinds of ending. A returned outcome is this invoice's own business — the firm carries on with the next one.
- * A thrown StepError stops the firm: the page did not look like Didox, so nothing further can be trusted. The split
- * matters for what the accountant has to do, so each step below says which one it is.
+ * Two kinds of ending. A returned outcome is this invoice's own business — the firm carries on with the next one
+ * (save `id_found`, below). A thrown StepError stops the firm: the page did not look like Didox, so nothing further
+ * can be trusted. The split matters for what the accountant has to do, so each step below says which one it is.
  *
  * Steps 0–10 never leave anything in Didox. From step 11 a draft may exist, so every failure after it records
  * `needs_check` with the reason instead of staying silent (§12).
@@ -21,7 +21,10 @@ import { matchOwnDraft, monthStartMs } from '../parse.js'
 /** What the caller must do next; the journal has already been written when this returns. */
 export type DraftOutcome =
   | { kind: 'marked'; didoxId: string }
-  /** Saved and identified, but the API did not take it; `flushIdFound` sends it again later. */
+  /**
+   * Saved and identified, but the API could not be reached; `flushIdFound` sends it again later. The one outcome
+   * that also stops the firm: the next draft would be just as unknown to the server (M13 §4.2).
+   */
   | { kind: 'id_found'; didoxId: string }
   | { kind: 'needs_check'; code: DidoxCode; message: string; didoxId?: string; candidateIds?: string[] }
   /** The app's own API refused the session: the whole run stops, nothing is wrong with Didox. */
