@@ -27,19 +27,56 @@ const monthName = (month: string) => {
 
 const HANDS_OFF = "Jarayon davomida klaviatura va sichqonchaga tegmang: parol E-IMZO oynasiga shu kompyuterning klaviaturasi orqali yoziladi."
 
-/** `firms`: 'all', the firm names when they could be read, or just how many were asked for. */
-export function draftsPrompt(month: string, firms: 'all' | string[] | number): ConfirmRequest {
-  const which =
-    firms === 'all' ? 'Firmalar: barcha beruvchi firmalar.' : typeof firms === 'number' ? `${firms} ta firma.` : `Firmalar: ${firms.join(', ')}.`
+/** A firm named in a confirmation: its STIR (digits only) and the organisation on its local E-IMZO key, if any. */
+export interface ConfirmFirm {
+  tin: string
+  name: string | null
+}
+
+const MAX_NAME = 60
+const MAX_FIRMS_SHOWN = 10
+/** Control and format characters (incl. bidi overrides) and line/paragraph separators: none belongs in a firm name. */
+const UNPRINTABLE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/gu
+
+/**
+ * One line, at most MAX_NAME characters: a certificate field is still outside text, and must not be able to add
+ * lines to the dialog or push its real content out of view. Null when nothing printable is left.
+ */
+function cleanName(name: string | null): string | null {
+  const flat = (name ?? '').replace(UNPRINTABLE, ' ').replace(/\s+/g, ' ').trim()
+  if (!flat) return null
+  const chars = [...flat]
+  return chars.length > MAX_NAME ? `${chars.slice(0, MAX_NAME - 1).join('')}…` : flat
+}
+
+const firmLabel = (tin: string, name: string | null) => {
+  const clean = cleanName(name)
+  return clean ? `${clean} (STIR ${tin})` : `STIR ${tin}`
+}
+
+/**
+ * `firms`: 'all', or the picked firms — STIRs with the organisation on their local E-IMZO key — or just how many were
+ * asked for when their STIRs could not be read. Never a name the server or the page wrote (security review H1).
+ */
+export function draftsPrompt(month: string, firms: 'all' | ConfirmFirm[] | number): ConfirmRequest {
+  const listed = (list: ConfirmFirm[]) => {
+    const shown = list.slice(0, MAX_FIRMS_SHOWN).map((f) => firmLabel(f.tin, f.name))
+    const rest = list.length - MAX_FIRMS_SHOWN
+    return `Firmalar: ${[...shown, ...(rest > 0 ? [`+${rest} ta`] : [])].join(', ')}.`
+  }
+  const which = firms === 'all' ? 'Firmalar: barcha beruvchi firmalar.' : typeof firms === 'number' ? `${firms} ta firma.` : listed(firms)
   return {
     message: `Didox'da ${monthName(month)} uchun qoralamalar yaratish boshlansinmi?`,
     detail: `${which}\n\nIlova har bir firma nomidan ERI kaliti bilan Didox'ga kiradi va qoralamalarni saqlaydi. Hech narsa imzolanmaydi va yuborilmaydi.\n\n${HANDS_OFF}`,
   }
 }
 
-/** `firmName`: the organisation on the firm's E-IMZO key, when E-IMZO could be read; never text from the page. */
+/**
+ * `firmName`: the organisation on the firm's E-IMZO key as this computer reads it, or null — never text from the page
+ * or the server. It is still cleaned and capped here, like every name a confirmation shows.
+ */
 export function checkLoginPrompt(tin: string, firmName: string | null): ConfirmRequest {
-  const firm = firmName ? `${firmName} (STIR ${tin})` : `STIR ${tin}`
+  const firm = firmLabel(tin, firmName)
   return {
     message: "Didox'ga kirishni tekshirish boshlansinmi?",
     detail: `Firma: ${firm}.\n\nIlova shu firmaning ERI kaliti bilan Didox'ga kiradi va darhol chiqadi. Hech narsa imzolanmaydi va yuborilmaydi.\n\n${HANDS_OFF}`,

@@ -34,7 +34,12 @@ describe('what the confirmation says', () => {
       message: "Didox'da Sentabr 2026 uchun qoralamalar yaratish boshlansinmi?",
       detail: expect.stringContaining('barcha beruvchi firmalar'),
     })
-    expect(draftsPrompt('2026-01', ['ALFA SAVDO MCHJ', 'DELTA MCHJ']).detail).toContain('ALFA SAVDO MCHJ, DELTA MCHJ')
+    expect(
+      draftsPrompt('2026-01', [
+        { tin: '300000001', name: 'ALFA SAVDO MCHJ' },
+        { tin: '300000002', name: null },
+      ]).detail,
+    ).toContain('Firmalar: ALFA SAVDO MCHJ (STIR 300000001), STIR 300000002.')
     expect(draftsPrompt('2026-12', 3)).toMatchObject({ message: expect.stringContaining('Dekabr 2026'), detail: expect.stringContaining('3 ta firma') })
   })
 
@@ -48,5 +53,33 @@ describe('what the confirmation says', () => {
       detail: expect.stringContaining('STIR 300000001'),
     })
     expect(checkLoginPrompt('300000001', 'ALFA SAVDO MCHJ').detail).toContain('ALFA SAVDO MCHJ (STIR 300000001)')
+  })
+})
+
+describe('names in a confirmation cannot reshape it (security review H1)', () => {
+  it('strips control characters, line breaks and bidi overrides from a name', () => {
+    const detail = draftsPrompt('2026-09', [{ tin: '300000001', name: 'ALFA\n\nHech narsa‮ qilinmaydi\u0007' }]).detail
+
+    expect(detail).toContain('Firmalar: ALFA Hech narsa qilinmaydi (STIR 300000001).')
+    expect(checkLoginPrompt('300000001', 'ALFA\r\nBETA').detail).toContain('ALFA BETA (STIR 300000001)')
+  })
+
+  it('caps a long name', () => {
+    const detail = draftsPrompt('2026-09', [{ tin: '300000001', name: 'A'.repeat(500) }]).detail
+
+    expect(detail).toContain(`${'A'.repeat(59)}… (STIR 300000001)`)
+    expect(detail).not.toContain('A'.repeat(60))
+  })
+
+  it('shows a name that is nothing but control characters as the STIR alone', () => {
+    expect(checkLoginPrompt('300000001', '\u0000\n').detail).toContain('Firma: STIR 300000001.')
+  })
+
+  it('lists ten firms, then counts the rest', () => {
+    const firms = Array.from({ length: 13 }, (_, i) => ({ tin: String(300000001 + i), name: null }))
+    const detail = draftsPrompt('2026-09', firms).detail
+
+    expect(detail).toContain('STIR 300000010, +3 ta.')
+    expect(detail).not.toContain('300000011')
   })
 })

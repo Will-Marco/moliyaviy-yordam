@@ -1,5 +1,5 @@
 import type { CheckLoginResult, StartDraftsResult } from '../didox/run.js'
-import { checkLoginPrompt, type Confirm, confirmed, draftsPrompt } from './confirm.js'
+import { checkLoginPrompt, type Confirm, type ConfirmFirm, confirmed, draftsPrompt } from './confirm.js'
 
 /*
  * What the page may *ask* the robot to do (CONSTITUTION §13, M13). Every request is validated, then confirmed in a
@@ -26,20 +26,39 @@ export interface DidoxRequestDeps {
     | undefined
   /** Renews the robot's server key while a person is logged in, so the run that follows can read the invoices. */
   prepareRobot(): Promise<unknown>
-  /** The organisation on the firm's E-IMZO key, or null — local and trusted, unlike anything the page sends. */
-  firmName(tin: string): Promise<string | null>
-  /** The picked lenders' names as the server lists them for the month, or null when that cannot be read. */
-  lenderNames(month: string, ids: string[]): Promise<string[] | null>
+  /**
+   * STIR → the organisation on the firm's E-IMZO key, for the STIRs that have one — read on this computer, unlike
+   * anything the page or the server sends.
+   */
+  firmNames(tins: string[]): Promise<ReadonlyMap<string, string>>
+  /**
+   * The picked lenders' STIRs as the server lists them for the month, or null when that cannot be read. Only these
+   * digits are taken from the server for the confirmation; the names next to them come from `firmNames`.
+   */
+  lenderTins(month: string, ids: string[]): Promise<string[] | null>
 }
 
 export function createDidoxRequests(deps: DidoxRequestDeps) {
+  /** Firms for a confirmation; E-IMZO being down only costs the names. */
+  const named = async (tins: string[]): Promise<ConfirmFirm[]> => {
+    const names = await deps.firmNames(tins).catch(() => new Map<string, string>())
+    return tins.map((tin) => ({ tin, name: names.get(tin) ?? null }))
+  }
+
+  /** The picked lenders, or just how many: a server answer that is not a list of STIRs is not shown at all. */
+  const pickedFirms = async (month: string, ids: string[]): Promise<ConfirmFirm[] | number> => {
+    const tins = await deps.lenderTins(month, ids).catch(() => null)
+    if (!tins || !tins.every((tin) => typeof tin === 'string' && TIN.test(tin))) return ids.length
+    return named([...new Set(tins)])
+  }
+
   return {
     async checkLogin(tin: unknown): Promise<CheckLoginResult> {
       if (typeof tin !== 'string' || !TIN.test(tin)) throw new Error('Invalid STIR')
       const didox = deps.didox
       if (!didox) return UNAVAILABLE
-      const name = await deps.firmName(tin).catch(() => null)
-      return confirmed(deps.confirm, checkLoginPrompt(tin, name), () => didox.checkLogin(tin))
+      const [firm] = await named([tin])
+      return confirmed(deps.confirm, checkLoginPrompt(tin, firm?.name ?? null), () => didox.checkLogin(tin))
     },
 
     async createDrafts(payload: unknown): Promise<StartDraftsResult> {
@@ -54,7 +73,7 @@ export function createDidoxRequests(deps: DidoxRequestDeps) {
       if (lenders === null) throw new Error('Invalid lenderIds')
       const didox = deps.didox
       if (!didox) return UNAVAILABLE
-      const firms = lenders === 'all' ? 'all' : ((await deps.lenderNames(month, lenders).catch(() => null)) ?? lenders.length)
+      const firms = lenders === 'all' ? 'all' : await pickedFirms(month, lenders)
       return confirmed(deps.confirm, draftsPrompt(month, firms), async () => {
         // Best effort: without a key the run refuses with ROBOT_TOKEN_MISSING, which tells the person what to do.
         await deps.prepareRobot().catch(() => undefined)

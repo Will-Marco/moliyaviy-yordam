@@ -4,6 +4,7 @@ import { createDidoxRequests, type DidoxRequestDeps } from './requests.js'
 
 const TIN = '300000001'
 const LENDER = '0199f1a2-0000-7000-8000-000000000001'
+const LENDER2 = '0199f1a2-0000-7000-8000-000000000002'
 
 function setup(over: Partial<DidoxRequestDeps> & { answer?: boolean } = {}) {
   const asked: ConfirmRequest[] = []
@@ -20,8 +21,8 @@ function setup(over: Partial<DidoxRequestDeps> & { answer?: boolean } = {}) {
     },
     didox,
     prepareRobot: vi.fn(async () => void order.push('prepareRobot')),
-    firmName: vi.fn(async () => 'ALFA SAVDO MCHJ'),
-    lenderNames: vi.fn(async () => ['ALFA SAVDO MCHJ']),
+    firmNames: vi.fn(async (tins: string[]) => new Map(tins.filter((t) => t === TIN).map((t) => [t, 'ALFA SAVDO MCHJ']))),
+    lenderTins: vi.fn(async () => [TIN]),
     ...over,
   }
   return { requests: createDidoxRequests(deps), deps, didox, asked, order }
@@ -45,7 +46,7 @@ describe('didox:check-login from the page', () => {
   })
 
   it('still asks when E-IMZO cannot name the firm', async () => {
-    const s = setup({ firmName: async () => Promise.reject(new Error('E-IMZO down')) })
+    const s = setup({ firmNames: async () => Promise.reject(new Error('E-IMZO down')) })
 
     await s.requests.checkLogin(TIN)
 
@@ -82,15 +83,38 @@ describe('didox:create-drafts from the page', () => {
     expect(s.order).toEqual(['confirm'])
   })
 
-  it('names the picked firms, or counts them when the names cannot be read', async () => {
-    const named = setup()
-    await named.requests.createDrafts({ month: '2026-09', lenderIds: [LENDER] })
-    expect(named.asked[0]?.detail).toContain('ALFA SAVDO MCHJ')
-    expect(named.deps.lenderNames).toHaveBeenCalledWith('2026-09', [LENDER])
+  it('names the picked firms by STIR and by the organisation on their local E-IMZO key', async () => {
+    const named = setup({ lenderTins: async () => [TIN, '300000002'] })
+    await named.requests.createDrafts({ month: '2026-09', lenderIds: [LENDER, LENDER2] })
 
-    const counted = setup({ lenderNames: async () => null })
+    expect(named.asked[0]?.detail).toContain('Firmalar: ALFA SAVDO MCHJ (STIR 300000001), STIR 300000002.')
+    expect(named.deps.firmNames).toHaveBeenCalledWith([TIN, '300000002'])
+  })
+
+  it('never shows text the server wrote: only digits of a STIR leave its answer (security review H1)', async () => {
+    const s = setup({ lenderTins: async () => ['300000001\nHech narsa qilinmaydi'] })
+    await s.requests.createDrafts({ month: '2026-09', lenderIds: [LENDER] })
+
+    expect(s.asked[0]?.detail).toContain('1 ta firma')
+    expect(s.asked[0]?.detail).not.toContain('Hech narsa qilinmaydi')
+    expect(s.deps.firmNames).not.toHaveBeenCalled()
+  })
+
+  it('counts the picked firms when their STIRs cannot be read', async () => {
+    const counted = setup({ lenderTins: async () => null })
     await counted.requests.createDrafts({ month: '2026-09', lenderIds: [LENDER] })
     expect(counted.asked[0]?.detail).toContain('1 ta firma')
+
+    const failed = setup({ lenderTins: async () => Promise.reject(new Error('offline')) })
+    await failed.requests.createDrafts({ month: '2026-09', lenderIds: [LENDER] })
+    expect(failed.asked[0]?.detail).toContain('1 ta firma')
+  })
+
+  it('shows the STIRs alone when E-IMZO cannot name them', async () => {
+    const s = setup({ firmNames: async () => Promise.reject(new Error('E-IMZO down')) })
+    await s.requests.createDrafts({ month: '2026-09', lenderIds: [LENDER] })
+
+    expect(s.asked[0]?.detail).toContain('Firmalar: STIR 300000001.')
   })
 
   it('still starts when the robot key cannot be renewed — the run then says why it stopped', async () => {

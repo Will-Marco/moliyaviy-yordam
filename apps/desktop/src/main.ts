@@ -195,14 +195,16 @@ function wire(config: AppConfig): RobotKey {
       },
     },
     prepareRobot: () => robot.ensure(),
-    firmName: async (tin) => {
-      const key = (await readKeys([tin])).get(tin)
-      return key && key.status !== 'missing' ? key.key.org : null
+    firmNames: async (tins) => {
+      const names = new Map<string, string>()
+      for (const [tin, key] of await readKeys(tins)) if (key.status !== 'missing' && key.key.org) names.set(tin, key.key.org)
+      return names
     },
-    lenderNames: async (month, ids) => {
+    // Only the STIRs: the server's firm names never reach the confirmation (security review H1).
+    lenderTins: async (month, ids) => {
       const { lenders } = await api.listInvoices(month)
-      const names = ids.flatMap((id) => lenders.filter((l) => l.id === id).map((l) => l.name))
-      return names.length === ids.length ? names : null
+      const tins = ids.flatMap((id) => lenders.filter((l) => l.id === id).map((l) => l.tin))
+      return tins.length === ids.length ? tins : null
     },
   })
   const passwords = createEriPasswordWindows({ assets, parent: () => appWin, eri, readKeys })
