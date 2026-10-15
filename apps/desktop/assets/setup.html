@@ -7,48 +7,43 @@
     <style>
       :root { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f1f5f9; color: #0f172a; }
-      .card { width: 360px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 28px; box-shadow: 0 10px 30px rgba(2,8,23,.06); }
+      .card { width: 380px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 28px; box-shadow: 0 10px 30px rgba(2,8,23,.06); }
       h1 { font-size: 20px; margin: 0 0 4px; }
-      p.sub { margin: 0 0 20px; color: #64748b; font-size: 14px; }
+      p.sub { margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.45; }
       label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
       input { width: 100%; box-sizing: border-box; height: 38px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 9px; font-size: 14px; }
       input:focus { outline: none; border-color: #1e40af; box-shadow: 0 0 0 3px rgba(30,64,175,.15); }
       button { margin-top: 22px; width: 100%; height: 40px; border: 0; border-radius: 9px; background: #1e40af; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
       button:disabled { opacity: .6; cursor: default; }
-      .err { color: #b91c1c; font-size: 13px; margin-top: 12px; min-height: 16px; }
+      .err { color: #b91c1c; font-size: 13px; margin-top: 12px; min-height: 16px; line-height: 1.4; }
     </style>
   </head>
   <body>
-    <form class="card" id="f">
-      <h1>Birinchi sozlash</h1>
-      <p class="sub">Shu kompyuter uchun kirish parolini o'rnating. Keyinchalik shu login va parol bilan kirasiz.</p>
-      <label for="u">Login</label>
-      <input id="u" autocomplete="off" value="admin" />
-      <label for="p">Parol</label>
-      <input id="p" type="password" autocomplete="new-password" placeholder="Kamida 8 belgi" />
-      <label for="p2">Parolni takrorlang</label>
-      <input id="p2" type="password" autocomplete="new-password" />
-      <button id="b" type="submit">Saqlash va kirish</button>
-      <div class="err" id="e"></div>
+    <form class="card" id="f" novalidate>
+      <h1>Server manzili</h1>
+      <p class="sub">Ilova ma'lumotni umumiy serverdan oladi. Server manzilini kiriting — keyin serverning o'z sahifasida login va parol bilan kirasiz.</p>
+      <label for="u">Manzil</label>
+      <input id="u" type="url" autocomplete="off" spellcheck="false" placeholder="https://moliya.example.uz" />
+      <button id="b" type="submit">Ulanish</button>
+      <div class="err" id="e" role="alert"></div>
     </form>
     <script>
       const $ = (id) => document.getElementById(id)
       $('f').addEventListener('submit', async (ev) => {
         ev.preventDefault()
-        const u = $('u').value.trim(), p = $('p').value, p2 = $('p2').value
+        const address = $('u').value.trim()
         const err = (m) => ($('e').textContent = m)
-        if (u.length < 1) return err("Login kiritilmagan")
-        if (p.length < 8) return err("Parol kamida 8 belgi bo'lishi kerak")
-        if (p !== p2) return err("Parollar mos emas")
+        if (!address) return err('Server manzilini kiriting')
         $('b').disabled = true
-        err('')
+        err('Tekshirilmoqda…')
         try {
-          const res = await window.setup.save(u, p)
-          if (res && res.ok) window.setup.finish()
-          else { err((res && res.message) || "Saqlab bo'lmadi"); $('b').disabled = false }
+          const res = await window.setup.save(address)
+          if (res && res.ok) return window.setup.finish()
+          err((res && res.message) || "Manzilni saqlab bo'lmadi")
         } catch {
-          err("Saqlab bo'lmadi"); $('b').disabled = false
+          err("Manzilni saqlab bo'lmadi")
         }
+        $('b').disabled = false
       })
     </script>
   </body>

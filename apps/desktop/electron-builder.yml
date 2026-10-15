@@ -9,13 +9,7 @@ files:
   - "dist/**/*"
   - "assets/**/*"
   - "package.json"
-extraResources:
-  - from: ".resources/api"
-    to: "api"
-  - from: ".resources/web"
-    to: "web"
-  - from: ".resources/migrations"
-    to: "migrations"
+# M13: no API, web bundle or migrations inside the app any more — the window opens the shared server.
 mac:
   identity: null
   category: public.app-category.finance

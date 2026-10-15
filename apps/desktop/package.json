@@ -4,17 +4,16 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Moliyaviy yordam \u2014 desktop shell (Electron). Boots the API in a child process on a local PGlite database.",
+  "description": "Moliyaviy yordam — desktop shell (Electron): opens the shared server and runs the Didox robot with this computer's E-IMZO keys.",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json && electron .",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepackage": "node scripts/prepare-resources.mjs",
-    "pack:mac": "pnpm build && pnpm prepackage && electron-builder --mac --dir",
-    "pack:mac:dmg": "pnpm build && pnpm prepackage && electron-builder --mac dmg",
-    "pack:win": "pnpm build && pnpm prepackage && electron-builder --win"
+    "pack:mac": "pnpm build && electron-builder --mac --dir",
+    "pack:mac:dmg": "pnpm build && electron-builder --mac dmg",
+    "pack:win": "pnpm build && electron-builder --win"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",
@@ -26,7 +25,6 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
-    "@node-rs/argon2": "^2.2.2",
     "ws": "^8.22.0"
   }
 }

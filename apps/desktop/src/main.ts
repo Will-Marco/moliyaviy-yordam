@@ -1,51 +1,47 @@
-import { type ChildProcess, fork } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, ipcMain, Notification, powerMonitor, safeStorage, shell, Tray, Menu } from 'electron'
-import { createKeyReader, registerIpc, sendProgress } from './bridge/ipc.js'
-import { isSameOrigin } from './bridge/trust.js'
-import { type AppConfig, isConfigured, loadConfig, saveCredentials } from './config.js'
-import { autotypePreflight, typeEimzoPassword } from './didox/autotype/index.js'
+import { app, BrowserWindow, dialog, Menu, Notification, powerMonitor, safeStorage, session, shell, Tray } from 'electron'
 import { createApiClient } from './api/client.js'
+import type { Confirm } from './bridge/confirm.js'
+import { createKeyReader, registerIpc, sendProgress } from './bridge/ipc.js'
+import { createDidoxRequests, type DidoxRequests } from './bridge/requests.js'
+import { isSameOrigin } from './bridge/trust.js'
+import { type AppConfig, installLabel, loadConfig } from './config.js'
+import { autotypePreflight, typeEimzoPassword } from './didox/autotype/index.js'
 import { createJournal } from './didox/journal.js'
 import { createDidoxRunner, type DidoxRunner } from './didox/run.js'
-import { createSkipStore } from './didox/skips.js'
 import { login } from './didox/steps/login.js'
 import { logout } from './didox/steps/logout.js'
 import { openDidoxWindow } from './didox/view.js'
+import { createRobotKey, type RobotKey, requestRobotToken } from './robot/robot-key.js'
+import { createRobotTokenStore } from './robot/token-store.js'
+import { monthToBill } from './scheduler/next-run.js'
 import { createScheduler, type ReadyVerdict, type Scheduler } from './scheduler/scheduler.js'
 import { createEriStore } from './secrets/eri-store.js'
+import { createEriPasswordWindows } from './windows/eri-password.js'
+import { openSetupWindow, setupWindow } from './windows/setup.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
-// Files tsc does not emit (setup page, preloads) live next to dist/ in assets/.
+// Files tsc does not emit (local pages, preloads, tray icons) live next to dist/ in assets/.
 const assets = resolve(here, '../assets')
-// Dev: read from the monorepo. Packaged: everything is staged under the app's Resources (see electron-builder.yml).
-const res = app.isPackaged ? process.resourcesPath : null
-const apiEntry = res ? join(res, 'api/dist/server-entry.js') : resolve(here, '../../api/dist/server-entry.js')
-const webRoot = res ? join(res, 'web') : resolve(here, '../../web/dist')
-const migrationsDir = res ? join(res, 'migrations') : resolve(here, '../../api/prisma/migrations')
-/*
- * macOS backgrounds a window the moment another one covers it, and a backgrounded renderer drops the synthetic
- * keystrokes the Didox form is filled with (c1 gate). Both switches must be set before the app is ready.
- */
 /*
  * Windows shows a notification only for an app it can name, and it names it by this id — which must match the one
  * the installer registers (electron-builder's appId). Without it the monthly reminder would be dropped silently.
  */
 app.setAppUserModelId('uz.moliyaviyyordam.desktop')
-
+/*
+ * macOS backgrounds a window the moment another one covers it, and a backgrounded renderer drops the synthetic
+ * keystrokes the Didox form is filled with (c1 gate). Both switches must be set before the app is ready.
+ */
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 
 const userData = () => app.getPath('userData')
 
-let api: ChildProcess | null = null
-let apiReady: Promise<string> | null = null
 let appWin: BrowserWindow | null = null
-let setupWin: BrowserWindow | null = null
-let ipcRegistered = false
-let quitting = false
 let didox: DidoxRunner | null = null
+let requests: DidoxRequests | null = null
+let robotKey: RobotKey | null = null
 let tray: Tray | null = null
 let scheduler: Scheduler | null = null
 /** The month the schedule could not do, shown in the tray until it is done (the notification may not arrive). */
@@ -53,51 +49,17 @@ let waitingMonth: string | null = null
 /** Set once the quit waited for a Didox run; the second before-quit goes through. */
 let quitAfterDidox = false
 const QUIT_WAIT_MS = 5_000
+/** Cookie the server keeps a person's login in (apps/api/src/auth/session.ts). */
+const SESSION_COOKIE = 'session'
 
-/** Boot the API in a child process (PGlite, ephemeral port) with this install's credentials. */
-function startApi(config: AppConfig): Promise<string> {
-  return new Promise((ok, fail) => {
-    const child = fork(apiEntry, [], {
-      stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
-      env: {
-        /*
-         * The system environment comes along. On Windows a child started with a scrubbed environment has no
-         * SystemRoot, TEMP or APPDATA, and Node needs them: without SystemRoot its crypto and DNS fail to load,
-         * and PGlite has nowhere to put its temporary files. The settings below are what this install adds.
-         */
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: '1',
-        DB_DRIVER: 'pglite',
-        PGLITE_DATA_DIR: join(userData(), 'db'),
-        PGLITE_MIGRATIONS_DIR: migrationsDir,
-        WEB_ROOT: webRoot,
-        PORT: '0',
-        COOKIE_SECURE: 'false',
-        TRUST_PROXY: '0',
-        AUTH_USERNAME: config.username,
-        AUTH_PASSWORD_HASH: config.passwordHash,
-        JWT_SECRET: config.jwtSecret,
-      },
-    })
-    api = child
-    let started = false
-    child.on('message', (msg: { type?: string; port?: number } | null) => {
-      if (msg?.type !== 'listening') return
-      started = true
-      ok(`http://127.0.0.1:${msg.port}`)
-    })
-    child.on('error', fail)
-    child.on('exit', (code) => {
-      if (!started) return fail(new Error(`API process exited with code ${code}`))
-      if (quitting) return
-      // The window would keep showing a dead app; say so and close instead.
-      dialog.showErrorBox('Moliyaviy yordam', "Ilovaning ichki serveri to'xtadi. Dasturni qayta oching.")
-      app.quit()
-    })
-  })
-}
+const alive = (win: BrowserWindow | null): win is BrowserWindow => !!win && !win.isDestroyed()
 
-function appWindow(baseUrl: string): BrowserWindow {
+/*
+ * M13: the app window shows the shared server — its own login page first. The desktop no longer runs an API or keeps
+ * a database; what stays on this computer is what belongs to it: E-IMZO, the ERI passwords, the Didox window, and the
+ * robot's journal and screenshots (FR-8.7).
+ */
+function appWindow(origin: string, onLoad: () => void): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -109,9 +71,9 @@ function appWindow(baseUrl: string): BrowserWindow {
       preload: join(assets, 'app-preload.cjs'),
     },
   })
-  // Keep the app inside its own origin (parsed, so `http://host@evil` lookalikes fail); other links go to the browser.
+  // Keep the window on the server's origin (parsed, so `https://host@evil` lookalikes fail); other links go to the browser.
   win.webContents.on('will-navigate', (event, url) => {
-    if (!isSameOrigin(url, new URL(baseUrl).origin)) {
+    if (!isSameOrigin(url, origin)) {
       event.preventDefault()
       void shell.openExternal(url)
     }
@@ -120,78 +82,162 @@ function appWindow(baseUrl: string): BrowserWindow {
     void shell.openExternal(url)
     return { action: 'deny' }
   })
+  win.webContents.on('did-finish-load', onLoad)
   // Nobody would see the run's result: stop driving Didox.
   win.on('closed', () => didox?.cancel())
-  void win.loadURL(baseUrl)
+  void win.loadURL(origin)
   return win
 }
 
-async function launchApp(): Promise<void> {
-  // One API per app run: macOS `activate` can call this again (even while the first start is still booting).
-  apiReady ??= (async () => {
-    const config = loadConfig(userData())
-    if (!config) throw new Error('config.json is missing')
-    return startApi(config)
-  })()
-  const baseUrl = await apiReady
-  if (appWin && !appWin.isDestroyed()) return void appWin.focus()
-  appWin = appWindow(baseUrl)
-  if (!ipcRegistered) {
-    const eri = createEriStore({ file: join(userData(), 'eri-secrets.json'), safeStorage })
-    const config = loadConfig(userData())
-    if (!config) throw new Error('config.json is missing')
-    /*
-     * The app talks to its own API over loopback with a short-lived cookie it signs itself (M8c §6), so a draft run
-     * reads the very same invoice rows the accountant is looking at. c1 ships with DIDOX_MAX_INVOICES=1: one invoice
-     * goes through end to end before a run is allowed to do many.
-     */
-    const configured = Number.parseInt(process.env.DIDOX_MAX_INVOICES ?? '', 10)
-    const drafts = {
-      api: createApiClient({ baseUrl, secret: config.jwtSecret }),
-      journal: createJournal({ dir: join(userData(), 'didox-runs') }),
-      skips: createSkipStore({ file: join(userData(), 'didox-skips.json') }),
-      // c2: a run takes the month's invoices; `DIDOX_MAX_INVOICES` caps it for a careful first run.
-      ...(Number.isFinite(configured) && configured > 0 ? { maxInvoices: configured } : {}),
-    }
-    didox = createDidoxRunner({
-      listKeys: createKeyReader(),
-      eri,
-      preflight: autotypePreflight,
-      openWindow: ({ signal }) => openDidoxWindow({ diagnosticsDir: join(userData(), 'didox-diagnostics'), signal }),
-      login,
-      logout,
-      typePassword: typeEimzoPassword,
-      onProgress: sendProgress(() => appWin),
-      drafts,
-    })
-    registerIpc(() => appWin, new URL(baseUrl).origin, join(userData(), 'backups'), join(userData(), 'didox-diagnostics'), eri, didox)
-    ipcRegistered = true
-    startSchedule(drafts.journal)
-    /*
-     * A run that the app died in the middle of is closed now, while nothing else is going on: its interrupted save
-     * becomes "needs checking", and any id it had already found is sent to the API again (M8c §2).
-     */
-    void drafts.journal
-      .recoverStaleRuns()
-      .then(() => drafts.journal.flushIdFound({ markDraft: drafts.api.markDraft }))
-      .then(() => drafts.journal.rotate())
-      .catch(() => undefined)
+/** The person's server session, read in main only: the robot asks for its own key with it (M13 P6b). */
+async function personSession(origin: string): Promise<string | null> {
+  const [cookie] = await session.defaultSession.cookies.get({ url: origin, name: SESSION_COOKIE })
+  return cookie?.value || null
+}
+
+/** Native and on this computer: the page can ask for a Didox login, only the person can say yes (CONSTITUTION §13). */
+const confirm: Confirm = async ({ message, detail }) => {
+  const options = {
+    type: 'question' as const,
+    title: 'Moliyaviy yordam',
+    buttons: ['Boshlash', 'Bekor qilish'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+    message,
+    detail,
   }
+  const { response } = alive(appWin) ? await dialog.showMessageBox(appWin, options) : await dialog.showMessageBox(options)
+  return response === 0
+}
+
+async function launchApp(): Promise<void> {
+  const config = loadConfig(userData())
+  if (!config) return void openSetup()
+  if (alive(appWin)) return void appWin.focus()
+  const robot = wire(config)
+  appWin = appWindow(config.serverUrl, () => void robot.ensure())
+}
+
+/** Everything the app window talks to, built once per app run (macOS `activate` can open the window again). */
+function wire(config: AppConfig): RobotKey {
+  if (robotKey) return robotKey
+  const origin = config.serverUrl
+  const label = installLabel(config)
+  const eri = createEriStore({ file: join(userData(), 'eri-secrets.json'), safeStorage })
+  const readKeys = createKeyReader()
+
+  const robot = createRobotKey({
+    store: createRobotTokenStore({ file: join(userData(), 'robot-token.json'), safeStorage }),
+    obtain: (person) => requestRobotToken({ origin, install: label, personSession: person }),
+    personSession: () => personSession(origin),
+    log: (message) => console.warn(message),
+  })
+  robotKey = robot
+  // A login sets the server's session cookie: that is the moment the robot can get (or renew) its key.
+  session.defaultSession.cookies.on('changed', (_event, cookie, _cause, removed) => {
+    if (!removed && cookie.name === SESSION_COOKIE) void robot.ensure()
+  })
+
+  const api = createApiClient({ baseUrl: origin, token: robot.token, install: label, onUnauthorized: () => void robot.invalidate() })
+  /*
+   * c1 shipped with DIDOX_MAX_INVOICES=1: one invoice went through end to end before a run was allowed to do many.
+   * It stays as a cap for a careful first run on a new computer.
+   */
+  const configured = Number.parseInt(process.env.DIDOX_MAX_INVOICES ?? '', 10)
+  const drafts = {
+    api,
+    journal: createJournal({ dir: join(userData(), 'didox-runs') }),
+    ...(Number.isFinite(configured) && configured > 0 ? { maxInvoices: configured } : {}),
+  }
+  const runner = createDidoxRunner({
+    listKeys: readKeys,
+    eri,
+    preflight: autotypePreflight,
+    openWindow: ({ signal }) => openDidoxWindow({ diagnosticsDir: join(userData(), 'didox-diagnostics'), signal }),
+    login,
+    logout,
+    typePassword: typeEimzoPassword,
+    onProgress: sendProgress(() => appWin),
+    drafts,
+  })
+  didox = runner
+  requests = createDidoxRequests({
+    confirm,
+    didox: {
+      checkLogin: (tin) => runner.checkLogin(tin),
+      createDrafts: async (opts) => {
+        const result = await runner.createDrafts(opts)
+        if (result.ok && waitingMonth === opts.month) {
+          waitingMonth = null
+          refreshTray()
+        }
+        return result
+      },
+    },
+    prepareRobot: () => robot.ensure(),
+    firmName: async (tin) => {
+      const key = (await readKeys([tin])).get(tin)
+      return key && key.status !== 'missing' ? key.key.org : null
+    },
+    lenderNames: async (month, ids) => {
+      const { lenders } = await api.listInvoices(month)
+      const names = ids.flatMap((id) => lenders.filter((l) => l.id === id).map((l) => l.name))
+      return names.length === ids.length ? names : null
+    },
+  })
+  const passwords = createEriPasswordWindows({ assets, parent: () => appWin, eri, readKeys })
+  registerIpc({
+    getAppWindow: () => appWin,
+    origin,
+    diagnosticsDir: join(userData(), 'didox-diagnostics'),
+    eri,
+    readKeys,
+    requests,
+    didox: runner,
+    openPasswordWindow: (tin) => passwords.open(tin),
+    install: { id: config.installId, name: config.installName, label },
+  })
+  startSchedule(drafts.journal)
+  refreshTray()
+  /*
+   * A run that the app died in the middle of is closed now, while nothing else is going on: its interrupted save
+   * becomes "needs checking", any id it had already found is sent to the server again (M8c §2), and every flag the
+   * server has not heard of yet is sent (M13). Without a robot key yet, they wait for the next run.
+   */
+  void drafts.journal
+    .recoverStaleRuns()
+    .then(() => drafts.journal.flushIdFound({ markDraft: api.markDraft }))
+    .then(() => drafts.journal.pushFlags(api))
+    .then(() => drafts.journal.rotate())
+    .catch(() => undefined)
+  return robot
 }
 
 /*
  * The monthly schedule (SRS FR-8.10). Everything it needs to know about the computer is asked here; everything it
  * decides lives in scheduler/. A run is only ever started while the accountant is away from the keyboard, because
- * the app types the ERI password on it.
+ * the app types the ERI password on it. It needs no confirmation: it is this computer's own schedule, not a page.
  */
 
 /** No automatic run while someone has touched the keyboard in the last few minutes. */
 const IDLE_SECONDS = 180
 /**
- * Run failures that say nothing about the month: the app never reached Didox, so the schedule tries again. Anything
- * else — a page that changed, a password Didox refused — is for the accountant, and is not retried behind their back.
+ * Run failures that say nothing about the month: the app never reached Didox, or the robot lost its server key, so
+ * the schedule tries again. Anything else — a page that changed, a password Didox refused — is for the accountant,
+ * and is not retried behind their back. (A look while the server is down records no run at all, so it never counts.)
  */
-const TRANSIENT: ReadySet = new Set(['EIMZO_NOT_RUNNING', 'EIMZO_ERROR', 'ACCESSIBILITY_DENIED', 'KEYBOARD_LAYOUT', 'EIMZO_DIALOG_OPEN', 'PLATFORM_UNSUPPORTED', 'APP_CLOSED', 'RUN_IN_PROGRESS'])
+const TRANSIENT: ReadySet = new Set([
+  'EIMZO_NOT_RUNNING',
+  'EIMZO_ERROR',
+  'ACCESSIBILITY_DENIED',
+  'KEYBOARD_LAYOUT',
+  'EIMZO_DIALOG_OPEN',
+  'PLATFORM_UNSUPPORTED',
+  'APP_CLOSED',
+  'RUN_IN_PROGRESS',
+  'ROBOT_TOKEN_MISSING',
+])
 type ReadySet = ReadonlySet<string>
 
 const NOT_READY: Record<Exclude<ReadyVerdict, 'ok'>, string> = {
@@ -215,7 +261,9 @@ function startSchedule(journal: ReturnType<typeof createJournal>): void {
       })),
     start: async (month) => {
       console.info(`[didox] jadval bo'yicha ishga tushirilmoqda: ${month}`)
+      await robotKey?.ensure()
       const result = await didox?.createDrafts({ month, lenderIds: 'all', trigger: 'scheduled' })
+      if (result && !result.ok) console.info(`[didox] jadval: ${result.code} — ${result.message}`)
       if (result?.ok) {
         waitingMonth = null
         refreshTray()
@@ -244,7 +292,7 @@ function startSchedule(journal: ReturnType<typeof createJournal>): void {
       if (!Notification.isSupported()) return
       const note = new Notification({
         title: 'Didox qoralamalari kutmoqda',
-        body: `${month} oyi uchun qoralamalar yaratilmadi (${NOT_READY[verdict]}). Ilovani ochib "Didox'da qoralama yaratish"ni bosing.`,
+        body: `${month} oyi uchun qoralamalar yaratilmadi (${NOT_READY[verdict]}). Tray menyusidan yoki ilovadan "Didox'da qoralama yaratish"ni bosing.`,
       })
       note.on('failed', () => undefined) // the tray already says it; a refused notification is not an error here
       note.show()
@@ -256,6 +304,20 @@ function startSchedule(journal: ReturnType<typeof createJournal>): void {
   powerMonitor.on('resume', wake)
   powerMonitor.on('unlock-screen', wake)
   powerMonitor.on('user-did-become-active', wake)
+}
+
+/**
+ * The tray's "create drafts": the same confirmed path as the page's button (bridge/requests.ts), for the month the
+ * schedule would do. The app window is opened so the run can be watched.
+ */
+async function startFromTray(): Promise<void> {
+  if (!requests) return void open()
+  const month = monthToBill(Date.now())
+  const result = await requests.createDrafts({ month, lenderIds: 'all' })
+  if (result.ok) return void open()
+  if (result.code === 'CANCELLED') return
+  const options = { type: 'info' as const, title: 'Moliyaviy yordam', message: "Didox'da qoralamalar boshlanmadi", detail: result.message }
+  void (alive(appWin) ? dialog.showMessageBox(appWin, options) : dialog.showMessageBox(options))
 }
 
 /** A tray icon, so the app can keep its schedule with no window open (FR-8.10). */
@@ -275,16 +337,12 @@ function createTray(): void {
 /** The tray says what the app is waiting for; it is the one channel that needs nobody's permission. */
 function refreshTray(): void {
   if (!tray) return
+  const month = monthToBill(Date.now())
   tray.setToolTip(waitingMonth ? `Moliyaviy yordam — ${waitingMonth} Didox qoralamalari kutmoqda` : 'Moliyaviy yordam')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      ...(waitingMonth
-        ? [
-            { label: `${waitingMonth}: Didox qoralamalari kutmoqda`, enabled: false },
-            { label: 'Ochib yaratish', click: () => void open() },
-            { type: 'separator' as const },
-          ]
-        : []),
+      ...(waitingMonth ? [{ label: `${waitingMonth}: Didox qoralamalari kutmoqda`, enabled: false }] : []),
+      ...(requests ? [{ label: `Didox'da qoralama yaratish (${month})`, click: () => void startFromTray() }, { type: 'separator' as const }] : []),
       { label: 'Ilovani ochish', click: () => void open() },
       { type: 'separator' as const },
       { label: 'Chiqish', click: () => app.quit() },
@@ -292,44 +350,8 @@ function refreshTray(): void {
   )
 }
 
-/** First run: a local setup window collects the password; no network endpoint is involved. */
-function setupWindow(): void {
-  if (setupWin && !setupWin.isDestroyed()) return void setupWin.focus()
-  registerSetupIpc()
-  const win = new BrowserWindow({
-    width: 440,
-    height: 560,
-    resizable: false,
-    title: 'Moliyaviy yordam — sozlash',
-    webPreferences: { contextIsolation: true, sandbox: true, preload: join(assets, 'setup-preload.cjs') },
-  })
-  void win.loadFile(join(assets, 'setup.html'))
-  setupWin = win
-}
-
-let setupIpcRegistered = false
-/** Registered once: the setup window can be closed and reopened (macOS `activate`) without re-registering. */
-function registerSetupIpc(): void {
-  if (setupIpcRegistered) return
-  setupIpcRegistered = true
-  const fromSetup = (event: { sender: { id: number } }) => !!setupWin && !setupWin.isDestroyed() && event.sender.id === setupWin.webContents.id
-  ipcMain.handle('setup:save', async (event, { username, password }: { username: unknown; password: unknown }) => {
-    if (!fromSetup(event)) throw new Error('Untrusted IPC sender')
-    if (typeof username !== 'string' || typeof password !== 'string' || password.length < 8) {
-      return { ok: false, message: "Parol kamida 8 belgi bo'lishi kerak" }
-    }
-    await saveCredentials(userData(), username, password)
-    return { ok: true }
-  })
-  ipcMain.on('setup:done', async (event) => {
-    if (!fromSetup(event) || !isConfigured(userData())) return
-    const win = setupWin
-    await launchApp()
-    win?.close()
-  })
-}
-
-const open = () => (isConfigured(userData()) ? launchApp() : setupWindow())
+const openSetup = () => openSetupWindow({ assets, userData: userData(), onDone: launchApp })
+const open = () => launchApp()
 const fatal = (error: unknown) => {
   dialog.showErrorBox('Moliyaviy yordam', `Ilovani ishga tushirib bo'lmadi: ${error instanceof Error ? error.message : String(error)}`)
   app.quit()
@@ -340,8 +362,8 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   // Focus the app (or setup) window — never the Didox window, which only the app drives.
   app.on('second-instance', () => {
-    const win = [appWin, setupWin].find((w) => w && !w.isDestroyed())
-    if (!win) return void Promise.resolve(open()).catch(fatal)
+    const win = [appWin, setupWindow()].find(alive)
+    if (!win) return void open().catch(fatal)
     if (win.isMinimized()) win.restore()
     win.focus()
   })
@@ -359,13 +381,11 @@ if (!app.requestSingleInstanceLock()) {
     .catch(fatal)
   // The Didox window may still be open; what matters is whether the app window is.
   app.on('activate', () => {
-    const shown = [appWin, setupWin].some((w) => w && !w.isDestroyed())
-    if (!shown) Promise.resolve(open()).catch(fatal)
+    if (![appWin, setupWindow()].some(alive)) open().catch(fatal)
   })
   // Closing the window leaves the app in the tray: a closed window must not cost the month its drafts (FR-8.10).
   app.on('window-all-closed', () => undefined)
   app.on('before-quit', (event) => {
-    quitting = true
     // Let a running Didox check end cleanly (cancel, clear session, close its window) — at most 5 s.
     if (!didox?.busy() || quitAfterDidox) return
     event.preventDefault()
@@ -378,5 +398,4 @@ if (!app.requestSingleInstanceLock()) {
       app.quit()
     }, 100)
   })
-  app.on('quit', () => api?.kill())
 }
