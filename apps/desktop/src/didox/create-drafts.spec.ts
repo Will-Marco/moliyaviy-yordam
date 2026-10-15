@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { InvoiceApiRow, InvoiceList, MarkDraftResult } from '../api/client.js'
+import { ApiError, type InvoiceApiRow, type InvoiceList, type MarkDraftResult } from '../api/client.js'
 import { EimzoError } from '../eimzo/client.js'
 import type { KeyStatus } from '../eimzo/match.js'
 import { EriStoreError } from '../secrets/eri-store.js'
@@ -311,6 +311,24 @@ describe('runPlan', () => {
       expect(journal.firms[0]).toMatchObject({ status: 'failed', code: 'API_UNAVAILABLE' })
       expect(journal.firms[0]?.invoices[0]).toMatchObject({ state: 'skipped', code: 'API_UNAVAILABLE' })
       expect(journal.firms[1]?.status).toBe('done')
+    })
+
+    /*
+     * A refused session is not this firm's problem: every firm after it would sign in to Didox, have its ERI password
+     * typed, and be refused the same way. It stops the run, as a refused mark already does.
+     */
+    it('stops the whole run when the server refuses the session on the re-read', async () => {
+      const h = harness({ rows: [apiRow({ contractId: 'c-1' }), apiRow({ contractId: 'c-2', lender: LENDER_B })] })
+      h.deps.api.listInvoices = vi
+        .fn()
+        .mockResolvedValueOnce(list([apiRow({ contractId: 'c-1' }), apiRow({ contractId: 'c-2', lender: LENDER_B })]))
+        .mockRejectedValueOnce(new ApiError(401, 'UNAUTHORIZED', 'Sessiya tugagan'))
+
+      const { outcome } = await run(h)
+
+      expect(outcome).toMatchObject({ status: 'failed', failure: { code: 'API_UNAVAILABLE' } })
+      expect(h.deps.loginFirm).toHaveBeenCalledTimes(1)
+      expect(createDraftMock).not.toHaveBeenCalled()
     })
 
     it('stops the firm when the skip list cannot be read again', async () => {

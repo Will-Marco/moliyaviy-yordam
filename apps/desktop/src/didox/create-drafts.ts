@@ -1,4 +1,4 @@
-import type { ApiClient } from '../api/client.js'
+import { type ApiClient, ApiError } from '../api/client.js'
 import type { KeyStatus } from '../eimzo/match.js'
 import { EimzoError } from '../eimzo/client.js'
 import type { EriStore } from '../secrets/eri-store.js'
@@ -249,8 +249,12 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
   try {
     fresh = await deps.api.listInvoices(plan.month)
     skipped = await deps.skips.list(plan.month)
-  } catch {
+  } catch (error) {
     if (ctx.signal.aborted) return { status: 'cancelled' }
+    // A refused session would refuse every firm after this one too, each after a real Didox sign-in: stop the run.
+    if (error instanceof ApiError && error.status === 401) {
+      return { status: 'failed', failure: { code: 'API_UNAVAILABLE', message: "Ilova o'z API'siga kira olmadi" } }
+    }
     await run.firmFailed(firm, 'API_UNAVAILABLE', RELIST_FAILED)
     return null
   }
