@@ -69,7 +69,7 @@ export interface IpcOptions {
   /** The shared server's origin: the only page the bridge answers. */
   origin: string
   diagnosticsDir: string
-  eri: Pick<EriStore, 'status' | 'remove'>
+  eri: Pick<EriStore, 'status'>
   readKeys: (tins: string[]) => Promise<Map<string, KeyStatus>>
   /** Validated, natively confirmed starts of Didox work (bridge/requests.ts). */
   requests: DidoxRequests
@@ -133,12 +133,8 @@ export function registerIpc({ getAppWindow, origin, diagnosticsDir, eri, readKey
   // The page only asks for the window; the password never passes through it (FR-8.2, CONSTITUTION §13).
   ipcMain.handle('eri:open-password-window', guarded(async (tin: unknown) => openPasswordWindow(tinOf(tin))))
 
-  ipcMain.handle(
-    'eri:remove-password',
-    guarded(async (tin: unknown): Promise<void> => {
-      await eri.remove(tinOf(tin))
-    }),
-  )
+  // Confirmed natively first, like a Didox start (security review L1); CANCELLED when the person said no.
+  ipcMain.handle('eri:remove-password', guarded(async (tin: unknown) => requests.removePassword(tin)))
 
   ipcMain.handle('didox:check-login', guarded(async (tin: unknown): Promise<CheckLoginResult> => requests.checkLogin(tin)))
   ipcMain.handle('didox:create-drafts', guarded(async (payload: unknown): Promise<StartDraftsResult> => requests.createDrafts(payload)))

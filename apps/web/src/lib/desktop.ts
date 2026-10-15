@@ -125,7 +125,11 @@ export interface DesktopBridge {
      * encrypted by the OS and kept on this computer only — the page never sees it.
      */
     openPasswordWindow(tin: string): Promise<{ saved: boolean }>
-    removePassword(tin: string): Promise<void>
+    /**
+     * Asks the desktop app to remove the saved password; it confirms in its own dialog first. Nothing (`undefined`)
+     * when removed; `code: 'CANCELLED'` when the person said no there.
+     */
+    removePassword(tin: string): Promise<void | { ok: false; code: string; message: string }>
   }
   /** Absent in desktop builds older than M8b. The app logs in to Didox in its own window; it never signs or sends. */
   didox?: {

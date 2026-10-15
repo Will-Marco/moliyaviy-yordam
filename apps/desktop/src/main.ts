@@ -118,11 +118,11 @@ async function personSession(origin: string): Promise<string | null> {
  * Native and on this computer: the page can ask for a Didox login, only the person can say yes (CONSTITUTION §13).
  * Guarded, so a page can neither stack these dialogs nor get a yes from a click that was aimed at the page.
  */
-const confirm: Confirm = guardConfirm(async ({ message, detail }) => {
+const confirm: Confirm = guardConfirm(async ({ message, detail, button = 'Boshlash' }) => {
   const options = {
     type: 'question' as const,
     title: 'Moliyaviy yordam',
-    buttons: ['Boshlash', 'Bekor qilish'],
+    buttons: [button, 'Bekor qilish'],
     defaultId: 1,
     cancelId: 1,
     noLink: true,
@@ -198,6 +198,7 @@ function wire(config: AppConfig): RobotKey {
       },
     },
     prepareRobot: () => robot.ensure(),
+    removePassword: (tin) => eri.remove(tin),
     firmNames: async (tins) => {
       const names = new Map<string, string>()
       for (const [tin, key] of await readKeys(tins)) if (key.status !== 'missing' && key.key.org) names.set(tin, key.key.org)

@@ -9,6 +9,8 @@ export interface ConfirmRequest {
   message: string
   /** What exactly will happen, so the person knows what they are agreeing to. */
   detail: string
+  /** The yes button; "Boshlash" when absent. */
+  button?: string
 }
 
 /** Shows the question; true only for an explicit "Boshlash". */
@@ -84,7 +86,20 @@ export function checkLoginPrompt(tin: string, firmName: string | null): ConfirmR
 }
 
 /**
- * A "Boshlash" that arrives sooner than this after the dialog was shown is not a decision: a page can call the bridge
+ * Removing a saved ERI password (security review L1): a page could otherwise wipe every firm's password without anyone
+ * noticing until the 06:00 run fails. `firmName` comes from the local E-IMZO key, as for checkLoginPrompt.
+ */
+export function removePasswordPrompt(tin: string, firmName: string | null): ConfirmRequest {
+  const clean = cleanName(firmName)
+  return {
+    message: `${clean ?? `STIR ${tin}`} ERI paroli o'chirilsinmi?`,
+    detail: `${firmLabel(tin, firmName)} uchun shu kompyuterda saqlangan parol o'chiriladi. Didox'ga avtomatik kirish uchun uni qayta kiritish kerak bo'ladi.`,
+    button: "O'chirish",
+  }
+}
+
+/**
+ * A yes ("Boshlash", "O'chirish") that arrives sooner than this after the dialog was shown is not a decision: a page can call the bridge
  * between the two clicks of a double-click, so the second click lands on the dialog's default-looking button.
  */
 const MIN_ANSWER_MS = 600

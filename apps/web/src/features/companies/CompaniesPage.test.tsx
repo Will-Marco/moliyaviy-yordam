@@ -176,6 +176,21 @@ describe('CompaniesPage', () => {
       expect(eri.removePassword).toHaveBeenCalledWith('300000001')
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     })
+
+    it('keeps the password and the dialog when removal is not confirmed in the desktop app', async () => {
+      const eri = desktopWith(
+        { '300000001': 'set' },
+        { removePassword: vi.fn(async () => ({ ok: false, code: 'CANCELLED', message: 'Bekor qilindi — ilova oynasida tasdiqlanmadi' })) },
+      )
+      renderWithProviders(<CompaniesPage />)
+      await userEvent.click(await within(await alfaRow()).findByRole('button', { name: `ERI paroli: ${alfa.name}` }))
+      const dialog = await screen.findByRole('dialog')
+      await userEvent.click(within(dialog).getByRole('button', { name: "Parolni o'chirish" }))
+      await waitFor(() => expect(eri.removePassword).toHaveBeenCalledWith('300000001'))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+      expect(screen.queryByText("ERI paroli o'chirildi")).not.toBeInTheDocument()
+    })
   })
 
   describe('Didox login check (desktop)', () => {

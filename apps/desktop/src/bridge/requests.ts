@@ -1,8 +1,9 @@
 import type { CheckLoginResult, StartDraftsResult } from '../didox/run.js'
-import { checkLoginPrompt, type Confirm, type ConfirmFirm, confirmed, draftsPrompt } from './confirm.js'
+import { type CANCELLED, checkLoginPrompt, type Confirm, type ConfirmFirm, confirmed, draftsPrompt, removePasswordPrompt } from './confirm.js'
 
 /*
- * What the page may *ask* the robot to do (CONSTITUTION §13, M13). Every request is validated, then confirmed in a
+ * What the page may *ask* the robot to do (CONSTITUTION §13, M13), and the removal of a saved ERI password, which
+ * would otherwise quietly stop the robot (security review L1). Every request is validated, then confirmed in a
  * native dialog on this computer, and only then handed to the runner. The page gets the same answer shapes as before,
  * with CANCELLED when the person said no.
  */
@@ -26,6 +27,8 @@ export interface DidoxRequestDeps {
     | undefined
   /** Renews the robot's server key while a person is logged in, so the run that follows can read the invoices. */
   prepareRobot(): Promise<unknown>
+  /** Deletes the firm's saved ERI password from this computer's encrypted store. */
+  removePassword(tin: string): Promise<void>
   /**
    * STIR → the organisation on the firm's E-IMZO key, for the STIRs that have one — read on this computer, unlike
    * anything the page or the server sends.
@@ -79,6 +82,13 @@ export function createDidoxRequests(deps: DidoxRequestDeps) {
         await deps.prepareRobot().catch(() => undefined)
         return didox.createDrafts({ month, lenderIds: lenders })
       })
+    },
+
+    /** Nothing on success; CANCELLED, as for a Didox start, when the person did not confirm. */
+    async removePassword(tin: unknown): Promise<void | typeof CANCELLED> {
+      if (typeof tin !== 'string' || !TIN.test(tin)) throw new Error('Invalid STIR')
+      const [firm] = await named([tin])
+      return confirmed(deps.confirm, removePasswordPrompt(tin, firm?.name ?? null), () => deps.removePassword(tin))
     },
   }
 }

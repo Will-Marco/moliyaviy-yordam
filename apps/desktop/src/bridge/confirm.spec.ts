@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { CANCELLED, checkLoginPrompt, confirmed, draftsPrompt, guardConfirm } from './confirm.js'
+import { CANCELLED, checkLoginPrompt, confirmed, draftsPrompt, guardConfirm, removePasswordPrompt } from './confirm.js'
 
 describe('confirmed — the robot starts only on a yes given in the app itself (CONSTITUTION §13)', () => {
   it('starts the work when the person says Boshlash', async () => {
@@ -126,5 +126,15 @@ describe('guardConfirm — one dialog at a time, no yes under a double-click (se
 
     await expect(confirm(request)).rejects.toThrow('window destroyed')
     expect(await confirm(request)).toBe(true)
+  })
+})
+
+describe('removePasswordPrompt (security review L1)', () => {
+  it('names the firm from its E-IMZO key, or by STIR', () => {
+    expect(removePasswordPrompt('300000001', 'ALFA SAVDO MCHJ')).toMatchObject({
+      message: "ALFA SAVDO MCHJ ERI paroli o'chirilsinmi?",
+      button: "O'chirish",
+    })
+    expect(removePasswordPrompt('300000001', null).message).toBe("STIR 300000001 ERI paroli o'chirilsinmi?")
   })
 })

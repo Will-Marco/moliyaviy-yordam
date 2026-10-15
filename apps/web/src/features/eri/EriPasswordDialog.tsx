@@ -46,7 +46,12 @@ export function EriPasswordDialog({ company, status, onOpenChange }: Props) {
   const removePassword = async () => {
     setError(null)
     try {
-      await remove.mutateAsync(company.tin)
+      const refused = await remove.mutateAsync(company.tin)
+      if (refused) {
+        // Not confirmed in the desktop app's own dialog: the password stays, and so does this dialog.
+        if (refused.code !== 'CANCELLED') setError(refused.message)
+        return
+      }
       toast.success("ERI paroli o'chirildi")
       onOpenChange(false)
     } catch (e) {

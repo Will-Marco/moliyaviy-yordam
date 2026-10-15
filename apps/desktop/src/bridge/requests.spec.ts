@@ -21,6 +21,7 @@ function setup(over: Partial<DidoxRequestDeps> & { answer?: boolean } = {}) {
     },
     didox,
     prepareRobot: vi.fn(async () => void order.push('prepareRobot')),
+    removePassword: vi.fn(async () => void order.push('removePassword')),
     firmNames: vi.fn(async (tins: string[]) => new Map(tins.filter((t) => t === TIN).map((t) => [t, 'ALFA SAVDO MCHJ']))),
     lenderTins: vi.fn(async () => [TIN]),
     ...over,
@@ -129,6 +130,30 @@ describe('didox:create-drafts from the page', () => {
     await expect(s.requests.createDrafts({ month: '2026-09', lenderIds: ['not-a-uuid'] })).rejects.toThrow('Invalid lenderIds')
     await expect(s.requests.createDrafts({ month: '2026-09', lenderIds: [] })).rejects.toThrow('Invalid lenderIds')
     await expect(s.requests.createDrafts(null)).rejects.toThrow('Invalid month')
+    expect(s.asked).toEqual([])
+  })
+})
+
+describe('eri:remove-password from the page (security review L1)', () => {
+  it('asks on this computer first, naming the firm from its E-IMZO key, then removes', async () => {
+    const s = setup()
+
+    expect(await s.requests.removePassword(TIN)).toBeUndefined()
+    expect(s.order).toEqual(['confirm', 'removePassword'])
+    expect(s.asked[0]?.message).toBe("ALFA SAVDO MCHJ ERI paroli o'chirilsinmi?")
+    expect(s.deps.removePassword).toHaveBeenCalledWith(TIN)
+  })
+
+  it('keeps the password and answers CANCELLED when the person says no', async () => {
+    const s = setup({ answer: false })
+
+    expect(await s.requests.removePassword(TIN)).toEqual(CANCELLED)
+    expect(s.deps.removePassword).not.toHaveBeenCalled()
+  })
+
+  it('refuses a malformed STIR before asking anyone', async () => {
+    const s = setup()
+    await expect(s.requests.removePassword('30000000x')).rejects.toThrow('Invalid STIR')
     expect(s.asked).toEqual([])
   })
 })
