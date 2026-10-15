@@ -10,6 +10,7 @@ interface Seen {
   method: string
   cookie: string | null
   body: unknown
+  redirect: RequestRedirect | undefined
 }
 
 /** Records every request and answers with the queued responses, oldest first. */
@@ -22,6 +23,7 @@ function fakeFetch(queue: ({ status: number; body?: unknown; raw?: string } | Er
       method: init?.method ?? 'GET',
       cookie: headers.get('cookie'),
       body: init?.body === undefined ? undefined : JSON.parse(String(init.body)),
+      redirect: init?.redirect,
     })
     const next = queue.shift()
     if (!next) throw new Error(`fake fetch: no response queued for ${String(url)}`)
@@ -301,6 +303,40 @@ describe('createApiClient (M8c §6, M13 P6b)', () => {
       expect(
         await client(fakeFetch([]).fetch).recordNeedsCheck('2026-09', C, { runId: 'r', code: 'SAVE_FAILED', message: 'x' }),
       ).toMatchObject({ ok: false, status: 401 })
+    })
+  })
+
+  // Security review M4: the cookie carries a 180-day token; a redirect must not carry it to another host.
+  describe('redirects', () => {
+    it('never lets fetch follow a redirect on its own', async () => {
+      const { fetch, seen } = fakeFetch([{ status: 200, body: listBody }, { status: 204 }])
+      const api = client(fetch)
+      await api.listInvoices('2026-09')
+      await api.resolveNeedsCheck('2026-09', 'c1')
+
+      expect(seen.map((s) => s.redirect)).toEqual(['manual', 'manual'])
+    })
+
+    it('treats a redirected read as a failure that names the cause', async () => {
+      const { fetch, seen } = fakeFetch([{ status: 302 }])
+      const error = await client(fetch)
+        .listInvoices('2026-09')
+        .catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(ApiError)
+      expect(error).toMatchObject({ status: 0, code: 'REDIRECT', message: expect.stringContaining("yo'naltirdi") })
+      expect(seen).toHaveLength(1)
+      expect(refused).toEqual([])
+    })
+
+    it('returns a redirected write as a failure the journal retries later', async () => {
+      const mark = { didoxId: 'D1', expectedAmount: '1.00' }
+      expect(await client(fakeFetch([{ status: 301 }]).fetch).markDraft('2026-09', 'c1', mark)).toMatchObject({
+        ok: false,
+        status: 0,
+        code: 'REDIRECT',
+      })
+      expect(await client(fakeFetch([{ status: 307 }]).fetch).resolveNeedsCheck('2026-09', 'c1')).toMatchObject({ ok: false, status: 0 })
     })
   })
 })

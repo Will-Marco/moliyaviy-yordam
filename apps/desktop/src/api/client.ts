@@ -82,6 +82,9 @@ const MAX_CANDIDATES = 50
 /** No robot token: nothing is sent, and the caller sees the same 401 the server would give. */
 class NoToken extends Error {}
 
+/** The server answered with a redirect, which is not followed (see `send`). */
+class Redirected extends Error {}
+
 /**
  * Talks to the shared server (M13) with the robot's own token as its session cookie — never the person's, whose
  * session ends after 12 hours while a scheduled run starts at 06:00 with nobody there. A 401 tells `onUnauthorized`,
@@ -105,10 +108,16 @@ export function createApiClient({
 }) {
   const root = `${baseUrl.replace(/\/+$/, '')}/api`
 
+  /*
+   * Redirects are never followed (security review M4): the cookie carries a 180-day robot token, and a followed
+   * redirect would resend it to wherever the Location points. The server has no reason to redirect its API, so a 3xx
+   * is a failure — reported like an unreachable server, which the journal tries again later.
+   */
   const send = async (url: string, init: RequestInit = {}): Promise<Response> => {
     const current = await token()
     if (!current) throw new NoToken()
-    const res = await fetch(url, { ...init, headers: { ...init.headers, cookie: `${SESSION_COOKIE}=${current}` } })
+    const res = await fetch(url, { ...init, headers: { ...init.headers, cookie: `${SESSION_COOKIE}=${current}` }, redirect: 'manual' })
+    if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) throw new Redirected()
     if (res.status === 401) onUnauthorized(current)
     return res
   }
@@ -119,7 +128,7 @@ export function createApiClient({
     try {
       res = await send(url)
     } catch (error) {
-      throw error instanceof NoToken ? noToken() : network(error)
+      throw unsent(error)
     }
     if (!res.ok) throw new ApiError(res.status, codeOf(res.status, await body(res)), await messageOf(res))
     const parsed = await json<T>(res)
@@ -132,7 +141,7 @@ export function createApiClient({
     try {
       res = await send(url, init)
     } catch (error) {
-      const { status, message } = error instanceof NoToken ? noToken() : network(error)
+      const { status, message } = unsent(error)
       return { ok: false, status, message }
     }
     return res.ok ? { ok: true } : { ok: false, status: res.status, message: await messageOf(res) }
@@ -164,7 +173,7 @@ export function createApiClient({
           body: JSON.stringify({ ...mark, source: 'didox' }),
         })
       } catch (error) {
-        const { status, code, message } = error instanceof NoToken ? noToken() : network(error)
+        const { status, code, message } = unsent(error)
         return { ok: false, status, code, message }
       }
       if (res.ok) {
@@ -211,6 +220,12 @@ const noToken = () => new ApiError(401, 'ROBOT_TOKEN_MISSING', didoxMessage('ROB
 
 const network = (error: unknown) =>
   new ApiError(0, 'NETWORK', `Server javob bermadi: ${error instanceof Error ? error.message : String(error)}`)
+
+const redirected = () =>
+  new ApiError(0, 'REDIRECT', "Server so'rovni boshqa manzilga yo'naltirdi — robot kaliti u yerga yuborilmadi. Server manzilini tekshiring")
+
+/** Why `send` produced no answer to use: no token, a redirect, or no server. */
+const unsent = (error: unknown) => (error instanceof NoToken ? noToken() : error instanceof Redirected ? redirected() : network(error))
 
 const codeOf = (status: number, parsed: Record<string, unknown> | null) =>
   status === 401 ? 'UNAUTHORIZED' : typeof parsed?.code === 'string' ? parsed.code : `HTTP_${status}`
