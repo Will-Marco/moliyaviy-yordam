@@ -4,7 +4,8 @@
 > qoralama yaratsin. macOS'da bularning hammasi o'tgan (c1, c2, M8d gate'lari); Windows kodi yozilgan, lekin
 > **hali hech qachon ishlatilmagan**. Sir: "asosiysi — Windows'da ishlashi".
 >
-> Holat: tayyorgarlik tugadi (2026-10-14), gate Sir tomonidan bajariladi.
+> Holat: **o'tdi (2026-10-15)** — W1–W5, Windows 11 ARM64 VM (UTM). Topilgan va tuzatilgan xatolar —
+> `docs/PROGRESS.md` qaror jurnali (2026-10-15).
 
 ## 0. Kerakli narsalar (Windows kompyuterida)
 
@@ -33,7 +34,7 @@ Ya'ni kodda yozilgan uchta sarlavha bo'yicha izlash **hech qachon ishlamas edi**
 ko'rinadigan oynasi bor-yo'qligi bo'yicha (`EnumWindows` + `IsWindowVisible` + oyna egasi E-IMZO jarayonimi).
 Parol faqat E-IMZO'ning o'z oynasiga tushadi: egasi aniqlanmasa — hech narsa yozilmaydi.
 
-## 2. W1 — qurish va ishga tushirish
+## 2. W1 — qurish va ishga tushirish — ✅ O'TDI (2026-10-15)
 
 ```powershell
 git clone <repo-url> moliyaviy-yordam
@@ -50,7 +51,7 @@ pnpm dev:desktop
 
 **Yuboring:** xato bo'lsa — to'liq matni; bo'lmasa — "W1 o'tdi".
 
-## 3. W2 — sinov ma'lumotini kiritish
+## 3. W2 — sinov ma'lumotini kiritish — ✅ O'TDI (2026-10-15)
 
 Windows'dagi baza bo'sh (ma'lumot macOS'dagi kompyuterda). Robot ishlashi uchun kamida bitta tayyor faktura kerak:
 
@@ -64,7 +65,7 @@ Shundan keyin **Fakturalar** sahifasida **2026-09** oyida bitta `tayyor` faktura
 
 **Yuboring:** "W2 o'tdi" yoki qaysi qadamda nima ko'rinmagani.
 
-## 4. W3 — Didox roboti, oyna KO'RINADIGAN holatda
+## 4. W3 — Didox roboti, oyna KO'RINADIGAN holatda — ✅ O'TDI (2026-10-15)
 
 Birinchi Windows urinishi ko'rinadigan oyna bilan bo'ladi: nima sodir bo'layotgani ko'rinib turadi.
 
@@ -87,7 +88,7 @@ Ilovada **Fakturalar → "Didox'da qoralama yaratish"** → firmani tanlang → 
 - `dialog_already_open` — W0 dagi sarlavha muammosi.
 - Forma to'lmasligi — ko'rinmas/shaffof oynaga fokus berish Windows'da boshqacha ishlashi mumkin.
 
-## 5. W4 — oyna KO'RINMAYDIGAN holatda
+## 5. W4 — oyna KO'RINMAYDIGAN holatda — ✅ O'TDI (2026-10-15)
 
 `$env:DIDOX_SHOW_WINDOW` ni olib tashlab (yoki yangi PowerShell oynasidan) yana bir marta:
 
@@ -100,7 +101,7 @@ Natija W3 bilan **bir xil** bo'lishi kerak.
 
 ⚠️ Didox'da sinov qoralamasi yaratilsa — **darhol o'chirib tashlang**.
 
-## 6. W5 — tray va jadval
+## 6. W5 — tray va jadval — ✅ O'TDI (2026-10-15)
 
 ```powershell
 $env:DIDOX_SCHEDULE_CHECK_MS="15000"

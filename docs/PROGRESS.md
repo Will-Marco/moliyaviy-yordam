@@ -3,8 +3,8 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** 8d — Windows (**kod yozildi 2026-10-14; Windows PC'da sinash qoldi**)
-**Oxirgi yangilanish:** 2026-10-13
+**Joriy modul:** M8 yopildi (Windows gate W1–W5 o'tdi, 2026-10-15) → keyingisi: M13 qarori, so'ng A1 (Windows o'rnatgich)
+**Oxirgi yangilanish:** 2026-10-15
 
 ## Modullar
 > Har modul = bitta vertical slice = bitta **user-visible harakat**.
@@ -18,9 +18,9 @@
 | 5 | Stavkani o'zgartirish | Buxgalter yangi stavka kiritadi, u qachondan amal qilishini ko'radi | standard | accepted | FR-5.1–5.5; API unit 64 + e2e 86, web 81; brauzerda 15.03→01.04, retroaktiv ogohlantirish, aprel 16% va o'chirish tekshirildi | 2026-10-07 |
 | 6 | Excel eksport | Buxgalter oylik hisobotni .xlsx qilib yuklab oladi | standard | accepted | FR-6.1–6.4; API unit 68 + e2e 91 (fayl qayta o'qilib tiyinigacha solishtiriladi), web 82; haqiqiy fayl dev serverdan yuklab tekshirildi | 2026-10-07 |
 | 7 | Oylik faktura ro'yxati | Buxgalter oy uchun tayyorlanadigan fakturalarni (summa, qator nomi) ko'radi va nusxalaydi | standard | accepted | FR-7.1–7.5; API unit 97 + e2e 101, web 95; brauzerda etalon yanvar, nusxalash, belgilash/409/olib tashlash | 2026-10-07 |
-| 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | in-progress (c1 gate o'tdi) | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni); FR-8.2 parol ombori (safeStorage) + M8b avto-kirish/"Kirishni tekshirish" qurildi; **M8c spec v5 Sir gate'idan o'tdi (2026-10-13)**, **c0 qabul qilindi (2026-10-13)** (SRS deltalari, `api/jwt`+`api/client`, `didox/money`+`parse`+`journal`+`skips`, `engine` (qulf/heartbeat/kritik bo'lim), `Page` kengayishi, `run.ts` refaktor — desktop 331 test, api 130+125 e2e, typecheck toza); keyin spike S1–S7 → c1 (1 faktura gate) → c2 | |
+| 8 | Didox — brauzerni boshqarib qoralamalar | Buxgalter Didox'ga ERI bilan kiradi, ilova sessiyani boshqarib qoralama yaratadi | complex | accepted | reja v2 (docs/plans/M8-didox-drafts.md); **M8a accepted 2026-10-12** (E-IMZO kalitlar, Firmalar'da ERI ustuni); FR-8.2 parol ombori (safeStorage) + M8b avto-kirish/"Kirishni tekshirish" qurildi; **M8c spec v5 Sir gate'idan o'tdi (2026-10-13)**, **c0 qabul qilindi (2026-10-13)** (SRS deltalari, `api/jwt`+`api/client`, `didox/money`+`parse`+`journal`+`skips`, `engine` (qulf/heartbeat/kritik bo'lim), `Page` kengayishi, `run.ts` refaktor — desktop 331 test, api 130+125 e2e, typecheck toza); keyin spike S1–S7 → c1 (1 faktura gate) → c2 ; **Windows gate W1–W5 o'tdi (2026-10-15)** — `docs/plans/M8d-windows-gate.md` | 2026-10-15 |
 | 9a | Lokal PGlite baza | Ilova serversiz lokal fayl-bazada ishlaydi | standard | accepted | PGlite adapter, dastur ichi migratsiya (ledger+rollback+snapshot), persistensiya; e2e PGlite'da ham 110 yashil | 2026-10-12 |
-| 9b | Electron qobig'i | Ilova desktop dastur sifatida ochiladi | complex | o'zak accepted | Electron 44, child-process Nest (PGlite), first-run parol, macOS qadoqlash (dir), kunlik zaxira, `productName`; **qoldi:** Windows NSIS + gate (A1/A2), imzolash; A3 qo'lda yangilash (qaror); dmg/ikona/hajm bajarildi (A5) | |
+| 9b | Electron qobig'i | Ilova desktop dastur sifatida ochiladi | complex | o'zak accepted | Electron 44, child-process Nest (PGlite), first-run parol, macOS qadoqlash (dir), kunlik zaxira, `productName`; **qoldi:** Windows NSIS (A1), imzolash; A2 Windows gate o'tdi (2026-10-15); A3 qo'lda yangilash (qaror); dmg/ikona/hajm bajarildi (A5) | |
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
 | 11 | Shartnomalar ro'yxati | Buxgalter shartnomalarni qidiradi, filtrlaydi, saralaydi; beruvchi/oluvchi alohida | standard | accepted | FR-11.1–11.4; web 153; brauzerda GAMMA → 2, DELTA AGRO → 2 | 2026-10-11 |
 | 12 | Davr hisoboti va Excel | Buxgalter davr tanlab shartnomalar harakatini ko'radi va Excel'ga yuklaydi | complex | accepted | FR-12.1–12.3; API unit 111 + e2e 110 (etalon yanvar–fevral, Excel qayta o'qiladi); brauzerda davr + Excel | 2026-10-11 |
@@ -54,6 +54,18 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-15 — **Windows gate (M8d) o'tdi, M8 qabul qilindi — Sir ("barchasi muvoffaqiyatli").** Sinov UTM'dagi
+  Windows 11 ARM64 VM'da (E-IMZO v6.4.7 `jre17`, x64 Java emulyatsiyada), dev rejimi: W1 o'rnatish/qurish, W2 sinov
+  ma'lumoti (API orqali), W3 Didox oynasi ko'rinib — "Kirishni tekshirish" + qoralama (МХИК to'ldi), W4 oyna
+  ko'rinmay — qoralama 27 s da, W5 tray (chap/o'ng bosish, yopilganda tray'da qolish), jadval o'zi ishga tushdi,
+  bildirishnoma chiqdi. Gate ikki xatoni topdi, tuzatildi (`ddf2bb5`): (1) typist `[ushort]` ishlatgan — Windows
+  PowerShell 5.1 da yo'q, birinchi belgida yiqilib "interrupted" berardi; endi `[uint16]` + PS 5.1 da yo'q tur
+  nomlariga test; (2) "Кириш" arm'dan 300 ms keyin bosilardi — `powershell.exe` 1 s+ da ko'tariladi, dialog
+  typist qaramasdan ochilib "allaqachon ochiq" bo'lardi; endi typist `READY` chiqaradi va login shundan keyin
+  bosadi (macOS ham; macOS'da real E-IMZO bilan qayta sinalmagan). Runbook: `Set-ExecutionPolicy` qadami; Electron
+  44 binary'ni `pnpm install` emas, birinchi `pnpm dev:desktop` yuklaydi (`60a787a`). Sir: Didox'da sinov
+  qoralamalari faqat zarur bo'lganda — W5 jadvali qoralama belgisi qoldirilib (`NOTHING_TO_DO`) Didox'siz sinaldi.
+  Ma'lum: desktop'ning 4 testi Windows'da yiqiladi (POSIX fayl ruxsati, yo'l ajratuvchisi) — ilova kodi emas, testlarning o'zi
 - 2026-10-14 — **Sir qarorlari: A varianti bekor, asosiysi — Windows.** (1) Didox'ga parol bilan kirish **amalga
   oshirilmaydi** (buxgalterda bunday imkon yo'q) — ya'ni ERI kaliti bilan kirish yagona yo'l va E-IMZO parol oynasi
   har kirishda qisqa vaqt ekranda ko'rinadi; (2) macOS'da bildirishnoma ishlamasligi **qabul qilindi** (tray yetarli);
@@ -269,7 +281,8 @@ Hajm: `trivial | standard | complex`
 
 ## Ochiq risk / texnik qarz
 - **Didox sahifasi o'zgarishi** (yo'l B): Didox UI/selector'lari ogohlantirishsiz o'zgarsa avtomatlashtirish to'xtaydi — fail-closed, didox-flow.md xaritasi yangilanadi
-- E-IMZO paroli har kirishda buxgalter tomonidan kiritiladi (avto-yozish qurilmagan) → oy 1-kuni to'liq qorovulsiz ishga tushish yo'q, bildirishnoma orqali (M8d)
+- E-IMZO parolini ilova o'zi yozadi (macOS + Windows, Windows'da 2026-10-15 tasdiqlandi), lekin faqat buxgalter klaviaturadan uzoq bo'lsa (3 daq) — aks holda oy "kutmoqda" (tray + bildirishnoma); natija vaqti kafolatlanmaydi (M8d)
+- Desktop testlarining 4 tasi Windows'da yiqiladi (POSIX fayl ruxsatlari, `\` yo'l ajratuvchisi) — testlar Windows'ga moslanmagan
 - Har buxgalterda alohida baza → kunlik lokal zaxira bor (2026-10-12), lekin bir diskda; ilovani yangilash har kompyuterda (M9)
 - M7/M8: summa formati (`552328.77`, mingliklar) haqiqiy Didox formasidagi kiritishda tekshirilmagan
 - M4: ro'yxat har so'rovda har shartnoma uchun to'liq yadroni ishlatadi — yuzlab shartnomada yetarli; ko'paysa yengil "faqat jamilar" rejimi yoki kesh
