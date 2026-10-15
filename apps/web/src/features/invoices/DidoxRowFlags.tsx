@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button'
 import type { DidoxNeedsCheck } from '@/lib/desktop'
 
 /**
- * M8c §7: what the last Didox run left behind on one invoice row. The API knows nothing about these marks —
- * they come from the desktop app's journal, so they only ever show next to the API's own state.
+ * M8c §7, M13: what a Didox run left behind on one invoice row, as the server keeps it for every accountant. An
+ * interrupted save can only be looked into from the computer whose robot made it, so another computer's flag says
+ * whose it is.
  */
-export function DidoxNeedsCheckBadge({ needsCheck }: { needsCheck: DidoxNeedsCheck }) {
+export function DidoxNeedsCheckBadge({ needsCheck, thisInstall }: { needsCheck: DidoxNeedsCheck; thisInstall: string | null }) {
+  const elsewhere = needsCheck.createdByInstall && needsCheck.createdByInstall !== thisInstall ? needsCheck.createdByInstall : null
   return (
     <div className="grid gap-1">
       <Badge className="bg-amber-100 text-amber-900">E'tibor kerak (Didox)</Badge>
@@ -16,6 +18,7 @@ export function DidoxNeedsCheckBadge({ needsCheck }: { needsCheck: DidoxNeedsChe
         <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
         {needsCheck.message}
       </span>
+      {elsewhere && <span className="text-muted-foreground text-xs">{`${elsewhere} dagi buxgalter tekshirishi kerak`}</span>}
       {needsCheck.didoxId && (
         <span className="flex items-center gap-1">
           <span className="font-mono text-xs break-all">{needsCheck.didoxId}</span>

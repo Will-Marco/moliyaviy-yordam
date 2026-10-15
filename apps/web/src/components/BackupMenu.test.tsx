@@ -9,7 +9,13 @@ describe('BackupMenu', () => {
     expect(screen.queryByRole('button', { name: /Zaxira/ })).not.toBeInTheDocument()
   })
 
-  it('shows when the last backup was made and opens the backups folder (desktop)', async () => {
+  it('is absent in a desktop app on the shared server, which has no local backups (M13)', () => {
+    vi.stubGlobal('desktop', { platform: 'darwin', eri: { listKeys: vi.fn() } })
+    renderWithProviders(<BackupMenu />)
+    expect(screen.queryByRole('button', { name: /Zaxira/ })).not.toBeInTheDocument()
+  })
+
+  it('shows when the last backup was made and opens the backups folder (desktop with a local database)', async () => {
     const openFolder = vi.fn(async () => {})
     vi.stubGlobal('desktop', {
       platform: 'darwin',

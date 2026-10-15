@@ -71,20 +71,33 @@ export interface DidoxRun {
   firms: DidoxRunFirm[]
 }
 
-/** Why an invoice needs a person's attention, as the last run recorded it. */
+/**
+ * Why an invoice needs a person's attention, as the robot recorded it on the server (`GET /api/didox-flags`,
+ * apps/api/src/didox-flags/didox-flag.ts — change both together).
+ */
 export interface DidoxNeedsCheck {
-  runId: string
+  /** Absent for a flag carried over by the data move without its run. */
+  runId?: string
   code: string
   message: string
   didoxId?: string
   candidateIds?: string[]
   at: string
+  /** The desktop install that recorded it — only that computer can recover an interrupted save (M13 §4.2). */
+  createdByInstall?: string
 }
 
 export interface DidoxInvoiceFlags {
-  /** Set while the accountant has told the app to leave this invoice alone this month. */
+  /** Set while an accountant has told the robot to leave this invoice alone this month. */
   skipped?: { at: string }
   needsCheck?: DidoxNeedsCheck
+}
+
+/** Which computer this desktop app is on the server (`label` is what its flags carry as `createdByInstall`). */
+export interface DesktopInstall {
+  id: string
+  name: string
+  label: string
 }
 
 export interface DidoxRunSummary {
@@ -96,13 +109,22 @@ export interface DidoxRunSummary {
   counts: { marked: number; skipped: number; needsCheck: number; error: number; pending: number }
 }
 
-/** What the Electron shell exposes as `window.desktop` (apps/desktop/assets/app-preload.cjs). */
+/**
+ * What the Electron shell exposes as `window.desktop` (apps/desktop/assets/app-preload.cjs). Since M13 the page comes
+ * from the shared server, so the bridge carries no secret: the ERI password is typed in the app's own window, and
+ * every Didox login asked for here is confirmed in a native dialog first (`code: 'CANCELLED'` when it is not).
+ */
 export interface DesktopBridge {
   platform: string
+  /** Absent in desktop builds older than M13. */
+  install?(): Promise<DesktopInstall>
   eri: {
     listKeys(tins: string[]): Promise<EriKeyReport>
-    /** Encrypted by the OS and kept on this computer only; never readable back. */
-    setPassword(tin: string, password: string): Promise<void>
+    /**
+     * Opens the app's own password window for the firm; resolves once it is closed. The password is typed there,
+     * encrypted by the OS and kept on this computer only — the page never sees it.
+     */
+    openPasswordWindow(tin: string): Promise<{ saved: boolean }>
     removePassword(tin: string): Promise<void>
   }
   /** Absent in desktop builds older than M8b. The app logs in to Didox in its own window; it never signs or sends. */
@@ -115,16 +137,13 @@ export interface DesktopBridge {
     cancel(): Promise<void>
     /** Returns the unsubscribe function. */
     onProgress(callback: (progress: DidoxProgress) => void): () => void
-    /** Keyed by contractId; invoices without a flag are absent. */
-    invoiceFlags(month: string): Promise<Record<string, DidoxInvoiceFlags>>
-    skipInvoice(opts: { month: string; contractId: string; skip: boolean }): Promise<void>
-    /** "Hal qilindi": drops the needs-check flag. Touches nothing in the API. */
-    resolveNeedsCheck(opts: { month: string; contractId: string }): Promise<void>
+    /** This computer's own run history (FR-8.7); the flags themselves are on the server. */
     listRuns(opts?: { month?: string; limit?: number }): Promise<DidoxRunSummary[]>
     getRun(runId: string): Promise<DidoxRun | null>
     openDiagnostics(): Promise<void>
   }
-  backups: {
+  /** Desktop builds before M13 only (local database); the shared server is backed up on the server. */
+  backups?: {
     /** `last` — when the newest daily backup was written (ISO), or null. */
     status(): Promise<{ last: string | null }>
     openFolder(): Promise<void>

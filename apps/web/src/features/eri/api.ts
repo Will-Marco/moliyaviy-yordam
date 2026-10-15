@@ -14,12 +14,16 @@ export function useEriKeys(tins: string[]) {
   })
 }
 
-export function useSetEriPassword() {
+/**
+ * Opens the desktop app's own password window (M13, CONSTITUTION §13): the page that comes from the server never
+ * sees the ERI password. Resolves when that window is closed; the status is re-read either way.
+ */
+export function useOpenEriPasswordWindow() {
   const desktop = useDesktop()
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ tin, password }: { tin: string; password: string }) => desktop!.eri.setPassword(tin, password),
-    onSuccess: () => client.invalidateQueries({ queryKey: eriKeysKey }),
+    mutationFn: (tin: string) => desktop!.eri.openPasswordWindow(tin),
+    onSettled: () => client.invalidateQueries({ queryKey: eriKeysKey }),
   })
 }
 

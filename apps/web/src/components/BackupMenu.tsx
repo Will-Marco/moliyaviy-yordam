@@ -6,15 +6,19 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useDesktop } from '@/lib/desktop'
 import { formatInstantDateTime } from '@/lib/format'
 
-/** Desktop only: when the local database was last backed up, and the folder (restore is by hand — runbook). */
+/**
+ * Desktop builds with a local database only (before M13): when it was last backed up, and the folder. A desktop on
+ * the shared server has no `backups` bridge — the server is backed up there — so nothing is shown.
+ */
 export function BackupMenu() {
   const desktop = useDesktop()
   const status = useQuery({
     queryKey: ['backups'],
-    queryFn: () => desktop!.backups.status(),
-    enabled: !!desktop,
+    queryFn: () => desktop!.backups!.status(),
+    enabled: !!desktop?.backups,
   })
-  if (!desktop) return null
+  const backups = desktop?.backups
+  if (!backups) return null
 
   return (
     <Popover onOpenChange={(open) => open && void status.refetch()}>
@@ -31,7 +35,7 @@ export function BackupMenu() {
         <p className="text-muted-foreground text-xs">
           Ilova har kuni bazadan avtomatik nusxa oladi: oxirgi 14 kun va har oydan bittasi (1 yil) saqlanadi.
         </p>
-        <Button variant="outline" className="h-9" onClick={() => desktop.backups.openFolder().catch(() => toast.error("Zaxira papkasini ochib bo'lmadi"))}>
+        <Button variant="outline" className="h-9" onClick={() => backups.openFolder().catch(() => toast.error("Zaxira papkasini ochib bo'lmadi"))}>
           <FolderOpen aria-hidden="true" />
           Zaxira papkasini ochish
         </Button>

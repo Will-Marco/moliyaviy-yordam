@@ -89,7 +89,7 @@ describe('CompaniesPage', () => {
     const desktopWith = (passwords: Record<string, string>, extra: Record<string, unknown> = {}) => {
       const eri = {
         listKeys: vi.fn(async () => ({ eimzo: 'ok', keys: { '300000001': okKey }, passwords })),
-        setPassword: vi.fn(async () => undefined),
+        openPasswordWindow: vi.fn(async () => ({ saved: true })),
         removePassword: vi.fn(async () => undefined),
         ...extra,
       }
@@ -123,41 +123,48 @@ describe('CompaniesPage', () => {
       expect(within(await row('DELTA')).getByText('Kalit yangilangan')).toBeInTheDocument()
     })
 
-    it('saves a password without ever showing it again', async () => {
+    it("has the password typed in the app's own window — the page never sees it (M13)", async () => {
       const eri = desktopWith({ '300000001': 'missing' })
       renderWithProviders(<CompaniesPage />)
       await userEvent.click(await within(await alfaRow()).findByRole('button', { name: `ERI paroli: ${alfa.name}` }))
       const dialog = await screen.findByRole('dialog')
-      const field = within(dialog).getByLabelText('ERI kaliti paroli')
-      expect(field).toHaveAttribute('type', 'password')
-      expect(within(dialog).getByText(/faqat shu kompyuterda/)).toBeInTheDocument()
+      expect(within(dialog).queryByLabelText('ERI kaliti paroli')).not.toBeInTheDocument()
+      expect(dialog.querySelector('input[type="password"]')).toBeNull()
+      expect(within(dialog).getByText(/serverga yuborilmaydi/)).toBeInTheDocument()
 
-      await userEvent.type(field, 'Maxfiy-1')
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Saqlash' }))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Parolni kiritish' }))
 
-      expect(eri.setPassword).toHaveBeenCalledWith('300000001', 'Maxfiy-1')
+      expect(eri.openPasswordWindow).toHaveBeenCalledWith('300000001')
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-      expect(eri.listKeys).toHaveBeenCalledTimes(2) // refreshed after saving
+      expect(eri.listKeys).toHaveBeenCalledTimes(2) // the status is read again once the window is closed
     })
 
-    it('does not save an empty password', async () => {
-      const eri = desktopWith({ '300000001': 'missing' })
+    it('stays open, and still re-reads the status, when the window is closed without saving', async () => {
+      const eri = desktopWith({ '300000001': 'missing' }, { openPasswordWindow: vi.fn(async () => ({ saved: false })) })
       renderWithProviders(<CompaniesPage />)
       await userEvent.click(await within(await alfaRow()).findByRole('button', { name: `ERI paroli: ${alfa.name}` }))
       const dialog = await screen.findByRole('dialog')
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Saqlash' }))
-      expect(await within(dialog).findByText('Parolni kiriting')).toBeInTheDocument()
-      expect(eri.setPassword).not.toHaveBeenCalled()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Parolni kiritish' }))
+
+      await waitFor(() => expect(eri.listKeys).toHaveBeenCalledTimes(2))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('says why the password could not be saved', async () => {
-      desktopWith({ '300000001': 'missing' }, { setPassword: async () => Promise.reject(new Error("Bu kompyuterda parolni shifrlab saqlab bo'lmaydi")) })
+    it('offers to replace a saved password', async () => {
+      const eri = desktopWith({ '300000001': 'rejected' })
+      renderWithProviders(<CompaniesPage />)
+      await userEvent.click(await within(await alfaRow()).findByRole('button', { name: `ERI paroli: ${alfa.name}` }))
+      await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Parolni yangilash' }))
+      expect(eri.openPasswordWindow).toHaveBeenCalledWith('300000001')
+    })
+
+    it('says why the password window could not be opened', async () => {
+      desktopWith({ '300000001': 'missing' }, { openPasswordWindow: async () => Promise.reject(new Error('Untrusted IPC sender')) })
       renderWithProviders(<CompaniesPage />)
       await userEvent.click(await within(await alfaRow()).findByRole('button', { name: `ERI paroli: ${alfa.name}` }))
       const dialog = await screen.findByRole('dialog')
-      await userEvent.type(within(dialog).getByLabelText('ERI kaliti paroli'), 'x')
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Saqlash' }))
-      expect(await within(dialog).findByRole('alert')).toHaveTextContent('shifrlab saqlab')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Parolni kiritish' }))
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent('Untrusted IPC sender')
     })
 
     it('removes a saved password', async () => {

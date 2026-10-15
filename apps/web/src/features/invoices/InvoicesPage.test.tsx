@@ -66,7 +66,8 @@ describe('InvoicesPage (Module 7)', () => {
     await screen.findByText('№ 1')
     await userEvent.selectOptions(screen.getByLabelText('Oy'), '2026-08')
     expect(await screen.findByText("Bu oy uchun faktura yo'q")).toBeInTheDocument()
-    expect(api.calls.at(-1)?.path).toBe('/api/invoices?month=2026-08')
+    // The month's Didox flags are read next to its invoices; the invoices asked for are the picked month's.
+    expect(api.calls.filter((c) => c.path.startsWith('/api/invoices')).at(-1)?.path).toBe('/api/invoices?month=2026-08')
   })
 
   it('filters by lender (FR-7.5)', async () => {
@@ -387,13 +388,15 @@ describe('InvoicesPage (Module 7)', () => {
     })
   })
 
-  describe('Didox row flags and run history (M8c, desktop)', () => {
+  describe('Didox row flags (M13: on the server) and run history (desktop)', () => {
+    const THIS_PC = 'BUXGALTER-PC (3f9a1c2e)'
     const needsCheck = {
       runId: 'r1',
       code: 'SAVED_ID_UNKNOWN',
       message: "Didox'da qoralama bo'lishi mumkin — uni tekshiring",
       didoxId: 'B'.repeat(32),
       at: '2026-10-01T05:00:00.000Z',
+      createdByInstall: THIS_PC,
     }
     const runSummary = (over: Partial<DidoxRunSummary> = {}): DidoxRunSummary => ({
       runId: 'r1',
@@ -404,25 +407,41 @@ describe('InvoicesPage (Module 7)', () => {
       counts: { marked: 3, skipped: 0, needsCheck: 1, error: 0, pending: 0 },
       ...over,
     })
+    const flagsUrl = 'GET /api/didox-flags?month=2026-09'
+    const skipUrl = `/api/didox-flags/2026-09/${ready.contractId}/skip`
+    const resolveUrl = `POST /api/didox-flags/2026-09/${ready.contractId}/needs-check/resolve`
 
-    /** The M8c half of the bridge: the journal-backed flags and the run history, each spied on. */
-    const desktopWithFlags = (flags: Record<string, DidoxInvoiceFlags> = {}, over: Record<string, unknown> = {}) => {
+    /** The server's invoices and flags; the skip and resolve endpoints answer as the API does unless overridden. */
+    const serverWithFlags = (flags: Record<string, DidoxInvoiceFlags> = {}, routes: Parameters<typeof mockApi>[0] = {}) =>
+      mockApi({
+        'GET /api/invoices': () => ({ status: 200, body: list([ready]) }),
+        [flagsUrl]: () => ({ status: 200, body: flags }),
+        [`PUT ${skipUrl}`]: () => ({ status: 200, body: { skipped: { at: '2026-10-15T10:00:00.000Z' } } }),
+        [`DELETE ${skipUrl}`]: () => ({ status: 204 }),
+        [resolveUrl]: () => ({ status: 204 }),
+        ...routes,
+      })
+
+    /** The desktop half: this computer's install and run history, each spied on. Flags never go through it. */
+    const desktopWithFlags = (
+      flags: Record<string, DidoxInvoiceFlags> = {},
+      over: Record<string, unknown> = {},
+      routes: Parameters<typeof mockApi>[0] = {},
+    ) => {
       const didox = {
         checkLogin: vi.fn(),
         createDrafts: vi.fn(),
         status: vi.fn(async () => null),
         cancel: vi.fn(),
         onProgress: vi.fn(() => () => undefined),
-        invoiceFlags: vi.fn(async () => flags),
-        skipInvoice: vi.fn(async () => undefined),
-        resolveNeedsCheck: vi.fn(async () => undefined),
         listRuns: vi.fn(async () => [] as DidoxRunSummary[]),
         getRun: vi.fn(async () => null as DidoxRun | null),
         openDiagnostics: vi.fn(async () => undefined),
         ...over,
       }
-      vi.stubGlobal('desktop', { platform: 'darwin', eri: {}, didox })
-      const api = mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([ready]) }) })
+      const install = vi.fn(async () => ({ id: '3f9a1c2e-0000', name: 'BUXGALTER-PC', label: THIS_PC }))
+      vi.stubGlobal('desktop', { platform: 'darwin', install, eri: {}, didox })
+      const api = serverWithFlags(flags, routes)
       return { api, didox }
     }
 
@@ -435,8 +454,25 @@ describe('InvoicesPage (Module 7)', () => {
       const row = badge.closest('tr')!
       expect(row).toHaveTextContent("Didox'da qoralama bo'lishi mumkin — uni tekshiring")
       expect(within(row).getByText('B'.repeat(32))).toBeInTheDocument()
+      // Recorded by this very computer: nobody else has to be named.
+      expect(row).not.toHaveTextContent('dagi buxgalter tekshirishi kerak')
       await user.click(within(row).getByRole('button', { name: `Nusxalash: Didox hujjat ID ${'B'.repeat(32)}` }))
       expect(await navigator.clipboard.readText()).toBe('B'.repeat(32))
+    })
+
+    it("names the computer that has to look into another computer's flag", async () => {
+      desktopWithFlags({ [ready.contractId]: { needsCheck: { ...needsCheck, createdByInstall: 'SIR-NOUTBUK (1a2b3c4d)' } } })
+      renderWithProviders(<InvoicesPage />)
+
+      expect(await screen.findByText('SIR-NOUTBUK (1a2b3c4d) dagi buxgalter tekshirishi kerak')).toBeInTheDocument()
+    })
+
+    it('shows the flags in a plain browser too — they come from the server', async () => {
+      serverWithFlags({ [ready.contractId]: { needsCheck } })
+      renderWithProviders(<InvoicesPage />)
+
+      expect(await screen.findByText("E'tibor kerak (Didox)")).toBeInTheDocument()
+      expect(screen.getByText(`${THIS_PC} dagi buxgalter tekshirishi kerak`)).toBeInTheDocument()
     })
 
     it('opens the mark dialog with the Didox ID the run found', async () => {
@@ -448,48 +484,44 @@ describe('InvoicesPage (Module 7)', () => {
       expect(within(dialog).getByLabelText(/Didox hujjat ID/)).toHaveValue('B'.repeat(32))
     })
 
-    it('"Hal qilindi" drops the flag without touching the API', async () => {
-      const { api, didox } = desktopWithFlags({ [ready.contractId]: { needsCheck } })
+    it('"Hal qilindi" resolves the flag on the server, leaves the invoice alone, and re-reads the flags', async () => {
+      const { api } = desktopWithFlags({ [ready.contractId]: { needsCheck } })
       renderWithProviders(<InvoicesPage />)
       await userEvent.click(await screen.findByRole('button', { name: 'Hal qilindi: № 1' }))
-      expect(didox.resolveNeedsCheck).toHaveBeenCalledWith({ month: '2026-09', contractId: ready.contractId })
-      expect(api.calls.every((c) => c.method === 'GET')).toBe(true)
-      await waitFor(() => expect(didox.invoiceFlags).toHaveBeenCalledTimes(2)) // the row re-reads its flags
+
+      await waitFor(() => expect(api.calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual([resolveUrl.slice(5)]))
+      expect(api.calls.some((c) => c.path.includes('/draft'))).toBe(false)
+      await waitFor(() => expect(api.calls.filter((c) => `GET ${c.path}` === flagsUrl)).toHaveLength(2))
     })
 
-    it('"O\'tkazib yuborish" tells the app to leave the invoice alone', async () => {
-      const { didox } = desktopWithFlags({ [ready.contractId]: { needsCheck } })
+    it('"O\'tkazib yuborish" puts the skip on the server, signed with this computer', async () => {
+      const { api } = desktopWithFlags({ [ready.contractId]: { needsCheck } })
       renderWithProviders(<InvoicesPage />)
       await screen.findByText("E'tibor kerak (Didox)")
       await userEvent.click(screen.getByRole('button', { name: "O'tkazib yuborish: № 1" }))
-      expect(didox.skipInvoice).toHaveBeenCalledWith({ month: '2026-09', contractId: ready.contractId, skip: true })
+
+      await waitFor(() => expect(api.calls.find((c) => c.method === 'PUT')).toEqual({ method: 'PUT', path: skipUrl, body: { createdByInstall: THIS_PC } }))
     })
 
-    it('offers the skip on a plain ready row too, and says so when it fails', async () => {
-      const failed = vi.fn(async () => Promise.reject(new Error("Belgini saqlab bo'lmadi")))
+    it('offers the skip on a plain ready row in a plain browser too, and says so when it fails', async () => {
       const error = vi.spyOn(toast, 'error')
-      desktopWithFlags({}, { skipInvoice: failed })
+      const api = serverWithFlags({}, { [`PUT ${skipUrl}`]: () => ({ status: 400, body: { message: "Belgini saqlab bo'lmadi" } }) })
       renderWithProviders(<InvoicesPage />)
       await userEvent.click(await screen.findByRole('button', { name: "O'tkazib yuborish: № 1" }))
-      expect(failed).toHaveBeenCalledWith({ month: '2026-09', contractId: ready.contractId, skip: true })
+
       await waitFor(() => expect(error).toHaveBeenCalledWith("Belgini saqlab bo'lmadi"))
+      expect(api.calls.find((c) => c.method === 'PUT')?.body).toEqual({ createdByInstall: 'Brauzer' })
     })
 
-    it('is not offered in a plain browser', async () => {
-      mockApi({ 'GET /api/invoices': () => ({ status: 200, body: list([ready]) }) })
-      renderWithProviders(<InvoicesPage />)
-      await screen.findByText('№ 1')
-      expect(screen.queryByRole('button', { name: "O'tkazib yuborish: № 1" })).not.toBeInTheDocument()
-    })
-
-    it('shows a skipped invoice and takes the mark back', async () => {
-      const { didox } = desktopWithFlags({ [ready.contractId]: { skipped: { at: '2026-10-01T05:00:00.000Z' } } })
+    it('shows a skipped invoice and takes the mark back on the server', async () => {
+      const { api } = desktopWithFlags({ [ready.contractId]: { skipped: { at: '2026-10-01T05:00:00.000Z' } } })
       renderWithProviders(<InvoicesPage />)
       expect(await screen.findByText("O'tkazib yuboriladi (Didox)")).toBeInTheDocument()
       // Nothing of the month waits for a draft once its only invoice is skipped.
       expect(screen.getByRole('button', { name: "Didox'da qoralama yaratish" })).toBeDisabled()
       await userEvent.click(screen.getByRole('button', { name: "O'tkazib yuborishni bekor qilish: № 1" }))
-      expect(didox.skipInvoice).toHaveBeenCalledWith({ month: '2026-09', contractId: ready.contractId, skip: false })
+
+      await waitFor(() => expect(api.calls.some((c) => c.method === 'DELETE' && c.path === skipUrl)).toBe(true))
     })
 
     it('lists the last runs of the month and opens one', async () => {

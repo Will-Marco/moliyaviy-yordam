@@ -138,7 +138,7 @@ export function DidoxRunDialog({ month, pending, onOpenChange }: Props) {
   useEffect(() => {
     if (!finished) return
     void client.invalidateQueries({ queryKey: invoicesKey })
-    // The "e'tibor kerak" / "o'tkazib yuboriladi" marks come from the journal, not the API.
+    // The "e'tibor kerak" marks the run left: the robot puts them on the server before it reports the run over.
     void client.invalidateQueries({ queryKey: didoxFlagsKey })
     // The history card should show the run that has just ended, not only the ones before it.
     void client.invalidateQueries({ queryKey: didoxRunsKey })

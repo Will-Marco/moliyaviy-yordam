@@ -24,7 +24,7 @@ import type { DidoxInvoiceFlags } from '@/lib/desktop'
 import { useDesktop } from '@/lib/desktop'
 import { formatDate, formatInstantDate, formatMoney, formatMonth } from '@/lib/format'
 import { type Invoice, useInvoices, useUnmarkDraft } from './api'
-import { useDidoxFlags, useResolveNeedsCheck, useSkipInvoice } from './didoxApi'
+import { useDesktopInstall, useDidoxFlags, useResolveNeedsCheck, useSkipInvoice } from './didoxApi'
 import { DidoxNeedsCheckActions, DidoxNeedsCheckBadge, DidoxSkippedBadge, SkipButton, UnskipButton } from './DidoxRowFlags'
 import { DidoxRunDialog } from './DidoxRunDialog'
 import { DidoxRunsCard } from './DidoxRunsCard'
@@ -41,13 +41,13 @@ export function InvoicesPage() {
   // Older desktop builds (and a plain browser) cannot create drafts; the whole run is then out of reach.
   const didox = useDesktop()?.didox
   const canCreateDrafts = !!didox?.createDrafts
-  // The skip mark lives in the desktop app's own store, so a browser row has nothing to skip.
-  const canSkip = !!didox?.skipInvoice
+  // Null in a plain browser: then every needs-check names the computer that has to look into it.
+  const thisInstall = useDesktopInstall()?.label ?? null
 
   const data = invoices.data
   const month = data?.month ?? null
   const unmark = useUnmarkDraft(month ?? '')
-  // The desktop app's own marks for this month; a plain browser has none and every row keeps its API state.
+  // The robot's marks for this month, from the server (M13): the same in every accountant's app and browser.
   const flags = useDidoxFlags(month)
   const flagsOf = (contractId: string): DidoxInvoiceFlags | undefined => flags.data?.[contractId]
   const skip = useSkipInvoice(month ?? '')
@@ -55,7 +55,7 @@ export function InvoicesPage() {
   const rows = (data?.rows ?? []).filter((r) => !lenderId || r.lender.id === lenderId)
   const drafted = rows.filter((r) => r.draft).length
   // The run covers every lender of the month, so the lender filter does not narrow what it would do.
-  // An invoice the accountant told the app to leave alone is not waiting for a draft either (spec §7).
+  // An invoice an accountant told the robot to leave alone is not waiting for a draft either (spec §7).
   const needDraft = (data?.rows ?? []).filter((r) => r.draft === null && !flagsOf(r.contractId)?.skipped).length
 
   const onSkip = (r: Invoice, next: boolean) =>
@@ -189,7 +189,7 @@ export function InvoicesPage() {
                   key={r.contractId}
                   invoice={r}
                   flags={flagsOf(r.contractId)}
-                  canSkip={canSkip}
+                  thisInstall={thisInstall}
                   busy={skip.isPending || resolve.isPending}
                   onMark={() => setMarking(r)}
                   onUnmark={() => setUnmarking(r)}
@@ -249,10 +249,10 @@ export function InvoicesPage() {
 
 interface RowProps {
   invoice: Invoice
-  /** Absent unless the desktop app has a mark on this invoice for this month. */
+  /** Absent unless the server has a Didox mark on this invoice for this month. */
   flags: DidoxInvoiceFlags | undefined
-  /** False in a plain browser (or a desktop build older than M8c): no skip mark can be set. */
-  canSkip: boolean
+  /** This computer's install label, or null in a plain browser. */
+  thisInstall: string | null
   /** A flag change is in flight somewhere in the table — the flag buttons wait for it. */
   busy: boolean
   onMark: () => void
@@ -261,7 +261,7 @@ interface RowProps {
   onResolve: () => void
 }
 
-function InvoiceRow({ invoice: r, flags, canSkip, busy, onMark, onUnmark, onSkip, onResolve }: RowProps) {
+function InvoiceRow({ invoice: r, flags, thisInstall, busy, onMark, onUnmark, onSkip, onResolve }: RowProps) {
   const amount = formatMoney(r.amount)
   // A drafted month may have lost its interest since; the API only marks positive amounts (FR-7.1).
   const invoiceable = !r.amount.startsWith('-') && /[1-9]/.test(r.amount)
@@ -319,7 +319,7 @@ function InvoiceRow({ invoice: r, flags, canSkip, busy, onMark, onUnmark, onSkip
             )}
           </div>
         ) : flags?.needsCheck ? (
-          <DidoxNeedsCheckBadge needsCheck={flags.needsCheck} />
+          <DidoxNeedsCheckBadge needsCheck={flags.needsCheck} thisInstall={thisInstall} />
         ) : flags?.skipped ? (
           <DidoxSkippedBadge />
         ) : (
@@ -353,7 +353,7 @@ function InvoiceRow({ invoice: r, flags, canSkip, busy, onMark, onUnmark, onSkip
             <Button variant="outline" size="sm" aria-label={`Qoralama deb belgilash: № ${r.contract.number}`} onClick={onMark}>
               Belgilash
             </Button>
-            {canSkip && <SkipButton contractNumber={r.contract.number} disabled={busy} onSkip={() => onSkip(true)} />}
+            <SkipButton contractNumber={r.contract.number} disabled={busy} onSkip={() => onSkip(true)} />
           </div>
         )}
       </TableCell>
