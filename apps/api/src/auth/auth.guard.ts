@@ -5,14 +5,15 @@ import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import type { Env } from '../config/env.js';
 import { IS_PUBLIC } from './public.decorator.js';
-import { SESSION_COOKIE, SessionPayload } from './session.js';
+import { SESSION_COOKIE, SessionPayload, SessionUser } from './session.js';
 
 const SESSION_EXPIRED = 'Sessiya tugagan. Qaytadan kiring.';
 
 /**
  * Global guard: every route needs a valid session cookie unless marked @Public(). The cookie is signed with JWT_SECRET
  * (a person's login) or, when configured, with ROBOT_SECRET — the desktop robot's own key, so an unattended run does
- * not hang on a person's 12-hour session (M13 §4.2).
+ * not hang on a person's 12-hour session (M13 §4.2). `request.user.kind` records which secret verified it — taken from
+ * the secret, never from the claims, so a JWT_SECRET token saying `sub: 'robot'` is still just a person.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -33,21 +34,25 @@ export class AuthGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest<Request & { user?: SessionPayload }>();
+    const request = context.switchToHttp().getRequest<Request & { user?: SessionUser }>();
     const token: unknown = request.cookies?.[SESSION_COOKIE];
     if (typeof token !== 'string' || !token) throw new UnauthorizedException(SESSION_EXPIRED);
     request.user = await this.verify(token);
     return true;
   }
 
-  private async verify(token: string): Promise<SessionPayload> {
+  private async verify(token: string): Promise<SessionUser> {
     try {
-      return await this.jwt.verifyAsync<SessionPayload>(token);
+      return { ...(await this.jwt.verifyAsync<SessionPayload>(token)), kind: 'person' };
     } catch {
       if (!this.robotSecret) throw new UnauthorizedException(SESSION_EXPIRED);
     }
     try {
-      return await this.jwt.verifyAsync<SessionPayload>(token, { secret: this.robotSecret, algorithms: ['HS256'] });
+      const payload = await this.jwt.verifyAsync<SessionPayload>(token, {
+        secret: this.robotSecret,
+        algorithms: ['HS256'],
+      });
+      return { ...payload, kind: 'robot' };
     } catch {
       throw new UnauthorizedException(SESSION_EXPIRED);
     }

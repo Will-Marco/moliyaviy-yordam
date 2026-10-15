@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
@@ -172,6 +173,92 @@ describe('Auth (FR-1.1)', () => {
       for (const token of [mintToken({ secret, ttlSec: -60 }), mintToken({ secret, alg: 'none' })]) {
         await request(app.getHttpServer()).get('/api/auth/me').set('Cookie', `session=${token}`).expect(401);
       }
+    });
+  });
+
+  /* M13 P6a: the desktop never holds ROBOT_SECRET — after a person logs in, the server issues the robot's token. */
+  describe('POST /api/auth/robot-token', () => {
+    const ROBOT_TOKEN_TTL_MS = 180 * 24 * 60 * 60 * 1000;
+    const decode = (token: string) =>
+      JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()) as Record<string, unknown>;
+
+    it('issues a 180-day robot token to a logged-in person, and that token opens the API', async () => {
+      const agent = await loggedInAgent(app);
+      const before = Date.now();
+      const res = await agent.post('/api/auth/robot-token').send({ install: '  Buxgalter-PC  ' }).expect(201);
+
+      expect(Object.keys(res.body).sort()).toEqual(['expiresAt', 'token']);
+      const { token, expiresAt } = res.body as { token: string; expiresAt: string };
+      const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString()) as { alg: string };
+      expect(header.alg).toBe('HS256');
+      const payload = decode(token);
+      expect(payload).toMatchObject({ sub: 'robot', install: 'Buxgalter-PC' });
+      expect(Number(payload.exp) - Number(payload.iat)).toBe(ROBOT_TOKEN_TTL_MS / 1000);
+      expect(new Date(expiresAt).toISOString()).toBe(expiresAt);
+      expect(Date.parse(expiresAt)).toBe(Number(payload.exp) * 1000);
+      expect(Date.parse(expiresAt) - before).toBeGreaterThan(ROBOT_TOKEN_TTL_MS - 60_000);
+
+      await request(app.getHttpServer()).get('/api/invoices').set('Cookie', `session=${token}`).expect(200);
+      const me = await request(app.getHttpServer()).get('/api/auth/me').set('Cookie', `session=${token}`).expect(200);
+      expect(me.body).toEqual({ username: 'robot' });
+    });
+
+    it('is signed with ROBOT_SECRET, not JWT_SECRET', async () => {
+      const agent = await loggedInAgent(app);
+      const { body } = await agent.post('/api/auth/robot-token').send({ install: 'PC' }).expect(201);
+      const [header, payload, signature] = (body as { token: string }).token.split('.');
+      const hmac = (secret: string) => createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
+      expect(signature).toBe(hmac(process.env.ROBOT_SECRET!));
+      expect(signature).not.toBe(hmac(process.env.JWT_SECRET!));
+    });
+
+    it('refuses a robot session, whether minted or issued here, so a robot token never renews itself', async () => {
+      const agent = await loggedInAgent(app);
+      const { body } = await agent.post('/api/auth/robot-token').send({ install: 'PC' }).expect(201);
+      const minted = mintToken({ sub: 'robot', secret: process.env.ROBOT_SECRET! });
+      for (const token of [(body as { token: string }).token, minted]) {
+        const res = await request(app.getHttpServer())
+          .post('/api/auth/robot-token')
+          .set('Cookie', `session=${token}`)
+          .send({ install: 'PC' })
+          .expect(403);
+        expect(res.body.message).toBe('Robot tokeni bilan robot tokeni olinmaydi');
+      }
+    });
+
+    it('treats a JWT_SECRET token that says sub "robot" as an ordinary person session', async () => {
+      const cookie = `session=${mintToken({ sub: 'robot' })}`;
+      await request(app.getHttpServer()).get('/api/invoices').set('Cookie', cookie).expect(200);
+      // Only the secret makes a robot: this person may still ask for a robot token, as any person may.
+      await request(app.getHttpServer())
+        .post('/api/auth/robot-token')
+        .set('Cookie', cookie)
+        .send({ install: 'PC' })
+        .expect(201);
+    });
+
+    it('needs a session', async () => {
+      await request(app.getHttpServer()).post('/api/auth/robot-token').send({ install: 'PC' }).expect(401);
+    });
+
+    it('validates install: a trimmed string of 1 to 100 characters', async () => {
+      const agent = await loggedInAgent(app);
+      for (const body of [{}, { install: '' }, { install: '   ' }, { install: 42 }, { install: 'x'.repeat(101) }]) {
+        const res = await agent.post('/api/auth/robot-token').send(body).expect(400);
+        expect(res.body.errors).toHaveProperty('install');
+      }
+      await agent.post('/api/auth/robot-token').send({ install: 'x'.repeat(100) }).expect(201);
+      await agent.post('/api/auth/robot-token').send({ install: 'PC', extra: 1 }).expect(400);
+    });
+
+    it('answers 503 when the server has no ROBOT_SECRET', async () => {
+      const config = app.get(ConfigService);
+      const get = config.get.bind(config);
+      vi.spyOn(config, 'get').mockImplementation(((key: string, options?: object) =>
+        key === 'ROBOT_SECRET' ? '' : get(key as never, options as never)) as typeof config.get);
+      const agent = await loggedInAgent(app);
+      const res = await agent.post('/api/auth/robot-token').send({ install: 'PC' }).expect(503);
+      expect(res.body.message).toBe('Serverda robot kaliti sozlanmagan');
     });
   });
 });

@@ -30,14 +30,17 @@ function context(token?: string) {
   return { ctx, request };
 }
 
-const sign = (secret: string, options: { algorithm?: 'HS256' | 'HS512'; expiresIn?: number } = {}) =>
-  new JwtService({ secret }).signAsync({ sub: 'desktop' }, { expiresIn: 900, ...options });
+const sign = (
+  secret: string,
+  options: { algorithm?: 'HS256' | 'HS512'; expiresIn?: number } = {},
+  payload: object = { sub: 'desktop' },
+) => new JwtService({ secret }).signAsync(payload, { expiresIn: 900, ...options });
 
 describe('AuthGuard', () => {
   it('accepts a session signed with JWT_SECRET', async () => {
     const { ctx, request } = context(await sign(JWT_SECRET));
     await expect(guard().canActivate(ctx)).resolves.toBe(true);
-    expect(request.user).toMatchObject({ sub: 'desktop' });
+    expect(request.user).toMatchObject({ sub: 'desktop', kind: 'person' });
   });
 
   it('rejects a missing cookie', async () => {
@@ -55,12 +58,19 @@ describe('AuthGuard', () => {
     it('accepts an HS256 token signed with it', async () => {
       const { ctx, request } = context(await sign(ROBOT_SECRET));
       await expect(guard(ROBOT_SECRET).canActivate(ctx)).resolves.toBe(true);
-      expect(request.user).toMatchObject({ sub: 'desktop' });
+      expect(request.user).toMatchObject({ sub: 'desktop', kind: 'robot' });
     });
 
     it('still accepts a person\'s JWT_SECRET session', async () => {
-      const { ctx } = context(await sign(JWT_SECRET));
+      const { ctx, request } = context(await sign(JWT_SECRET));
       await expect(guard(ROBOT_SECRET).canActivate(ctx)).resolves.toBe(true);
+      expect(request.user).toMatchObject({ kind: 'person' });
+    });
+
+    it('takes the kind from the secret, never from the claims', async () => {
+      const { ctx, request } = context(await sign(JWT_SECRET, {}, { sub: 'robot', kind: 'robot' }));
+      await expect(guard(ROBOT_SECRET).canActivate(ctx)).resolves.toBe(true);
+      expect(request.user).toMatchObject({ sub: 'robot', kind: 'person' });
     });
 
     it('rejects a robot token that is expired, of another algorithm, or signed with a third secret', async () => {
