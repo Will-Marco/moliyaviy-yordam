@@ -37,6 +37,10 @@
     - **M13 (Sir, 2026-10-15):** UI serverdan (internetdagi origin) keladi. Shuning uchun Didox'ga kirishni boshlaydigan har
       amal ("Kirishni tekshirish", qoralama yaratish) **faqat desktop ilovaning o'zidan** — tray menyusi yoki lokal oyna;
       serverdagi sahifa robot holatini **faqat ko'rsatadi**. Server buzilsa ham u buxgalterning ERI kaliti bilan kirishni so'ray olmaydi.
+    - **Qabul qilingan qoldiq xavf (M13, 2026-10-15):** oy 1-kungi **jadval** tasdiqsiz ishlaydi va nima yaratishni serverdan
+      oladi. Server buzilsa, u shu kompyuterda ERI paroli saqlangan firmalar nomidan Didox'da **soxta qoralamalar** yaratdira
+      oladi (imzolay ham, yubora ham olmaydi — §12). Himoya: robot faqat paroli shu kompyuterda saqlangan firmalar uchun
+      ishlaydi; qoralamalarni buxgalter imzolashdan oldin ko'radi. Xavfsizlik ko'rigi M1 topilmasi.
 14. **Didox'ning partner tokeni yoki boshqa maxfiy kaliti ilova kodiga olinmaydi.** Ilova Didox API'sini to'g'ridan-to'g'ri
     chaqirmaydi; faqat buxgalter kirgan **sahifa (DOM)** bilan ishlaydi — xuddi buxgalter o'zi bosganidek. Sahifa Didox
     tokenini o'zi ishlatadi.
