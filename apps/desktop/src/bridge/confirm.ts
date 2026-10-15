@@ -83,6 +83,32 @@ export function checkLoginPrompt(tin: string, firmName: string | null): ConfirmR
   }
 }
 
+/**
+ * A "Boshlash" that arrives sooner than this after the dialog was shown is not a decision: a page can call the bridge
+ * between the two clicks of a double-click, so the second click lands on the dialog's default-looking button.
+ */
+const MIN_ANSWER_MS = 600
+
+/**
+ * Wraps the native dialog (security review M3b): only one confirmation is open at a time — a page asking again while
+ * one is open gets an immediate no, so it cannot stack dialogs until one is clicked through — and a yes that came
+ * faster than MIN_ANSWER_MS counts as a no.
+ */
+export function guardConfirm(show: Confirm, now: () => number = Date.now): Confirm {
+  let open = false
+  return async (request) => {
+    if (open) return false
+    open = true
+    try {
+      const shownAt = now()
+      const yes = await show(request)
+      return yes && now() - shownAt >= MIN_ANSWER_MS
+    } finally {
+      open = false
+    }
+  }
+}
+
 /** Runs `start` only after a yes; anything else — a no, a closed window, a failed dialog — starts nothing. */
 export async function confirmed<R>(confirm: Confirm, request: ConfirmRequest, start: () => Promise<R>): Promise<R | typeof CANCELLED> {
   const yes = await confirm(request).catch(() => false)

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { CANCELLED, checkLoginPrompt, confirmed, draftsPrompt } from './confirm.js'
+import { CANCELLED, checkLoginPrompt, confirmed, draftsPrompt, guardConfirm } from './confirm.js'
 
 describe('confirmed — the robot starts only on a yes given in the app itself (CONSTITUTION §13)', () => {
   it('starts the work when the person says Boshlash', async () => {
@@ -81,5 +81,50 @@ describe('names in a confirmation cannot reshape it (security review H1)', () =>
 
     expect(detail).toContain('STIR 300000010, +3 ta.')
     expect(detail).not.toContain('300000011')
+  })
+})
+
+describe('guardConfirm — one dialog at a time, no yes under a double-click (security review M3b)', () => {
+  const request = draftsPrompt('2026-09', 'all')
+
+  it('passes a considered answer through', async () => {
+    let now = 0
+    const confirm = guardConfirm(async () => ((now += 2_000), true), () => now)
+
+    expect(await confirm(request)).toBe(true)
+  })
+
+  it('treats a yes that came faster than 600 ms as a no', async () => {
+    let now = 0
+    const confirm = guardConfirm(async () => ((now += 599), true), () => now)
+
+    expect(await confirm(request)).toBe(false)
+  })
+
+  it('answers no at once while another confirmation is open, without showing a second one', async () => {
+    let now = 0
+    let answer!: (yes: boolean) => void
+    const show = vi.fn(() => new Promise<boolean>((ok) => (answer = ok)))
+    const confirm = guardConfirm(show, () => now)
+
+    const first = confirm(request)
+    expect(await confirm(request)).toBe(false)
+    expect(show).toHaveBeenCalledTimes(1)
+
+    now += 1_000
+    answer(true)
+    expect(await first).toBe(true)
+  })
+
+  it('shows the next one once the first is answered, even when the first dialog failed', async () => {
+    let now = 0
+    const show = vi
+      .fn<(request: unknown) => Promise<boolean>>()
+      .mockRejectedValueOnce(new Error('window destroyed'))
+      .mockImplementation(async () => ((now += 1_000), true))
+    const confirm = guardConfirm(show, () => now)
+
+    await expect(confirm(request)).rejects.toThrow('window destroyed')
+    expect(await confirm(request)).toBe(true)
   })
 })

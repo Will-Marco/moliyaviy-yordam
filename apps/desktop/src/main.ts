@@ -2,7 +2,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, Menu, Notification, powerMonitor, safeStorage, session, shell, Tray } from 'electron'
 import { createApiClient } from './api/client.js'
-import type { Confirm } from './bridge/confirm.js'
+import { type Confirm, guardConfirm } from './bridge/confirm.js'
 import { createKeyReader, registerIpc, sendProgress } from './bridge/ipc.js'
 import { createDidoxRequests, type DidoxRequests } from './bridge/requests.js'
 import { isExternalWebUrl, isSameOrigin } from './bridge/trust.js'
@@ -114,8 +114,11 @@ async function personSession(origin: string): Promise<string | null> {
   return cookie?.value || null
 }
 
-/** Native and on this computer: the page can ask for a Didox login, only the person can say yes (CONSTITUTION §13). */
-const confirm: Confirm = async ({ message, detail }) => {
+/**
+ * Native and on this computer: the page can ask for a Didox login, only the person can say yes (CONSTITUTION §13).
+ * Guarded, so a page can neither stack these dialogs nor get a yes from a click that was aimed at the page.
+ */
+const confirm: Confirm = guardConfirm(async ({ message, detail }) => {
   const options = {
     type: 'question' as const,
     title: 'Moliyaviy yordam',
@@ -128,7 +131,7 @@ const confirm: Confirm = async ({ message, detail }) => {
   }
   const { response } = alive(appWin) ? await dialog.showMessageBox(appWin, options) : await dialog.showMessageBox(options)
   return response === 0
-}
+})
 
 async function launchApp(): Promise<void> {
   const config = loadConfig(userData())
