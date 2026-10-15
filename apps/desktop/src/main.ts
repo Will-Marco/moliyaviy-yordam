@@ -5,7 +5,7 @@ import { createApiClient } from './api/client.js'
 import { type Confirm, guardConfirm } from './bridge/confirm.js'
 import { createKeyReader, registerIpc, sendProgress } from './bridge/ipc.js'
 import { createDidoxRequests, type DidoxRequests } from './bridge/requests.js'
-import { isExternalWebUrl, isPermissionAllowed, isSameOrigin } from './bridge/trust.js'
+import { createExternalOpener, isPermissionAllowed, isSameOrigin } from './bridge/trust.js'
 import { type AppConfig, installLabel, loadConfig, robotTokenPath } from './config.js'
 import { autotypePreflight, typeEimzoPassword } from './didox/autotype/index.js'
 import { createJournal } from './didox/journal.js'
@@ -71,10 +71,8 @@ function appWindow(origin: string, onLoad: () => void): BrowserWindow {
       preload: join(assets, 'app-preload.cjs'),
     },
   })
-  // Only web links reach the browser: the page is from the internet, and other schemes can start local programs.
-  const openOutside = (url: string) => {
-    if (isExternalWebUrl(url)) void shell.openExternal(url).catch(() => undefined)
-  }
+  // Only web links reach the browser, one per 2 s: the page is from the internet, other schemes can start programs.
+  const openOutside = createExternalOpener({ open: (url) => void shell.openExternal(url).catch(() => undefined) })
   /*
    * Keep the window on the server's origin (parsed, so `https://host@evil` lookalikes fail); other links of the page
    * itself go to the browser. A frame inside the page is only blocked: the web app has none of its own.

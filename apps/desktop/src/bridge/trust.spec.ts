@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { isExternalWebUrl, isPermissionAllowed, isTrustedSender } from './trust.js'
+import { describe, expect, it, vi } from 'vitest'
+import { createExternalOpener, isExternalWebUrl, isPermissionAllowed, isTrustedSender } from './trust.js'
 
 describe('isExternalWebUrl', () => {
   it('lets web links go to the browser', () => {
@@ -50,5 +50,41 @@ describe('isPermissionAllowed (security review M2)', () => {
     }
     expect(isPermissionAllowed('clipboard-sanitized-write', 'https://evil.example/', app.origin)).toBe(false)
     expect(isPermissionAllowed('clipboard-sanitized-write', 'file:///index.html', app.origin)).toBe(false)
+  })
+})
+
+describe('createExternalOpener (security review L2)', () => {
+  const setup = () => {
+    let now = 0
+    const open = vi.fn()
+    const openOutside = createExternalOpener({ open, now: () => now })
+    return { open, openOutside, wait: (ms: number) => void (now += ms) }
+  }
+
+  it('opens web links only', () => {
+    const s = setup()
+    s.openOutside('file:///C:/Windows/System32/calc.exe')
+    s.openOutside('https://didox.uz/')
+
+    expect(s.open.mock.calls).toEqual([['https://didox.uz/']])
+  })
+
+  it('opens at most one link per 2 seconds and drops the rest', () => {
+    const s = setup()
+    s.openOutside('https://a.example/')
+    s.wait(1_999)
+    s.openOutside('https://b.example/')
+    s.wait(1)
+    s.openOutside('https://c.example/')
+
+    expect(s.open.mock.calls).toEqual([['https://a.example/'], ['https://c.example/']])
+  })
+
+  it('does not let a refused link hold up the next web link', () => {
+    const s = setup()
+    s.openOutside('smb://evil/share')
+    s.openOutside('https://a.example/')
+
+    expect(s.open.mock.calls).toEqual([['https://a.example/']])
   })
 })

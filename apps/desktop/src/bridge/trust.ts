@@ -20,6 +20,23 @@ export function isExternalWebUrl(url: string): boolean {
   }
 }
 
+/** At most one link from the page reaches the browser per this many ms. */
+const EXTERNAL_EVERY_MS = 2_000
+
+/**
+ * Hands the page's web links to the OS browser (security review L2). Opening needs no click from the person, so a
+ * hostile page could fire tabs at the browser in a loop; one link per EXTERNAL_EVERY_MS is plenty for a person who
+ * clicks, and the rest are dropped.
+ */
+export function createExternalOpener({ open, now = Date.now }: { open: (url: string) => void; now?: () => number }): (url: string) => void {
+  let last = Number.NEGATIVE_INFINITY
+  return (url) => {
+    if (!isExternalWebUrl(url) || now() - last < EXTERNAL_EVERY_MS) return
+    last = now()
+    open(url)
+  }
+}
+
 /**
  * Browser permissions for pages in the app window's session (security review M2). The page is from the internet, so
  * it gets none — no camera, microphone, location, notifications, devices or clipboard reading — except writing the
