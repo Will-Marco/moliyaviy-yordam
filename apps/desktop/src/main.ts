@@ -6,7 +6,7 @@ import { type Confirm, guardConfirm } from './bridge/confirm.js'
 import { createKeyReader, registerIpc, sendProgress } from './bridge/ipc.js'
 import { createDidoxRequests, type DidoxRequests } from './bridge/requests.js'
 import { isExternalWebUrl, isSameOrigin } from './bridge/trust.js'
-import { type AppConfig, installLabel, loadConfig } from './config.js'
+import { type AppConfig, installLabel, loadConfig, robotTokenPath } from './config.js'
 import { autotypePreflight, typeEimzoPassword } from './didox/autotype/index.js'
 import { createJournal } from './didox/journal.js'
 import { createDidoxRunner, type DidoxRunner } from './didox/run.js'
@@ -150,7 +150,7 @@ function wire(config: AppConfig): RobotKey {
   const readKeys = createKeyReader()
 
   const robot = createRobotKey({
-    store: createRobotTokenStore({ file: join(userData(), 'robot-token.json'), safeStorage }),
+    store: createRobotTokenStore({ file: robotTokenPath(userData()), origin, safeStorage }),
     obtain: (person) => requestRobotToken({ origin, install: label, personSession: person }),
     personSession: () => personSession(origin),
     log: (message) => console.warn(message),

@@ -13,15 +13,30 @@ interface FileShape {
   /** base64 of the OS-encrypted token. */
   cipher: string
   expiresAt: string
+  /** The server that issued it — the only one it is ever sent to. */
+  origin: string
 }
 
 /**
  * Keeps the robot token the way the ERI store keeps passwords: only OS-encrypted ciphertext on disk (`safeStorage`).
  * The token is a 180-day key to the shared server's data, so a copied userData folder must not carry it in the clear.
+ * It is bound to `origin` (security review L5): a token from another server address counts as no token, so it is
+ * never sent anywhere but where it came from.
  */
-export function createRobotTokenStore({ file, safeStorage, nowMs = Date.now }: { file: string; safeStorage: SafeStorageLike; nowMs?: () => number }) {
+export function createRobotTokenStore({
+  file,
+  origin,
+  safeStorage,
+  nowMs = Date.now,
+}: {
+  file: string
+  /** The server origin this app is a client of. */
+  origin: string
+  safeStorage: SafeStorageLike
+  nowMs?: () => number
+}) {
   return {
-    /** The token, or null when there is none, it has expired, or it cannot be decrypted on this account. */
+    /** The token, or null when there is none, it is another server's, it has expired, or it cannot be decrypted. */
     async get(): Promise<StoredRobotToken | null> {
       let stored: Partial<FileShape>
       try {
@@ -29,7 +44,7 @@ export function createRobotTokenStore({ file, safeStorage, nowMs = Date.now }: {
       } catch {
         return null
       }
-      if (typeof stored.cipher !== 'string' || typeof stored.expiresAt !== 'string') return null
+      if (typeof stored.cipher !== 'string' || typeof stored.expiresAt !== 'string' || stored.origin !== origin) return null
       const expires = Date.parse(stored.expiresAt)
       if (!Number.isFinite(expires) || expires <= nowMs()) return null
       try {
@@ -41,7 +56,7 @@ export function createRobotTokenStore({ file, safeStorage, nowMs = Date.now }: {
 
     async set(token: string, expiresAt: string): Promise<void> {
       if (!safeStorage.isEncryptionAvailable()) throw new Error("Bu kompyuterda robot kalitini shifrlab saqlab bo'lmaydi")
-      const content: FileShape = { cipher: safeStorage.encryptString(token).toString('base64'), expiresAt }
+      const content: FileShape = { cipher: safeStorage.encryptString(token).toString('base64'), expiresAt, origin }
       await mkdir(dirname(file), { recursive: true })
       const tmp = `${file}.tmp`
       await writeFile(tmp, JSON.stringify(content, null, 2), { mode: 0o600 })

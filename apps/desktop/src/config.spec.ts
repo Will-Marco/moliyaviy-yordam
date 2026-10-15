@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { checkServer, configPath, installLabel, isConfigured, loadConfig, parseServerUrl, saveServer } from './config.js'
+import { checkServer, configPath, installLabel, isConfigured, loadConfig, parseServerUrl, robotTokenPath, saveServer } from './config.js'
 
 describe('parseServerUrl (M13 §4.2)', () => {
   it('takes an https address and keeps only its origin', () => {
@@ -92,6 +92,17 @@ describe('stored config', () => {
     const again = saveServer(dir, 'https://b.uz', { randomUUID: () => 'other', hostname: () => 'RENAMED' })
 
     expect(again).toMatchObject({ serverUrl: 'https://b.uz', installId: ids.randomUUID(), installName: 'BUXGALTER-PC' })
+  })
+
+  it("drops the robot token when another server is saved — it is the old server's key (security review L5)", async () => {
+    saveServer(dir, 'https://a.uz', ids)
+    await writeFile(robotTokenPath(dir), '{}')
+
+    saveServer(dir, 'https://a.uz', ids)
+    expect(await readFile(robotTokenPath(dir), 'utf8')).toBe('{}')
+
+    saveServer(dir, 'https://b.uz', ids)
+    await expect(readFile(robotTokenPath(dir), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('treats a pre-M13 config (local login) as not configured, and replaces it', async () => {

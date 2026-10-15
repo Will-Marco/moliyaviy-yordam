@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -65,6 +65,8 @@ export async function checkServer(origin: string, fetch: FetchLike = globalThis.
 }
 
 export const configPath = (userData: string) => join(userData, 'config.json')
+/** Where the robot's encrypted server token is kept (robot/token-store.ts). */
+export const robotTokenPath = (userData: string) => join(userData, 'robot-token.json')
 
 export function loadConfig(userData: string): AppConfig | null {
   let parsed: Partial<AppConfig> | null
@@ -102,6 +104,8 @@ export function saveServer(
     installName: previous?.installName ?? (ids.hostname().trim() || 'Kompyuter'),
   }
   mkdirSync(dirname(configPath(userData)), { recursive: true })
+  // The robot token is a key to the old server: it must not be sent to the new one (security review L5).
+  if (previous?.serverUrl !== origin) rmSync(robotTokenPath(userData), { force: true })
   writeFileSync(configPath(userData), JSON.stringify(config, null, 2), { mode: 0o600 })
   return config
 }
