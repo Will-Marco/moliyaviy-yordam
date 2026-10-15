@@ -158,6 +158,7 @@ export type RunCode =
   | 'DRAFT_CHANGED'
   | 'API_REJECTED'
   | 'API_UNAVAILABLE'
+  | 'ROBOT_TOKEN_MISSING'
   | 'STALLED'
   | 'APP_CLOSED'
   | 'SKIPPED_BY_USER'
@@ -212,7 +213,8 @@ export const DIDOX_MESSAGES: Record<DidoxCode, string> = {
   POSSIBLE_DUPLICATE: "Didox'da ikkita qoralama bo'lishi mumkin — tekshiring",
   DRAFT_CHANGED: "Faktura belgisi shu payt o'zgardi",
   API_REJECTED: "Ilova qoralamani yozib olmadi",
-  API_UNAVAILABLE: "Ilovaning ichki serveri javob bermadi — keyingi ochilishda belgilanadi",
+  API_UNAVAILABLE: "Server javob bermadi — keyingi ochilishda belgilanadi",
+  ROBOT_TOKEN_MISSING: "Ilovaga qayta kiring — robot kaliti yo'q yoki eskirgan",
   // The runner itself
   RUN_IN_PROGRESS: "Didox bilan boshqa ish bajarilmoqda — tugashini kuting",
   UNEXPECTED: "Kutilmagan xato",

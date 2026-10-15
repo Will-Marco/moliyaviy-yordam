@@ -1,7 +1,10 @@
-import { mintSessionToken, sessionCookie } from './jwt.js'
+import { didoxMessage } from '../didox/contract.js'
 
 /** The slice of `fetch` the client uses, so tests can hand it a fake. */
 export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>
+
+/** Cookie the API reads the session from (apps/api/src/auth/session.ts); the robot token travels in it too. */
+export const SESSION_COOKIE = 'session'
 
 export interface Party {
   id: string
@@ -9,7 +12,7 @@ export interface Party {
   tin: string
 }
 
-/** One row of `GET /api/invoices` — the app's own API, so the shape mirrors InvoiceView (apps/api). */
+/** One row of `GET /api/invoices` — the shape mirrors InvoiceView (apps/api). */
 export interface InvoiceApiRow {
   contractId: string
   lender: Party
@@ -43,6 +46,24 @@ export type MarkDraftResult =
   | { ok: true; row: InvoiceApiRow }
   | { ok: false; status: number; code?: string; warnings?: ApiWarning[]; message: string }
 
+/** One contract's unresolved Didox flags on the server (apps/api didox-flags, the web's `DidoxInvoiceFlags`). */
+export interface ServerInvoiceFlags {
+  skipped?: { at: string }
+  needsCheck?: { runId?: string; code: string; message: string; didoxId?: string; candidateIds?: string[]; at: string; createdByInstall: string }
+}
+
+/** What the robot records about an invoice that needs a person (POST …/needs-check); the install is added here. */
+export interface NeedsCheckFlag {
+  runId: string
+  code: string
+  message: string
+  didoxId?: string
+  candidateIds?: string[]
+}
+
+/** Flag writes are retried later from the journal, so their failures are data, not exceptions. */
+export type FlagWriteResult = { ok: true } | { ok: false; status: number; message: string }
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -54,41 +75,79 @@ export class ApiError extends Error {
   }
 }
 
+/** The server keeps at most this much of a flag (apps/api didox-flags/dto/didox-flag.dto.ts). */
+const MAX_MESSAGE = 1000
+const MAX_CANDIDATES = 50
+
+/** No robot token: nothing is sent, and the caller sees the same 401 the server would give. */
+class NoToken extends Error {}
+
 /**
- * Talks to this install's own API over loopback (M8c §6). Every request carries a freshly minted session cookie, so a
- * long run never fails on an expired token. `confirmWarnings` is never sent: only a person may confirm a warning (FR-8.5).
+ * Talks to the shared server (M13) with the robot's own token as its session cookie — never the person's, whose
+ * session ends after 12 hours while a scheduled run starts at 06:00 with nobody there. A 401 tells `onUnauthorized`,
+ * so main can drop the token and fetch a new one. `confirmWarnings` is never sent: only a person may confirm (FR-8.5).
  */
 export function createApiClient({
   baseUrl,
-  secret,
+  token,
+  install,
+  onUnauthorized = () => undefined,
   fetch = globalThis.fetch,
-  nowMs = Date.now,
 }: {
   baseUrl: string
-  secret: string
+  /** The stored robot token, or null when there is none yet. */
+  token: () => Promise<string | null>
+  /** This install's label, written as `createdByInstall` on the flags it records. */
+  install: string
+  onUnauthorized?: () => void
   fetch?: FetchLike
-  nowMs?: () => number
 }) {
   const root = `${baseUrl.replace(/\/+$/, '')}/api`
-  const cookie = () => sessionCookie(mintSessionToken(secret, { sub: 'desktop', nowMs: nowMs() }))
 
-  const send = (url: string, init: RequestInit = {}) =>
-    fetch(url, { ...init, headers: { ...init.headers, cookie: cookie() } })
+  const send = async (url: string, init: RequestInit = {}): Promise<Response> => {
+    const current = await token()
+    if (!current) throw new NoToken()
+    const res = await fetch(url, { ...init, headers: { ...init.headers, cookie: `${SESSION_COOKIE}=${current}` } })
+    if (res.status === 401) onUnauthorized()
+    return res
+  }
+
+  /** GET that must succeed: without its answer there is nothing safe to plan with. */
+  async function read<T>(url: string, valid: (body: T) => boolean): Promise<T> {
+    let res: Response
+    try {
+      res = await send(url)
+    } catch (error) {
+      throw error instanceof NoToken ? noToken() : network(error)
+    }
+    if (!res.ok) throw new ApiError(res.status, codeOf(res.status, await body(res)), await messageOf(res))
+    const parsed = await json<T>(res)
+    if (!parsed || !valid(parsed)) throw new ApiError(res.status, 'BAD_BODY', "Server javobini o'qib bo'lmadi")
+    return parsed
+  }
+
+  async function write(url: string, init: RequestInit): Promise<FlagWriteResult> {
+    let res: Response
+    try {
+      res = await send(url, init)
+    } catch (error) {
+      const { status, message } = error instanceof NoToken ? noToken() : network(error)
+      return { ok: false, status, message }
+    }
+    return res.ok ? { ok: true } : { ok: false, status: res.status, message: await messageOf(res) }
+  }
+
+  const flagPath = (month: string, contractId: string) =>
+    `${root}/didox-flags/${encodeURIComponent(month)}/${encodeURIComponent(contractId)}/needs-check`
 
   return {
     /** Throws ApiError: without the month's rows there is nothing to drive Didox with. */
-    async listInvoices(month: string): Promise<InvoiceList> {
-      let res: Response
-      try {
-        res = await send(`${root}/invoices?month=${encodeURIComponent(month)}`)
-      } catch (error) {
-        throw network(error)
-      }
-      if (!res.ok) throw new ApiError(res.status, codeOf(res.status, await body(res)), await messageOf(res))
-      const list = await json<InvoiceList>(res)
-      if (!list || !Array.isArray(list.rows)) throw new ApiError(res.status, 'BAD_BODY', "Ichki server javobini o'qib bo'lmadi")
-      return list
-    },
+    listInvoices: (month: string): Promise<InvoiceList> =>
+      read<InvoiceList>(`${root}/invoices?month=${encodeURIComponent(month)}`, (list) => Array.isArray(list.rows)),
+
+    /** The month's unresolved Didox flags by contract id — skips decide what a run plans (M13 §4.2). Throws ApiError. */
+    listFlags: (month: string): Promise<Record<string, ServerInvoiceFlags>> =>
+      read<Record<string, ServerInvoiceFlags>>(`${root}/didox-flags?month=${encodeURIComponent(month)}`, (flags) => !Array.isArray(flags)),
 
     /**
      * FR-8.4: marks the invoice with the ID read from Didox and the amount written into it. Failures are returned,
@@ -104,15 +163,13 @@ export function createApiClient({
           body: JSON.stringify({ ...mark, source: 'didox' }),
         })
       } catch (error) {
-        const { status, code, message } = network(error)
+        const { status, code, message } = error instanceof NoToken ? noToken() : network(error)
         return { ok: false, status, code, message }
       }
       if (res.ok) {
         const row = await json<InvoiceApiRow>(res)
         // Marked, but the answer was unreadable: the caller must not treat that as a confirmed mark.
-        return row
-          ? { ok: true, row }
-          : { ok: false, status: res.status, code: 'BAD_BODY', message: "Ichki server javobini o'qib bo'lmadi" }
+        return row ? { ok: true, row } : { ok: false, status: res.status, code: 'BAD_BODY', message: "Server javobini o'qib bo'lmadi" }
       }
       const parsed = await body(res)
       const code = typeof parsed?.code === 'string' ? parsed.code : undefined
@@ -125,18 +182,39 @@ export function createApiClient({
         message: message(parsed, res.status),
       }
     },
+
+    /** Puts a needs-check on the server, where every accountant sees it (M13 §4.1); replaces an older one. */
+    recordNeedsCheck: (month: string, contractId: string, flag: NeedsCheckFlag): Promise<FlagWriteResult> =>
+      write(flagPath(month, contractId), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          runId: flag.runId,
+          code: flag.code,
+          message: (flag.message.trim() || didoxMessage(flag.code)).slice(0, MAX_MESSAGE),
+          ...(flag.didoxId ? { didoxId: flag.didoxId } : {}),
+          ...(flag.candidateIds?.length ? { candidateIds: flag.candidateIds.slice(0, MAX_CANDIDATES) } : {}),
+          createdByInstall: install,
+        }),
+      }),
+
+    /** The invoice no longer needs a person (its draft was found and marked): the server flag is closed. */
+    resolveNeedsCheck: (month: string, contractId: string): Promise<FlagWriteResult> =>
+      write(`${flagPath(month, contractId)}/resolve`, { method: 'POST' }),
   }
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>
 
+const noToken = () => new ApiError(401, 'ROBOT_TOKEN_MISSING', didoxMessage('ROBOT_TOKEN_MISSING'))
+
 const network = (error: unknown) =>
-  new ApiError(0, 'NETWORK', `Ilovaning ichki serveri javob bermadi: ${error instanceof Error ? error.message : String(error)}`)
+  new ApiError(0, 'NETWORK', `Server javob bermadi: ${error instanceof Error ? error.message : String(error)}`)
 
 const codeOf = (status: number, parsed: Record<string, unknown> | null) =>
   status === 401 ? 'UNAUTHORIZED' : typeof parsed?.code === 'string' ? parsed.code : `HTTP_${status}`
 
-/** Parses a successful body; null when it is not JSON at all (a truncated answer from a dying API process). */
+/** Parses a successful body; null when it is not JSON at all (a truncated answer from a dying server). */
 async function json<T>(res: Response): Promise<T | null> {
   try {
     const parsed: unknown = await res.clone().json()
@@ -162,5 +240,5 @@ function message(parsed: Record<string, unknown> | null, status: number): string
   const raw = parsed?.message
   if (Array.isArray(raw)) return raw.map(String).join('; ')
   if (typeof raw === 'string' && raw) return raw
-  return `Ichki server xatosi (${status})`
+  return `Server xatosi (${status})`
 }
