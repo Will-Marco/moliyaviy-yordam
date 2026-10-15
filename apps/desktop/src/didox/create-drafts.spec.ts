@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, type InvoiceApiRow, type InvoiceList, type MarkDraftResult } from '../api/client.js'
+import { ApiError, type InvoiceApiRow, type InvoiceList, type MarkDraftResult, type ServerInvoiceFlags } from '../api/client.js'
 import { EimzoError } from '../eimzo/client.js'
 import type { KeyStatus } from '../eimzo/match.js'
 import { EriStoreError } from '../secrets/eri-store.js'
@@ -79,9 +79,9 @@ function harness(over: Partial<CreateDraftsDeps> & { draft?: () => Promise<unkno
     api: {
       listInvoices: vi.fn(async () => list(over.rows ?? [apiRow()])),
       markDraft: vi.fn(async (): Promise<MarkDraftResult> => ({ ok: true, row: apiRow() })),
+      listFlags: vi.fn(async (): Promise<Record<string, ServerInvoiceFlags>> => ({})),
     },
     journal: createJournal({ dir, nowMs: () => clockMs, randomHex: () => hex }),
-    skips: { list: vi.fn(async () => ({})) },
     listKeys: vi.fn(async (tins: string[]) => new Map(tins.map(okKey))),
     eri: { withPassword: vi.fn(async (_tin, use) => use('parol')), markRejected: vi.fn(async () => undefined) },
     preflight: vi.fn(async () => 'ok' as const),
@@ -144,10 +144,31 @@ describe('planRun', () => {
     expect(plan?.firms.map((f) => f.tin)).toEqual([LENDER_B.tin])
   })
 
-  it('leaves out an invoice the accountant has told it to skip', async () => {
-    const h = harness({ rows: [apiRow({ contractId: 'c-1' })], skips: { list: async () => ({ 'c-1': { at: 'x' } }) } })
+  it('leaves out an invoice an accountant has told it to skip — read from the server', async () => {
+    const h = harness({ rows: [apiRow({ contractId: 'c-1' })] })
+    h.deps.api.listFlags = vi.fn(async () => ({ 'c-1': { skipped: { at: 'x' } } }))
 
     expect(await planRun(h.deps, { month: MONTH, lenderIds: 'all' })).toBeNull()
+    expect(h.deps.api.listFlags).toHaveBeenCalledWith(MONTH)
+  })
+
+  it('still plans an invoice that only needs checking, and remembers the flag for recovery', async () => {
+    const h = harness({ rows: [apiRow({ contractId: 'c-1' })] })
+    h.deps.api.listFlags = vi.fn(async () => ({
+      'c-1': { needsCheck: { code: 'SAVE_FAILED', message: 'x', at: 'x', createdByInstall: 'PC (1)' } },
+    }))
+
+    const plan = await planRun(h.deps, { month: MONTH, lenderIds: 'all' })
+
+    expect(plan?.firms[0]?.invoices.map((i) => i.contractId)).toEqual(['c-1'])
+    expect([...(plan?.flagged ?? [])]).toEqual(['c-1'])
+  })
+
+  it('does not plan at all when the server flags cannot be read', async () => {
+    const h = harness()
+    h.deps.api.listFlags = vi.fn(async () => Promise.reject(new ApiError(0, 'NETWORK', 'Server javob bermadi')))
+
+    await expect(planRun(h.deps, { month: MONTH, lenderIds: 'all' })).rejects.toBeInstanceOf(ApiError)
   })
 
   /* c1 runs with DIDOX_MAX_INVOICES=1: one invoice goes end to end before many are let loose. */
@@ -317,7 +338,7 @@ describe('runPlan', () => {
      * A refused session is not this firm's problem: every firm after it would sign in to Didox, have its ERI password
      * typed, and be refused the same way. It stops the run, as a refused mark already does.
      */
-    it('stops the whole run when the server refuses the session on the re-read', async () => {
+    it('stops the whole run when the server refuses the robot key on the re-read', async () => {
       const h = harness({ rows: [apiRow({ contractId: 'c-1' }), apiRow({ contractId: 'c-2', lender: LENDER_B })] })
       h.deps.api.listInvoices = vi
         .fn()
@@ -326,14 +347,14 @@ describe('runPlan', () => {
 
       const { outcome } = await run(h)
 
-      expect(outcome).toMatchObject({ status: 'failed', failure: { code: 'API_UNAVAILABLE' } })
+      expect(outcome).toMatchObject({ status: 'failed', failure: { code: 'ROBOT_TOKEN_MISSING', message: expect.stringContaining('qayta kiring') } })
       expect(h.deps.loginFirm).toHaveBeenCalledTimes(1)
       expect(createDraftMock).not.toHaveBeenCalled()
     })
 
-    it('stops the firm when the skip list cannot be read again', async () => {
+    it('stops the firm when the server flags cannot be read again', async () => {
       const h = harness()
-      h.deps.skips.list = vi.fn().mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('EACCES'))
+      h.deps.api.listFlags = vi.fn().mockResolvedValueOnce({}).mockRejectedValueOnce(new ApiError(0, 'NETWORK', 'Server javob bermadi'))
 
       const { journal } = await run(h)
 
@@ -341,9 +362,9 @@ describe('runPlan', () => {
       expect(journal.firms[0]).toMatchObject({ status: 'failed', code: 'API_UNAVAILABLE' })
     })
 
-    it('does not create an invoice the accountant skipped after the plan was made', async () => {
+    it('does not create an invoice an accountant skipped (on any computer) after the plan was made', async () => {
       const h = harness()
-      h.deps.skips.list = vi.fn().mockResolvedValueOnce({}).mockResolvedValueOnce({ 'c-1': { at: 'x' } })
+      h.deps.api.listFlags = vi.fn().mockResolvedValueOnce({}).mockResolvedValueOnce({ 'c-1': { skipped: { at: 'x' } } })
 
       const { journal } = await run(h)
 
@@ -475,8 +496,8 @@ describe('recovering a draft an earlier run could not name (§5)', () => {
     expect((await h.deps.journal.read(earlier))?.firms[0]?.invoices[0]).toMatchObject({
       state: 'marked',
       didoxId: LOST_DRAFT,
+      flagSync: 'clear', // the server's needs-check for it is resolved by the next push
     })
-    expect(await h.deps.journal.flags(MONTH)).toEqual({})
   })
 
   it('leaves the invoice flagged, with a fresher reason, when nothing fits', async () => {
@@ -486,7 +507,8 @@ describe('recovering a draft an earlier run could not name (§5)', () => {
 
     await run(h)
 
-    expect((await h.deps.journal.flags(MONTH))['c-1']).toMatchObject({
+    expect((await h.deps.journal.findNeedsCheck(MONTH))[0]?.invoice).toMatchObject({
+      contractId: 'c-1',
       code: 'SAVED_ID_UNKNOWN',
       message: expect.stringContaining('topilmadi'),
     })
@@ -499,6 +521,37 @@ describe('recovering a draft an earlier run could not name (§5)', () => {
 
     await run(h)
 
-    expect(Object.keys(await h.deps.journal.flags(MONTH))).toEqual(['c-1'])
+    expect((await h.deps.journal.findNeedsCheck(MONTH)).map((e) => e.invoice.contractId)).toEqual(['c-1'])
+  })
+
+  /** The earlier run's flag as the server has it: sent, and still unresolved there (or not). */
+  const sent = async (h: Harness) => {
+    await h.deps.journal.pushFlags({ recordNeedsCheck: async () => ({ ok: true }), resolveNeedsCheck: async () => ({ ok: true }) })
+  }
+
+  it('still recovers an invoice the server keeps flagged', async () => {
+    const h = today()
+    const earlier = await earlierRun(h)
+    await sent(h)
+    h.deps.api.listFlags = vi.fn(async () => ({
+      'c-1': { needsCheck: { code: 'SAVED_ID_UNKNOWN', message: 'x', at: 'x', createdByInstall: 'PC (1)' } },
+    }))
+    h.page.on(L.listReady.js, true).on(L.listRows.js, [listRow()])
+
+    await run(h)
+
+    expect((await h.deps.journal.read(earlier))?.firms[0]?.invoices[0]).toMatchObject({ state: 'marked', didoxId: LOST_DRAFT })
+  })
+
+  it('leaves alone what an accountant resolved on the server, and stops looking for it', async () => {
+    const h = today()
+    const earlier = await earlierRun(h)
+    await sent(h)
+    h.page.on(L.listReady.js, true).on(L.listRows.js, [listRow()])
+
+    await run(h)
+
+    expect((await h.deps.journal.read(earlier))?.firms[0]?.invoices[0]).toMatchObject({ state: 'needs_check', resolved: true })
+    expect(await h.deps.journal.findNeedsCheck(MONTH)).toEqual([])
   })
 })

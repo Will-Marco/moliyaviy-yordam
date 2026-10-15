@@ -1,3 +1,4 @@
+import { ApiError } from '../api/client.js'
 import { EimzoError } from '../eimzo/client.js'
 import type { KeyStatus } from '../eimzo/match.js'
 import { type EriStore, EriStoreError } from '../secrets/eri-store.js'
@@ -13,10 +14,9 @@ import {
   StepError,
   type StepErrorCode,
 } from './contract.js'
-import { type CreateDraftsDeps, planRun, runPlan, type StartOptions } from './create-drafts.js'
-import type { SkipStore } from './skips.js'
+import { type CreateDraftsDeps, planRun, type RunPlan, runPlan, type StartOptions } from './create-drafts.js'
 import { createRunEngine, RunBusyError, type RunContext } from './engine.js'
-import type { InvoiceFlag, RunJournal, RunTrigger } from './journal.js'
+import type { FlagSink, RunJournal, RunTrigger } from './journal.js'
 
 /** The Didox window as the runner sees it (view.ts implements it with Electron). */
 export interface DidoxWindow {
@@ -33,11 +33,11 @@ export interface DidoxWindow {
  */
 export type CheckLoginResult = { ok: true } | { ok: false; code: string; message: string; screenshot?: string | null }
 
-/** Everything `createDrafts` needs that the runner itself does not already have (M8c §3). */
-export type DraftsDeps = Pick<CreateDraftsDeps, 'api' | 'journal' | 'maxInvoices' | 'nowMs'> & {
-  /** The run planner only reads the flags; the IPC layer sets and clears them (§7). */
-  skips: SkipStore
-}
+/**
+ * Everything `createDrafts` needs that the runner itself does not already have (M8c §3). The API is the shared
+ * server: it holds the invoices and the skips the plan reads, and takes the needs-checks the journal queues (M13).
+ */
+export type DraftsDeps = Pick<CreateDraftsDeps, 'journal' | 'maxInvoices' | 'nowMs'> & { api: CreateDraftsDeps['api'] & FlagSink }
 
 /** Start of a draft run: the run id is returned at once and the work goes on in the background (§3). */
 export type StartDraftsResult = { ok: true; runId: string } | { ok: false; code: string; message: string }
@@ -292,9 +292,22 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
     starting = true
     let handle: Awaited<ReturnType<DraftsDeps['journal']['start']>>
     try {
-      // Anything found in an earlier run but never recorded in the API goes first, before new work is planned (§3).
+      // Anything found in an earlier run but never recorded in the API goes first, before new work is planned (§3);
+      // so do flags the server has not heard of yet, so the plan reads what this computer already knows.
       await drafts.journal.flushIdFound({ markDraft: drafts.api.markDraft }).catch(() => undefined)
-      const plan = await planRun(drafts, { month, lenderIds })
+      await drafts.journal.pushFlags(drafts.api).catch(() => undefined)
+      let plan: RunPlan | null
+      try {
+        plan = await planRun(drafts, { month, lenderIds })
+      } catch (error) {
+        /*
+         * No server, no plan: nothing is started and nothing is recorded, so for the schedule this look never
+         * happened and the month stays owed (M13 §4.2) — it is tried again at the next look.
+         */
+        if (!(error instanceof ApiError)) throw error
+        if (error.status === 401) return refuse('ROBOT_TOKEN_MISSING', didoxMessage('ROBOT_TOKEN_MISSING'))
+        return refuse('API_UNAVAILABLE', `Server bilan bog'lanib bo'lmadi — qoralamalar boshlanmadi. ${error.message}`)
+      }
       if (!plan) {
         // The schedule reads the run record to know whether a month is still owed: an empty answer left a month whose
         // invoices were all drafted by hand owed for good, so the schedule's look is recorded as a finished attempt.
@@ -319,6 +332,9 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
               message: unexpected(error),
             }),
         )
+        // What needs a person is shown to every accountant as soon as the run is over; what cannot be sent now
+        // stays queued for the next run or the next time the app opens.
+        .then(() => drafts.journal.pushFlags(drafts.api))
         .catch(() => undefined)
         .finally(() => {
           beat = () => undefined
@@ -347,40 +363,12 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
     return deps.drafts.journal.read(lastRun)
   }
 
-  /* What the invoices page reads next to the API's own draft state (§7). */
+  /* This computer's run history (FR-8.7: it stays local); the flags themselves are on the server (M13). */
 
   const listRuns = async (opts: { month?: string; limit?: number } = {}) =>
     deps.drafts ? deps.drafts.journal.list(opts) : []
 
   const getRun = async (runId: string) => (deps.drafts ? deps.drafts.journal.read(runId) : null)
-
-  /** The shape the web reads (`DidoxInvoiceFlags` in apps/web/src/lib/desktop.ts): both flags nested, either may be absent. */
-  const invoiceFlags = async (month: string): Promise<Record<string, { needsCheck?: InvoiceFlag; skipped?: { at: string } }>> => {
-    if (!deps.drafts) return {}
-    const [needsCheck, skipped] = await Promise.all([deps.drafts.journal.flags(month), deps.drafts.skips.list(month)])
-    const flags: Record<string, { needsCheck?: InvoiceFlag; skipped?: { at: string } }> = {}
-    for (const [contractId, flag] of Object.entries(needsCheck)) flags[contractId] = { needsCheck: flag }
-    for (const [contractId, flag] of Object.entries(skipped)) {
-      flags[contractId] = { ...flags[contractId], skipped: { at: flag.at } }
-    }
-    return flags
-  }
-
-  const skipInvoice = async ({ month, contractId, skip }: { month: string; contractId: string; skip: boolean }) => {
-    if (!deps.drafts) return
-    if (skip) await deps.drafts.skips.set(month, contractId)
-    else await deps.drafts.skips.remove(month, contractId)
-  }
-
-  /** "Hal qilindi": the flag goes, the record stays, and the API is not touched (FR-8.5). */
-  const resolveNeedsCheck = async ({ month, contractId }: { month: string; contractId: string }) => {
-    if (!deps.drafts) return
-    const flag = (await deps.drafts.journal.flags(month))[contractId]
-    if (!flag) return
-    const run = await deps.drafts.journal.read(flag.runId)
-    const firm = run?.firms.find((f) => f.invoices.some((i) => i.contractId === contractId))
-    if (firm) await deps.drafts.journal.resolveNeedsCheck(flag.runId, firm.tin, contractId)
-  }
 
   return {
     checkLogin,
@@ -388,9 +376,6 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
     status,
     listRuns,
     getRun,
-    invoiceFlags,
-    skipInvoice,
-    resolveNeedsCheck,
     /** Ends the current run's waits early; the window closes and the run reports CANCELLED. */
     cancel: (): void => engine.cancel(),
     busy: (): boolean => engine.busy(),

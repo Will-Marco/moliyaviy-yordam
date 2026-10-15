@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../api/client.js'
 import { EimzoError } from '../eimzo/client.js'
 import type { KeyStatus } from '../eimzo/match.js'
 import { EriStoreError, type EriStoreErrorCode } from '../secrets/eri-store.js'
@@ -368,11 +369,12 @@ describe('createDidoxRunner.createDrafts', () => {
         start: vi.fn(async () => handle),
         read: vi.fn(async () => null),
         flushIdFound: vi.fn(async () => ({ marked: 0, needsCheck: 0, left: 0, unauthorized: false })),
+        pushFlags: vi.fn(async () => ({ sent: 0, cleared: 0, left: 0, unauthorized: false })),
       },
     }
   }
 
-  const drafts = (over: { rows?: unknown[]; journal?: unknown } = {}) => {
+  const drafts = (over: { rows?: unknown[]; journal?: unknown; listFlags?: () => Promise<unknown> } = {}) => {
     const j = fakeJournal()
     return {
       spy: j,
@@ -387,9 +389,11 @@ describe('createDidoxRunner.createDrafts', () => {
             ],
           })),
           markDraft: vi.fn(async () => ({ ok: true as const, row: {} as never })),
+          listFlags: over.listFlags ?? vi.fn(async () => ({})),
+          recordNeedsCheck: vi.fn(async () => ({ ok: true as const })),
+          resolveNeedsCheck: vi.fn(async () => ({ ok: true as const })),
         },
         journal: (over.journal ?? j.journal) as never,
-        skips: { list: vi.fn(async () => ({})) },
       } as never,
     }
   }
@@ -411,6 +415,55 @@ describe('createDidoxRunner.createDrafts', () => {
     await runner.createDrafts({ month: '2026-09', lenderIds: 'all' })
 
     expect(d.spy.journal.flushIdFound).toHaveBeenCalled()
+  })
+
+  it('sends queued flags to the server before it plans, and again once the run is over (M13)', async () => {
+    const d = drafts()
+    const { runner } = setup({ drafts: d.deps })
+
+    await runner.createDrafts({ month: '2026-09', lenderIds: 'all' })
+    expect(d.spy.journal.pushFlags).toHaveBeenCalledTimes(1)
+
+    await vi.waitFor(() => expect(d.spy.handle.finish).toHaveBeenCalled())
+    await vi.waitFor(() => expect(d.spy.journal.pushFlags).toHaveBeenCalledTimes(2))
+  })
+
+  it('reads the skips from the server: an invoice skipped there is not planned', async () => {
+    const d = drafts({ listFlags: async () => ({ 'c-1': { skipped: { at: '2026-10-01T06:00:00.000Z' } } }) })
+    const { runner } = setup({ drafts: d.deps })
+
+    await expect(runner.createDrafts({ month: '2026-09', lenderIds: 'all' })).resolves.toMatchObject({ ok: false, code: 'NOTHING_TO_DO' })
+  })
+
+  /*
+   * M13 §4.2: without the server there is no plan. A scheduled look must not be recorded as an attempt — that would
+   * close the month (or use up its retries) for a reason that says nothing about Didox.
+   */
+  it('starts nothing and records nothing when the server cannot be reached', async () => {
+    const d = drafts()
+    ;(d.deps as unknown as { api: { listInvoices: unknown } }).api.listInvoices = vi.fn(async () =>
+      Promise.reject(new ApiError(0, 'NETWORK', 'Server javob bermadi: fetch failed')),
+    )
+    const { runner } = setup({ drafts: d.deps })
+
+    await expect(runner.createDrafts({ month: '2026-09', lenderIds: 'all', trigger: 'scheduled' })).resolves.toMatchObject({
+      ok: false,
+      code: 'API_UNAVAILABLE',
+      message: expect.stringContaining('Server javob bermadi'),
+    })
+    expect(d.spy.journal.start).not.toHaveBeenCalled()
+  })
+
+  it('asks the person to log in again when there is no robot key, and records nothing', async () => {
+    const d = drafts({ listFlags: async () => Promise.reject(new ApiError(401, 'ROBOT_TOKEN_MISSING', 'x')) })
+    const { runner } = setup({ drafts: d.deps })
+
+    await expect(runner.createDrafts({ month: '2026-09', lenderIds: 'all', trigger: 'scheduled' })).resolves.toEqual({
+      ok: false,
+      code: 'ROBOT_TOKEN_MISSING',
+      message: "Ilovaga qayta kiring — robot kaliti yo'q yoki eskirgan",
+    })
+    expect(d.spy.journal.start).not.toHaveBeenCalled()
   })
 
   it('says there is nothing to do instead of starting an empty run', async () => {
@@ -480,7 +533,7 @@ describe('createDidoxRunner.createDrafts', () => {
   })
 })
 
-describe('what the invoices page reads (c2)', () => {
+describe('the run history the invoices page reads (c2)', () => {
   const invoice = {
     contractId: 'c-1',
     contractNumber: '12/25',
@@ -491,25 +544,19 @@ describe('what the invoices page reads (c2)', () => {
     amount: '552328.77',
   }
 
-  /** A real journal and a real skip store on disk: these wrappers exist to put the two together. */
-  async function withStores() {
+  /** A real journal on disk: the history is local (FR-8.7), the flags are the server's (M13). */
+  async function withJournal() {
     const { mkdtemp } = await import('node:fs/promises')
     const { tmpdir } = await import('node:os')
     const { join } = await import('node:path')
     const { createJournal } = await import('./journal.js')
-    const { createSkipStore } = await import('./skips.js')
-    const dir = await mkdtemp(join(tmpdir(), 'didox-flags-'))
+    const dir = await mkdtemp(join(tmpdir(), 'didox-history-'))
     const journal = createJournal({ dir, nowMs: () => Date.parse('2026-10-13T09:00:00.000Z'), randomHex: () => 'a1b2' })
-    const skips = createSkipStore({ file: join(dir, 'skips.json') })
-    const drafts = {
-      api: { listInvoices: vi.fn(), markDraft: vi.fn() } as never,
-      journal,
-      skips,
-    }
-    return { journal, skips, drafts }
+    const drafts = { api: { listInvoices: vi.fn(), markDraft: vi.fn() } as never, journal }
+    return { journal, drafts }
   }
 
-  const flagged = async (journal: Awaited<ReturnType<typeof withStores>>['journal']) => {
+  const flagged = async (journal: Awaited<ReturnType<typeof withJournal>>['journal']) => {
     const run = await journal.start({
       month: '2026-09',
       trigger: 'manual',
@@ -521,54 +568,8 @@ describe('what the invoices page reads (c2)', () => {
     return run.runId
   }
 
-  it('shows why an invoice needs attention and which invoices are being skipped, in one answer', async () => {
-    const { journal, drafts } = await withStores()
-    await flagged(journal)
-    const { runner } = setup({ drafts })
-    await runner.skipInvoice({ month: '2026-09', contractId: 'c-2', skip: true })
-
-    const flags = await runner.invoiceFlags('2026-09')
-
-    // The web reads `needsCheck` nested (apps/web/src/lib/desktop.ts DidoxInvoiceFlags); returned flat, the
-    // "e'tibor kerak" badge and its actions never showed in the real app.
-    expect(flags['c-1']).toEqual({ needsCheck: expect.objectContaining({ code: 'SAVED_ID_UNKNOWN', message: 'topilmadi' }) })
-    expect(flags['c-2']).toEqual({ skipped: { at: expect.any(String) } })
-  })
-
-  it('keeps both when an invoice that needs attention is also skipped', async () => {
-    const { journal, drafts } = await withStores()
-    await flagged(journal)
-    const { runner } = setup({ drafts })
-    await runner.skipInvoice({ month: '2026-09', contractId: 'c-1', skip: true })
-
-    expect(await runner.invoiceFlags('2026-09')).toEqual({
-      'c-1': { needsCheck: expect.objectContaining({ code: 'SAVED_ID_UNKNOWN' }), skipped: { at: expect.any(String) } },
-    })
-  })
-
-  it('takes the skip off again', async () => {
-    const { drafts } = await withStores()
-    const { runner } = setup({ drafts })
-    await runner.skipInvoice({ month: '2026-09', contractId: 'c-2', skip: true })
-
-    await runner.skipInvoice({ month: '2026-09', contractId: 'c-2', skip: false })
-
-    expect(await runner.invoiceFlags('2026-09')).toEqual({})
-  })
-
-  it('drops the attention flag when the accountant has dealt with it, and keeps the run', async () => {
-    const { journal, drafts } = await withStores()
-    const runId = await flagged(journal)
-    const { runner } = setup({ drafts })
-
-    await runner.resolveNeedsCheck({ month: '2026-09', contractId: 'c-1' })
-
-    expect(await runner.invoiceFlags('2026-09')).toEqual({})
-    expect((await runner.getRun(runId))?.firms[0]?.invoices[0]).toMatchObject({ state: 'needs_check', resolved: true })
-  })
-
-  it('lists the month\'s runs for the history card', async () => {
-    const { journal, drafts } = await withStores()
+  it("lists the month's runs for the history card", async () => {
+    const { journal, drafts } = await withJournal()
     await flagged(journal)
     const { runner } = setup({ drafts })
 
@@ -578,9 +579,16 @@ describe('what the invoices page reads (c2)', () => {
     expect(runs[0]).toMatchObject({ month: '2026-09', status: 'done', counts: expect.objectContaining({ needsCheck: 1 }) })
   })
 
+  it('reads one run back for the detail dialog', async () => {
+    const { journal, drafts } = await withJournal()
+    const runId = await flagged(journal)
+    const { runner } = setup({ drafts })
+
+    expect((await runner.getRun(runId))?.firms[0]?.invoices[0]).toMatchObject({ state: 'needs_check', code: 'SAVED_ID_UNKNOWN' })
+  })
+
   it('answers with nothing in a build without the draft side', async () => {
     const { runner } = setup()
-    expect(await runner.invoiceFlags('2026-09')).toEqual({})
     expect(await runner.listRuns({})).toEqual([])
     expect(await runner.getRun('2026-10-13T09-00-00.000Z-a1b2')).toBeNull()
   })

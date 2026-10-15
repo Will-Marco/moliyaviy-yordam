@@ -2,8 +2,8 @@ import { mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { MarkDraftBody, MarkDraftResult } from '../api/client.js'
-import { createJournal, type InvoiceEntry, type RunJournal } from './journal.js'
+import type { FlagWriteResult, MarkDraftBody, MarkDraftResult } from '../api/client.js'
+import { createJournal, type FlagSink, type InvoiceEntry, type RunJournal } from './journal.js'
 
 let dir: string
 let now = Date.parse('2026-10-13T06:00:00.000Z')
@@ -446,7 +446,7 @@ describe('findNeedsCheck — what the next run may recover (§3.4)', () => {
   })
 })
 
-describe('needs-check flags and recovery (c2)', () => {
+describe('needs-check entries and recovery (c2)', () => {
   const needsCheck = async () => {
     const j = journal()
     const run = await j.start({ month: '2026-09', trigger: 'manual', firms: [firm('300000001')] })
@@ -455,22 +455,14 @@ describe('needs-check flags and recovery (c2)', () => {
     await run.finish('done')
     return { j, runId: run.runId }
   }
+  const entry = async (j: ReturnType<typeof journal>, runId: string) => (await j.read(runId))?.firms[0]?.invoices[0]
 
-  it('shows the invoice as needing attention, with what the run knew', async () => {
-    const { j } = await needsCheck()
-
-    const flags = await j.flags('2026-09')
-
-    expect(flags.c1).toMatchObject({ code: 'SAVED_ID_UNKNOWN', message: 'topilmadi', at: expect.any(String) })
-  })
-
-  it('drops the flag once the accountant says it is dealt with, and keeps the record', async () => {
+  it('keeps the record when the accountant has dealt with it, and stops searching for it', async () => {
     const { j, runId } = await needsCheck()
 
     await j.resolveNeedsCheck(runId, '300000001', 'c1')
 
-    expect(await j.flags('2026-09')).toEqual({})
-    expect((await j.read(runId))?.firms[0]?.invoices[0]).toMatchObject({ state: 'needs_check', resolved: true })
+    expect(await entry(j, runId)).toMatchObject({ state: 'needs_check', resolved: true })
     expect(await j.findNeedsCheck('2026-09')).toEqual([]) // a resolved one is not searched for again either
   })
 
@@ -479,8 +471,7 @@ describe('needs-check flags and recovery (c2)', () => {
 
     await j.attachFoundId(runId, '300000001', 'c1', 'A'.repeat(32))
 
-    expect((await j.read(runId))?.firms[0]?.invoices[0]).toMatchObject({ state: 'id_found', didoxId: 'A'.repeat(32) })
-    expect(await j.flags('2026-09')).toEqual({})
+    expect(await entry(j, runId)).toMatchObject({ state: 'id_found', didoxId: 'A'.repeat(32) })
   })
 
   it('refreshes the reason when the draft is still not found', async () => {
@@ -488,17 +479,173 @@ describe('needs-check flags and recovery (c2)', () => {
 
     await j.refreshNeedsCheck(runId, '300000001', 'c1', 'bugun ham topilmadi')
 
-    expect((await j.flags('2026-09')).c1?.message).toBe('bugun ham topilmadi')
+    expect(await entry(j, runId)).toMatchObject({ state: 'needs_check', message: 'bugun ham topilmadi' })
+  })
+})
+
+describe('pushFlags — every needs-check reaches the shared server (M13)', () => {
+  type Call = { kind: 'record' | 'resolve'; month: string; contractId: string; flag?: unknown }
+
+  /** Answers each write with the next queued result (ok when the queue is empty) and records what was asked. */
+  function fakeServer(answers: FlagWriteResult[] = []) {
+    const calls: Call[] = []
+    const next = async (): Promise<FlagWriteResult> => answers.shift() ?? { ok: true }
+    const sink: FlagSink = {
+      recordNeedsCheck: async (month, contractId, flag) => (calls.push({ kind: 'record', month, contractId, flag }), next()),
+      resolveNeedsCheck: async (month, contractId) => (calls.push({ kind: 'resolve', month, contractId }), next()),
+    }
+    return { sink, calls }
+  }
+
+  const flagged = async (j = journal()) => {
+    const run = await j.start({ month: '2026-09', trigger: 'manual', firms: [firm('300000001', [{}, {}])] })
+    await run.setInvoice('300000001', 'c1', { state: 'saving', savingAt: '2026-10-13T09:32:00.000Z' })
+    await run.setInvoice('300000001', 'c1', {
+      state: 'needs_check',
+      code: 'SAVED_ID_AMBIGUOUS',
+      message: 'Ikki nomzod',
+      candidateIds: ['A'.repeat(32), 'B'.repeat(32)],
+    })
+    return { j, run }
+  }
+  const sync = async (j: ReturnType<typeof journal>, runId: string, contractId = 'c1') =>
+    (await j.read(runId))?.firms[0]?.invoices.find((i) => i.contractId === contractId)?.flagSync
+
+  it('queues a needs-check the moment it is written, and sends it with the run id', async () => {
+    const { j, run } = await flagged()
+    expect(await sync(j, run.runId)).toBe('pending')
+    const server = fakeServer()
+
+    expect(await j.pushFlags(server.sink)).toEqual({ sent: 1, cleared: 0, left: 0, unauthorized: false })
+
+    expect(server.calls).toEqual([
+      {
+        kind: 'record',
+        month: '2026-09',
+        contractId: 'c1',
+        flag: { runId: run.runId, code: 'SAVED_ID_AMBIGUOUS', message: 'Ikki nomzod', candidateIds: ['A'.repeat(32), 'B'.repeat(32)] },
+      },
+    ])
+    expect(await sync(j, run.runId)).toBe('sent')
   })
 
-  it('lets a later run settle what an earlier one flagged', async () => {
-    const { j } = await needsCheck()
-    now += 60_000 // a second run needs its own id, which is built from the clock
-    const second = await j.start({ month: '2026-09', trigger: 'manual', firms: [firm('300000001')] })
-    await second.setInvoice('300000001', 'c1', { state: 'saving', savingAt: '2026-10-13T10:00:00.000Z' })
-    await second.setInvoice('300000001', 'c1', { state: 'id_found', didoxId: 'B'.repeat(32) })
-    await second.finish('done')
+  it('sends a flag once — a second push has nothing to do', async () => {
+    const { j } = await flagged()
+    await j.pushFlags(fakeServer().sink)
+    const again = fakeServer()
 
-    expect(await j.flags('2026-09')).toEqual({})
+    await j.pushFlags(again.sink)
+
+    expect(again.calls).toEqual([])
+  })
+
+  it('keeps the flag queued while the server is down, and sends it later', async () => {
+    const { j, run } = await flagged()
+
+    expect(await j.pushFlags(fakeServer([{ ok: false, status: 0, message: 'down' }]).sink)).toMatchObject({ sent: 0, left: 1 })
+    expect(await sync(j, run.runId)).toBe('pending')
+
+    expect(await j.pushFlags(fakeServer().sink)).toMatchObject({ sent: 1, left: 0 })
+  })
+
+  it('stops at a refused robot key and leaves the rest for later', async () => {
+    const { j, run } = await flagged()
+    await run.setInvoice('300000001', 'c2', { state: 'needs_check', code: 'COUNTERPARTY_MISMATCH', message: 'nom mos emas' })
+    const server = fakeServer([{ ok: false, status: 401, message: 'Sessiya tugagan' }])
+
+    expect(await j.pushFlags(server.sink)).toEqual({ sent: 0, cleared: 0, left: 2, unauthorized: true })
+    expect(server.calls).toHaveLength(1)
+  })
+
+  it('gives up on a flag the server refuses for good (the contract is gone)', async () => {
+    const { j, run } = await flagged()
+
+    await j.pushFlags(fakeServer([{ ok: false, status: 404, message: 'Shartnoma topilmadi' }]).sink)
+    const again = fakeServer()
+    await j.pushFlags(again.sink)
+
+    expect(again.calls).toEqual([])
+    expect(await sync(j, run.runId)).toBeUndefined()
+  })
+
+  it('sends a newer reason again', async () => {
+    const { j, run } = await flagged()
+    await run.finish('done')
+    await j.pushFlags(fakeServer().sink)
+
+    await j.refreshNeedsCheck(run.runId, '300000001', 'c1', 'bugun ham topilmadi')
+    const server = fakeServer()
+    await j.pushFlags(server.sink)
+
+    expect(server.calls).toMatchObject([{ kind: 'record', flag: { message: 'bugun ham topilmadi' } }])
+  })
+
+  it("resolves the server's flag once the draft is found and marked here", async () => {
+    const { j, run } = await flagged()
+    await run.finish('done')
+    await j.pushFlags(fakeServer().sink)
+
+    await j.attachFoundId(run.runId, '300000001', 'c1', 'A'.repeat(32))
+    await j.flushIdFound({ markDraft: async () => ({ ok: true, row: {} as never }) })
+    const server = fakeServer()
+
+    expect(await j.pushFlags(server.sink)).toMatchObject({ cleared: 1 })
+    expect(server.calls).toEqual([{ kind: 'resolve', month: '2026-09', contractId: 'c1' }])
+    expect(await sync(j, run.runId)).toBeUndefined()
+  })
+
+  it("settles another computer's flag when this one marks the invoice (a resolve with nothing to resolve is fine)", async () => {
+    const j = journal()
+    const run = await j.start({ month: '2026-09', trigger: 'manual', firms: [firm('300000001')] })
+    await run.setInvoice('300000001', 'c1', { state: 'saving', savingAt: '2026-10-13T09:32:00.000Z' })
+    await run.setInvoice('300000001', 'c1', { state: 'id_found', didoxId: 'A'.repeat(32) })
+    await run.setInvoice('300000001', 'c1', { state: 'marked' })
+    const server = fakeServer([{ ok: false, status: 404, message: 'Tekshiruv belgisi topilmadi' }])
+
+    await j.pushFlags(server.sink)
+
+    expect(server.calls).toEqual([{ kind: 'resolve', month: '2026-09', contractId: 'c1' }])
+    expect(await sync(j, run.runId)).toBeUndefined()
+  })
+
+  it('queues nothing when a resolution made on the server is mirrored here', async () => {
+    const { j, run } = await flagged()
+    await run.finish('done')
+    await j.pushFlags(fakeServer().sink)
+
+    await j.resolveNeedsCheck(run.runId, '300000001', 'c1')
+    const server = fakeServer()
+    await j.pushFlags(server.sink)
+
+    expect(server.calls).toEqual([])
+  })
+
+  it('queues the needs-check a crashed run leaves behind', async () => {
+    const j = journal()
+    const run = await j.start({ month: '2026-09', trigger: 'manual', firms: [firm('300000001')] })
+    await run.setInvoice('300000001', 'c1', { state: 'saving', savingAt: '2026-10-13T09:32:00.000Z' })
+
+    await j.recoverStaleRuns()
+    const server = fakeServer()
+    await j.pushFlags(server.sink)
+
+    expect(server.calls).toMatchObject([{ kind: 'record', contractId: 'c1', flag: { code: 'INTERRUPTED_SAVE', runId: run.runId } }])
+  })
+
+  it('keeps an old run on disk while its flag has not reached the server', async () => {
+    const j = journal()
+    const { run } = await flagged(j)
+    await run.finish('done')
+    // Marked now, so only the queued resolve of the server's flag still needs this run.
+    await j.attachFoundId(run.runId, '300000001', 'c1', 'A'.repeat(32))
+    await j.flushIdFound({ markDraft: async () => ({ ok: true, row: {} as never }) })
+    for (let i = 0; i < 51; i++) {
+      now += 60_000
+      await (await j.start({ month: '2026-09', trigger: 'manual', firms: [] })).finish('done')
+    }
+
+    await j.rotate()
+
+    expect(await j.read(run.runId)).not.toBeNull()
   })
 })

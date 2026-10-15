@@ -7,7 +7,6 @@ import { type AutotypePreflight, type DidoxCode, didoxMessage, type ProgressEven
 import type { DidoxWindow } from './run.js'
 import type { RunContext } from './engine.js'
 import type { FirmPlan, InvoicePlan, Journal, RunHandle } from './journal.js'
-import type { SkipStore } from './skips.js'
 import { draftKey, matchOwnDraft, openDraftList, savedWindow } from './draft-list.js'
 import { createDraft } from './steps/create-draft.js'
 
@@ -20,12 +19,13 @@ import { createDraft } from './steps/create-draft.js'
  *    opens, so the accountant is not watching a browser while the app finds out it has no password.
  *  - The invoice list is read again after login: by then the accountant may have changed an amount or marked the
  *    invoice by hand, and nothing has been written to Didox yet, so it is safe to follow.
+ *  - M13: the skips live on the shared server with the invoices, so both reads ask the server — another accountant
+ *    may have skipped an invoice from their own computer a minute ago.
  */
 
 export interface CreateDraftsDeps {
-  api: Pick<ApiClient, 'listInvoices' | 'markDraft'>
+  api: Pick<ApiClient, 'listInvoices' | 'markDraft' | 'listFlags'>
   journal: Journal
-  skips: Pick<SkipStore, 'list'>
   listKeys(tins: string[]): Promise<Map<string, KeyStatus>>
   eri: Pick<EriStore, 'withPassword' | 'markRejected'>
   preflight: AutotypePreflight
@@ -56,6 +56,11 @@ export interface RunPlan {
   month: string
   firms: FirmPlan[]
   keys: Map<string, KeyStatus>
+  /**
+   * Contracts with an unresolved needs-check on the server when the plan was made. Recovery only searches for what
+   * the server still flags: an accountant who resolved it there has dealt with it (M13).
+   */
+  flagged: ReadonlySet<string>
 }
 
 const LOGOUT_TIMEOUT_MS = 30_000
@@ -77,15 +82,15 @@ const KEY_PROBLEMS: Record<Exclude<KeyStatus['status'], 'ok'>, DidoxCode> = {
 }
 
 /**
- * Builds the plan from the app's own API: invoices of the month that have no draft yet, minus the ones the accountant
- * has told the app to skip, grouped by the firm that issues them.
+ * Builds the plan from the server: invoices of the month that have no draft yet, minus the ones an accountant has
+ * told the app to skip, grouped by the firm that issues them. Throws ApiError when either list cannot be read.
  */
 export async function planRun(
-  deps: Pick<CreateDraftsDeps, 'api' | 'skips' | 'maxInvoices'>,
+  deps: Pick<CreateDraftsDeps, 'api' | 'maxInvoices'>,
   { month, lenderIds }: StartOptions,
 ): Promise<RunPlan | null> {
   const list = await deps.api.listInvoices(month)
-  const skipped = await deps.skips.list(month)
+  const flags = await deps.api.listFlags(month)
   const wanted = lenderIds === 'all' ? null : new Set(lenderIds)
   const byFirm = new Map<string, FirmPlan>()
   let taken = 0
@@ -94,7 +99,7 @@ export async function planRun(
   for (const row of list.rows) {
     if (row.draft !== null) continue
     if (wanted && !wanted.has(row.lender.id)) continue
-    if (row.contractId in skipped) continue
+    if (flags[row.contractId]?.skipped) continue
     if (taken >= limit) break
     const invoice: InvoicePlan = {
       contractId: row.contractId,
@@ -112,7 +117,8 @@ export async function planRun(
   }
 
   if (!byFirm.size) return null
-  return { month, firms: [...byFirm.values()], keys: new Map() }
+  const flagged = new Set(Object.entries(flags).flatMap(([contractId, flag]) => (flag.needsCheck ? [contractId] : [])))
+  return { month, firms: [...byFirm.values()], keys: new Map(), flagged }
 }
 
 export type RunOutcome = { status: 'done' | 'cancelled' | 'failed'; failure?: { code: string; message: string } }
@@ -245,15 +251,15 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
    * A list that cannot be read stops the firm instead of falling back to the plan (M13 §4.2): with the data on a shared
    * server another computer may have drafted or skipped an invoice since, and the old plan would draft it twice.
    */
-  let fresh, skipped
+  let fresh, flags
   try {
     fresh = await deps.api.listInvoices(plan.month)
-    skipped = await deps.skips.list(plan.month)
+    flags = await deps.api.listFlags(plan.month)
   } catch (error) {
     if (ctx.signal.aborted) return { status: 'cancelled' }
-    // A refused session would refuse every firm after this one too, each after a real Didox sign-in: stop the run.
+    // A refused robot key would refuse every firm after this one too, each after a real Didox sign-in: stop the run.
     if (error instanceof ApiError && error.status === 401) {
-      return { status: 'failed', failure: { code: 'API_UNAVAILABLE', message: "Ilova o'z API'siga kira olmadi" } }
+      return { status: 'failed', failure: { code: 'ROBOT_TOKEN_MISSING', message: didoxMessage('ROBOT_TOKEN_MISSING') } }
     }
     await run.firmFailed(firm, 'API_UNAVAILABLE', RELIST_FAILED)
     return null
@@ -262,7 +268,7 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
   const invoices = firm.invoices
   for (const [index, planned] of invoices.entries()) {
     if (ctx.signal.aborted) return { status: 'cancelled' }
-    if (planned.contractId in skipped) {
+    if (flags[planned.contractId]?.skipped) {
       await handle.setInvoice(firm.tin, planned.contractId, {
         state: 'skipped',
         code: 'SKIPPED_BY_USER',
@@ -349,6 +355,7 @@ async function runFirm(deps: CreateDraftsDeps, handle: RunHandle, plan: RunPlan,
  * read once more: a single row that fits the invoice and the minutes around that save is the draft, and the id is
  * written down for `flushIdFound` to send. Anything else only refreshes the reason. Nothing is created here, and a
  * draft that appeared outside this app is never claimed — that is what the tight window and the four-field key are for.
+ * An invoice the server no longer flags was resolved there by an accountant: it is marked resolved here too and left alone.
  */
 async function recover(
   deps: CreateDraftsDeps,
@@ -357,7 +364,13 @@ async function recover(
   win: DidoxWindow,
   progress: (e: Omit<ProgressEvent, 'runId'>) => void,
 ): Promise<void> {
-  const open = (await deps.journal.findNeedsCheck(plan.month)).filter((entry) => entry.firmTin === firm.tin)
+  const mine = (await deps.journal.findNeedsCheck(plan.month)).filter((entry) => entry.firmTin === firm.tin)
+  const open = []
+  for (const entry of mine) {
+    // `pending`: the server has not heard of it yet, so its silence means nothing.
+    if (entry.invoice.flagSync === 'pending' || plan.flagged.has(entry.invoice.contractId)) open.push(entry)
+    else await deps.journal.resolveNeedsCheck(entry.runId, firm.tin, entry.invoice.contractId).catch(() => undefined)
+  }
   if (!open.length) return
   progress({ firmTin: firm.tin, step: 'recover', status: 'running' })
   let found = 0

@@ -1,6 +1,6 @@
 import { mkdir, open, readdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { MarkDraftBody, MarkDraftResult } from '../api/client.js'
+import type { FlagWriteResult, MarkDraftBody, MarkDraftResult, NeedsCheckFlag } from '../api/client.js'
 
 /*
  * The run journal (M8c §2, FR-8.7). Main is its only writer. Every state change is written through to disk before the
@@ -9,6 +9,10 @@ import type { MarkDraftBody, MarkDraftResult } from '../api/client.js'
  * The invariant that matters: a draft may exist in Didox while the app is not running. Therefore `saving` is written
  * *before* the save button is pressed, and the found ID is written *before* the API is told about it. Nothing is ever
  * created or re-marked automatically — an interrupted invoice waits for a person (`needs_check`).
+ *
+ * M13: the journal stays on this computer (FR-8.7), but a `needs_check` is also what every accountant must see, so
+ * each one is queued for the shared server (`flagSync`) and sent by `pushFlags` — the same outbox shape as
+ * `flushIdFound`, so a server that is down when the invoice is flagged only delays the flag, never loses it.
  */
 
 export type RunStatus = 'running' | 'done' | 'cancelled' | 'failed'
@@ -35,6 +39,12 @@ export interface InvoiceEntry {
   message?: string
   /** "Hal qilindi": the accountant has dealt with this one, so it no longer asks for attention (§7). */
   resolved?: boolean
+  /**
+   * Where the server's copy of this invoice's needs-check stands (M13): `pending` — to be sent; `sent` — the server has
+   * it; `clear` — the invoice is settled here and the server's flag is to be resolved. Absent: nothing to do (or a run
+   * written before M13, whose flags the data move carried to the server).
+   */
+  flagSync?: 'pending' | 'sent' | 'clear'
   screenshot?: string | null
   steps?: { step: string; status: 'done' | 'failed'; at: string }[]
 }
@@ -114,18 +124,22 @@ export interface NeedsCheckEntry {
   invoice: InvoiceEntry
 }
 
-/** What the invoices page shows on a row: why it needs attention, from the run that last said so. */
-export interface InvoiceFlag {
-  runId: string
-  code: string
-  message: string
-  didoxId?: string
-  candidateIds?: string[]
-  at: string
+export interface PushResult {
+  sent: number
+  cleared: number
+  /** Still queued: the server did not answer, so the next push tries again. */
+  left: number
+  unauthorized: boolean
 }
 
 /** What the journal needs of the API client. */
 type MarkDraft = (month: string, contractId: string, mark: MarkDraftBody) => Promise<MarkDraftResult>
+
+/** The server's Didox flags, as far as the journal writes them (apps/desktop/src/api/client.ts). */
+export interface FlagSink {
+  recordNeedsCheck(month: string, contractId: string, flag: NeedsCheckFlag): Promise<FlagWriteResult>
+  resolveNeedsCheck(month: string, contractId: string): Promise<FlagWriteResult>
+}
 
 const MAX_RUNS = 50
 /** Enough to show the live log of one invoice; the journal is a record, not a trace. */
@@ -243,15 +257,31 @@ export function createJournal({
   const loadAll = async (): Promise<RunJournal[]> =>
     (await Promise.all((await runIds()).map(load))).flatMap((j) => (j ? [j] : []))
 
-  /** Reads, changes and writes one run under the queue; the changed journal is returned. */
+  /**
+   * Reads, changes and writes one run under the queue; the changed journal is returned. Every change passes through
+   * here, so this is also where an invoice entering or leaving `needs_check` is queued for the server.
+   */
   const edit = (runId: string, change: (journal: RunJournal) => void): Promise<RunJournal> =>
     serially(async () => {
       const journal = await load(runId)
       if (!journal) throw new Error(`Run yozuvi topilmadi: ${runId}`)
+      const before = structuredClone(journal)
       change(journal)
+      queueFlagSync(before, journal)
       await write(journal)
       return journal
     })
+
+  /** Sets one entry's `flagSync`, but only if the entry is still what was sent — a newer reason stays queued. */
+  const settleSync = (runId: string, tin: string, sent: InvoiceEntry, next: InvoiceEntry['flagSync']) =>
+    edit(runId, (j) => {
+      const invoice = findInvoice(j, tin, sent.contractId)
+      if (invoice.flagSync !== sent.flagSync || flagChanged(invoice, sent)) return
+      if (next === undefined) delete invoice.flagSync
+      else invoice.flagSync = next
+    })
+
+  let pushing: Promise<PushResult> | null = null
 
   async function mark(markDraft: MarkDraft, journal: RunJournal, firm: FirmEntry, invoice: InvoiceEntry) {
     if (!invoice.didoxId) {
@@ -367,7 +397,7 @@ export function createJournal({
       for (const runId of ids) {
         if (keep.has(runId)) continue
         const journal = await load(runId)
-        if (journal && invoices(journal).some((i) => i.state === 'needs_check' || i.state === 'id_found')) continue
+        if (journal && invoices(journal).some((i) => i.state === 'needs_check' || i.state === 'id_found' || i.flagSync)) continue
         await serially(() => rm(file(runId), { force: true }))
       }
     },
@@ -455,31 +485,40 @@ export function createJournal({
     },
 
     /**
-     * What each invoice of `month` is flagged with, newest run first — the page reads this next to the API's own
-     * draft state. Resolved entries and invoices that ended well carry no flag.
+     * Sends every queued needs-check to the server, and resolves the server's flag for every invoice that has since
+     * been settled here (M13). Runs when the app opens, before a run plans and after it ends; a run still in flight
+     * is included, because a flag is only ever news. One push at a time, so nothing is sent twice in parallel.
      */
-    async flags(month: string): Promise<Record<string, InvoiceFlag>> {
-      const runs = (await loadAll()).filter((j) => j.month === month)
-      const flags: Record<string, InvoiceFlag> = {}
-      for (const journal of runs) {
-        for (const firm of journal.firms) {
-          for (const invoice of firm.invoices) {
-            if (invoice.state !== 'needs_check' || invoice.resolved) {
-              delete flags[invoice.contractId] // a later run settled it
-              continue
-            }
-            flags[invoice.contractId] = {
-              runId: journal.runId,
-              code: invoice.code ?? 'UNEXPECTED',
-              message: invoice.message ?? '',
-              ...(invoice.didoxId === undefined ? {} : { didoxId: invoice.didoxId }),
-              ...(invoice.candidateIds === undefined ? {} : { candidateIds: invoice.candidateIds }),
-              at: journal.finishedAt ?? journal.startedAt,
+    pushFlags(api: FlagSink): Promise<PushResult> {
+      pushing ??= (async () => {
+        const result: PushResult = { sent: 0, cleared: 0, left: 0, unauthorized: false }
+        for (const journal of await loadAll()) {
+          for (const firm of journal.firms) {
+            for (const invoice of firm.invoices.filter((i) => i.flagSync === 'pending' || i.flagSync === 'clear')) {
+              if (result.unauthorized) {
+                result.left++
+                continue
+              }
+              const outcome = pushOutcome(await sendFlag(api, journal, invoice), invoice.flagSync === 'clear')
+              if (outcome === 'unauthorized') {
+                result.unauthorized = true
+                result.left++
+              } else if (outcome === 'retry') {
+                result.left++
+              } else {
+                // Done, or refused for good (the contract was deleted, a 400 that will never pass): stop sending it.
+                await settleSync(journal.runId, firm.tin, invoice, outcome === 'done' && invoice.flagSync === 'pending' ? 'sent' : undefined)
+                if (outcome === 'done' && invoice.flagSync === 'clear') result.cleared++
+                else if (outcome === 'done') result.sent++
+              }
             }
           }
         }
-      }
-      return flags
+        return result
+      })().finally(() => {
+        pushing = null
+      })
+      return pushing
     },
 
     /** Invoices of `month` whose save started but whose draft was never identified — §5 may still find it. */
@@ -498,6 +537,60 @@ export function createJournal({
 
 export type Journal = ReturnType<typeof createJournal>
 export type RunHandle = Awaited<ReturnType<Journal['start']>>
+
+/** One queued entry to the server: its needs-check, or the resolve of a flag it no longer deserves. */
+function sendFlag(api: FlagSink, journal: RunJournal, invoice: InvoiceEntry): Promise<FlagWriteResult> {
+  if (invoice.flagSync === 'clear') return api.resolveNeedsCheck(journal.month, invoice.contractId)
+  return api.recordNeedsCheck(journal.month, invoice.contractId, {
+    runId: journal.runId,
+    code: invoice.code ?? 'UNEXPECTED',
+    message: invoice.message ?? '',
+    ...(invoice.didoxId === undefined ? {} : { didoxId: invoice.didoxId }),
+    ...(invoice.candidateIds === undefined ? {} : { candidateIds: invoice.candidateIds }),
+  })
+}
+
+/** How a flag write ended: `done`, try again later, stop everything (the robot key was refused), or never again. */
+function pushOutcome(answer: FlagWriteResult, isResolve: boolean): 'done' | 'retry' | 'unauthorized' | 'refused' {
+  if (answer.ok) return 'done'
+  if (answer.status === 401) return 'unauthorized'
+  if (answer.status === 0 || answer.status >= 500 || answer.status === 408 || answer.status === 429) return 'retry'
+  // A resolve the server has nothing for has reached its goal: there is no unresolved flag.
+  return isResolve && answer.status === 404 ? 'done' : 'refused'
+}
+
+const isOpenNeedsCheck = (invoice: InvoiceEntry | undefined) => !!invoice && invoice.state === 'needs_check' && !invoice.resolved
+
+/** What the server shows of a needs-check; a change in any of these is news for the other accountants. */
+const flagChanged = (a: InvoiceEntry, b: InvoiceEntry) =>
+  a.state !== b.state ||
+  a.code !== b.code ||
+  a.message !== b.message ||
+  a.didoxId !== b.didoxId ||
+  JSON.stringify(a.candidateIds ?? []) !== JSON.stringify(b.candidateIds ?? [])
+
+/**
+ * Queues the server side of what just changed: a new or changed needs-check is to be sent; an invoice that left it
+ * — or was marked in any run — is to have the server's flag resolved. A local "resolved" mirrors a resolution that
+ * already happened on the server, so nothing is queued for it.
+ */
+function queueFlagSync(before: RunJournal, after: RunJournal): void {
+  for (const firm of after.firms) {
+    for (const invoice of firm.invoices) {
+      const previous = before.firms.find((f) => f.tin === firm.tin)?.invoices.find((i) => i.contractId === invoice.contractId)
+      const was = isOpenNeedsCheck(previous)
+      if (isOpenNeedsCheck(invoice)) {
+        if (!was || flagChanged(previous!, invoice)) invoice.flagSync = 'pending'
+      } else if (invoice.resolved && was) {
+        delete invoice.flagSync
+      } else if (was || (invoice.state === 'marked' && previous?.state !== 'marked')) {
+        // Marked in any run: a needs-check another computer left on this invoice is settled too (a resolve the
+        // server has no flag for is answered 404 and dropped).
+        invoice.flagSync = 'clear'
+      }
+    }
+  }
+}
 
 /** 409s carry the API's own code (AMOUNT_CHANGED, DRAFT_CHANGED, or the warning that needs a person). */
 function rejectionCode(result: Extract<MarkDraftResult, { ok: false }>): string {
