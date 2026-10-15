@@ -346,13 +346,14 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
 
   const getRun = async (runId: string) => (deps.drafts ? deps.drafts.journal.read(runId) : null)
 
-  const invoiceFlags = async (month: string): Promise<Record<string, InvoiceFlag & { skipped?: { at: string } }>> => {
+  /** The shape the web reads (`DidoxInvoiceFlags` in apps/web/src/lib/desktop.ts): both flags nested, either may be absent. */
+  const invoiceFlags = async (month: string): Promise<Record<string, { needsCheck?: InvoiceFlag; skipped?: { at: string } }>> => {
     if (!deps.drafts) return {}
     const [needsCheck, skipped] = await Promise.all([deps.drafts.journal.flags(month), deps.drafts.skips.list(month)])
-    const flags: Record<string, InvoiceFlag & { skipped?: { at: string } }> = {}
-    for (const [contractId, flag] of Object.entries(needsCheck)) flags[contractId] = flag
+    const flags: Record<string, { needsCheck?: InvoiceFlag; skipped?: { at: string } }> = {}
+    for (const [contractId, flag] of Object.entries(needsCheck)) flags[contractId] = { needsCheck: flag }
     for (const [contractId, flag] of Object.entries(skipped)) {
-      flags[contractId] = { ...(flags[contractId] ?? ({} as InvoiceFlag)), skipped: { at: flag.at } }
+      flags[contractId] = { ...flags[contractId], skipped: { at: flag.at } }
     }
     return flags
   }

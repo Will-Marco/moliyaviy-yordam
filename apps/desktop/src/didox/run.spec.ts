@@ -503,8 +503,21 @@ describe('what the invoices page reads (c2)', () => {
 
     const flags = await runner.invoiceFlags('2026-09')
 
-    expect(flags['c-1']).toMatchObject({ code: 'SAVED_ID_UNKNOWN', message: 'topilmadi' })
-    expect(flags['c-2']).toMatchObject({ skipped: { at: expect.any(String) } })
+    // The web reads `needsCheck` nested (apps/web/src/lib/desktop.ts DidoxInvoiceFlags); returned flat, the
+    // "e'tibor kerak" badge and its actions never showed in the real app.
+    expect(flags['c-1']).toEqual({ needsCheck: expect.objectContaining({ code: 'SAVED_ID_UNKNOWN', message: 'topilmadi' }) })
+    expect(flags['c-2']).toEqual({ skipped: { at: expect.any(String) } })
+  })
+
+  it('keeps both when an invoice that needs attention is also skipped', async () => {
+    const { journal, drafts } = await withStores()
+    await flagged(journal)
+    const { runner } = setup({ drafts })
+    await runner.skipInvoice({ month: '2026-09', contractId: 'c-1', skip: true })
+
+    expect(await runner.invoiceFlags('2026-09')).toEqual({
+      'c-1': { needsCheck: expect.objectContaining({ code: 'SAVED_ID_UNKNOWN' }), skipped: { at: expect.any(String) } },
+    })
   })
 
   it('takes the skip off again', async () => {
