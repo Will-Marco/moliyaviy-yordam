@@ -68,7 +68,7 @@ Hajm: `trivial | standard | complex`
   PowerShell 5.1 da yo'q, birinchi belgida yiqilib "interrupted" berardi; endi `[uint16]` + PS 5.1 da yo'q tur
   nomlariga test; (2) "Кириш" arm'dan 300 ms keyin bosilardi — `powershell.exe` 1 s+ da ko'tariladi, dialog
   typist qaramasdan ochilib "allaqachon ochiq" bo'lardi; endi typist `READY` chiqaradi va login shundan keyin
-  bosadi (macOS ham; macOS'da real E-IMZO bilan qayta sinalmagan). Runbook: `Set-ExecutionPolicy` qadami; Electron
+  bosadi (macOS ham — Mac'da real E-IMZO bilan "Kirishni tekshirish" `typed`, 2026-10-15). Runbook: `Set-ExecutionPolicy` qadami; Electron
   44 binary'ni `pnpm install` emas, birinchi `pnpm dev:desktop` yuklaydi (`60a787a`). Sir: Didox'da sinov
   qoralamalari faqat zarur bo'lganda — W5 jadvali qoralama belgisi qoldirilib (`NOTHING_TO_DO`) Didox'siz sinaldi.
   Ma'lum: desktop'ning 4 testi Windows'da yiqiladi (POSIX fayl ruxsati, yo'l ajratuvchisi) — ilova kodi emas, testlarning o'zi
