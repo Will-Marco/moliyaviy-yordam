@@ -180,3 +180,18 @@ ma'lumotni qayerdan o'qishi va natijani qayerga yozishi. Ilova hamon **hech qach
 
 CONSTITUTION §5 (serverdagi snapshot), §13 (masofaviy origin xavfi), §16 (lokal → server), Tech stack ("Infra:
 lokal o'rnatish" → server); SRS §1, §2, §7, Modul 9 sarlavhasi ("server yo'q"), FR-8.7, FR-8.10, FR-9.x.
+
+## 10. P6b (desktop → server mijozi) — rejadan farqlar (2026-10-15)
+
+- **Robot kaliti serverdan olinadi** (Sir qarori, 2026-10-15; §4.1/§4.2 dagi "desktop `ROBOT_SECRET` bilan o'zi yasaydi"
+  o'rniga): buxgalter kirgan paytda main uning `session` cookie'si bilan `POST /api/auth/robot-token` so'raydi, javobni
+  `safeStorage` bilan saqlaydi (`userData/robot-token.json`); yo'q bo'lsa, 30 kundan kam qolsa yoki API 401 bersa —
+  keyingi kirishda yangilanadi. Kalit yo'q bo'lsa run boshlanmaydi: "Ilovaga qayta kiring — robot kaliti yo'q yoki eskirgan".
+- **Kompyuter nomi** (`createdByInstall`) — `<hostname> (<installId ning 8 belgisi>)`. Ko'chishda (`migrate-data.ts
+  --install`) yozilgan bayroqlar boshqa nom bilan turadi, shuning uchun o'sha kompyuterda ham "… dagi buxgalter
+  tekshirishi kerak" deb ko'rinadi (tiklash baribir lokal jurnal bo'yicha ishlaydi).
+- **O'tkazib yuborish brauzerdan ham** mumkin (bayroq serverda; nom — "Brauzer").
+- Robot qoralamani belgilagan fakturada serverdagi "e'tibor kerak" bayrog'i yopiladi (eski `journal.flags` ham shunday
+  qilardi); buxgalter serverda yopgan bayroqni tiklash qayta qidirmaydi va qayta ochmaydi.
+- Server javob bermasa jadval urinishi **yozilmaydi** (oy yopilmaydi, urinishlar soni ham sarflanmaydi) — server
+  qaytguncha har soatda qayta qaraladi.
