@@ -1,6 +1,8 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  // didox_invoice_flag: "one unresolved flag per invoice" is a partial unique index (M13 §4.1).
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -32,23 +34,24 @@ model Company {
 
 /// Moliyaviy yordam shartnomasi (SRS Modul 2). Pul — Decimal, sanalar — faqat sana.
 model Contract {
-  id            String         @id @default(uuid(7)) @db.Uuid
-  number        String         @db.VarChar(50)
+  id            String             @id @default(uuid(7)) @db.Uuid
+  number        String             @db.VarChar(50)
   /// Shartnoma imzolangan sana
-  signedOn      DateTime       @map("signed_on") @db.Date
-  lenderId      String         @map("lender_id") @db.Uuid
-  lender        Company        @relation("lender", fields: [lenderId], references: [id], onDelete: Restrict)
-  borrowerId    String         @map("borrower_id") @db.Uuid
-  borrower      Company        @relation("borrower", fields: [borrowerId], references: [id], onDelete: Restrict)
+  signedOn      DateTime           @map("signed_on") @db.Date
+  lenderId      String             @map("lender_id") @db.Uuid
+  lender        Company            @relation("lender", fields: [lenderId], references: [id], onDelete: Restrict)
+  borrowerId    String             @map("borrower_id") @db.Uuid
+  borrower      Company            @relation("borrower", fields: [borrowerId], references: [id], onDelete: Restrict)
   /// Jami berilishi mumkin bo'lgan summa (CR-7)
-  limitAmount   Decimal        @map("limit_amount") @db.Decimal(18, 2)
-  startDate     DateTime       @map("start_date") @db.Date
-  endDate       DateTime       @map("end_date") @db.Date
+  limitAmount   Decimal            @map("limit_amount") @db.Decimal(18, 2)
+  startDate     DateTime           @map("start_date") @db.Date
+  endDate       DateTime           @map("end_date") @db.Date
   rateChanges   RateChange[]
   operations    Operation[]
   invoiceDrafts InvoiceDraft[]
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  didoxFlags    DidoxInvoiceFlag[]
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([lenderId, borrowerId, number])
   @@index([borrowerId])
@@ -116,4 +119,30 @@ model InvoiceDraft {
   @@unique([contractId, month])
   @@index([month])
   @@map("invoice_drafts")
+}
+
+/// Didox roboti faktura bo'yicha qoldirgan belgi (M13 §4.1): "e'tibor kerak" yoki "bu oy o'tkazib yuborilsin".
+/// Serverda turadi — bir buxgalter ko'rgan belgi hammada ko'rinadi. Hal qilingani o'chirilmaydi, `resolved_at` oladi.
+model DidoxInvoiceFlag {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  contractId       String    @map("contract_id") @db.Uuid
+  contract         Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  /// "yyyy-mm"
+  month            String    @db.Char(7)
+  /// "needs_check" | "skipped". CHECK in migration.
+  state            String    @db.VarChar(12)
+  code             String    @db.VarChar(50)
+  message          String    @db.VarChar(1000)
+  didoxDocumentId  String?   @map("didox_document_id") @db.VarChar(100)
+  /// Didox documents the robot could not tell apart; empty (or NULL) when there were none.
+  candidateIds     String[]  @map("candidate_ids")
+  runId            String?   @map("run_id") @db.VarChar(100)
+  /// The desktop install that recorded it — only that computer can recover an interrupted save (M13 §4.2).
+  createdByInstall String    @map("created_by_install")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  resolvedAt       DateTime? @map("resolved_at") @db.Timestamptz(3)
+
+  @@unique([contractId, month, state], map: "didox_invoice_flag_unresolved_key", where: raw("resolved_at IS NULL"))
+  @@index([month])
+  @@map("didox_invoice_flag")
 }
