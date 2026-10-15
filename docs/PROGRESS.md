@@ -24,7 +24,7 @@
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
 | 11 | Shartnomalar ro'yxati | Buxgalter shartnomalarni qidiradi, filtrlaydi, saralaydi; beruvchi/oluvchi alohida | standard | accepted | FR-11.1–11.4; web 153; brauzerda GAMMA → 2, DELTA AGRO → 2 | 2026-10-11 |
 | 12 | Davr hisoboti va Excel | Buxgalter davr tanlab shartnomalar harakatini ko'radi va Excel'ga yuklaydi | complex | accepted | FR-12.1–12.3; API unit 111 + e2e 110 (etalon yanvar–fevral, Excel qayta o'qiladi); brauzerda davr + Excel | 2026-10-11 |
-| 13 | Umumiy server | Barcha buxgalterlar bitta ma'lumotni ko'radi; desktop — serverga mijoz + Didox roboti | complex | pending (reja qabul qilindi 2026-10-15) | `docs/plans/M13-shared-server.md` v2; 13a server muhiti → 13b ko'chish (bir qadamda) → 13c umumiy bayroqlar | |
+| 13 | Umumiy server | Barcha buxgalterlar bitta ma'lumotni ko'radi; desktop — serverga mijoz + Didox roboti | complex | in-progress (13a lokal tayyor) | `docs/plans/M13-shared-server.md` v2; 13a server muhiti → 13b ko'chish (bir qadamda) → 13c umumiy bayroqlar. **13a (2026-10-15):** `deploy/` (compose: postgres + migrate + api + caddy), `deploy.sh` (snapshot → build → migrate), `pg-backup.sh` / `restore-test.sh`, `docs/runbooks/server-setup.md`; lokal (colima) sinaldi — https/Secure cookie, login cheklovi proxy ortida, zaxira → bo'sh bazaga tiklash, redeploy, dump'dan tiklash. **Kutilmoqda:** VPS, domen, tashqi zaxira joyi (Sir) | |
 
 Status: `pending → in-progress → review → accepted`
 Hajm: `trivial | standard | complex`
