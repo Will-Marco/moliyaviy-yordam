@@ -93,6 +93,10 @@ ERI parollari (`safeStorage`), Didox oynasi, run jurnali va diagnostika screensh
   kaliti). Shuning uchun bayroqda `created_by_install` bor va fakturalar ro'yxatida "bu fakturani <kompyuter> dagi
   buxgalter tekshirishi kerak" deb yoziladi.
 
+- **P6 qarorlari (Sir, 2026-10-15):** ERI paroli lokal oynada; run sahifadan so'raladi, lekin OS tasdiq oynasi bilan
+  boshlanadi; robot `ROBOT_SECRET` ning o'zini emas, login'dan keyin serverdan olingan 180 kunlik tokenni saqlaydi
+  (`safeStorage`) — PROGRESS qaror jurnali.
+
 ### 4.3 Web
 - O'zgarish deyarli yo'q: u allaqachon `/api` orqali gaplashadi va Nest uni statik beradi.
 - Didox bayroqlari endi API'dan keladi (desktop bridge o'rniga); desktop bridge faqat **run boshlash/kuzatish** uchun

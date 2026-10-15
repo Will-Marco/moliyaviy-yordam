@@ -55,6 +55,12 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-15 — **P6 (desktop → server mijozi) qarorlari — Sir:** (1) **ERI paroli faqat lokal oynada** kiritiladi (ilova
+  ichidagi alohida oyna) — serverdan kelgan sahifa parolni hech qachon ko'rmaydi; (2) "Didox'da qoralama yaratish" va
+  "Kirishni tekshirish" sahifada qoladi, lekin **har safar OS'ning o'z oynasi tasdiq so'raydi** — sahifa kodi uni bosa
+  olmaydi; (3) server manzili birinchi ishga tushishda kiritiladi, **robot kaliti login'dan keyin serverdan olinadi** —
+  amalda `ROBOT_SECRET` ning o'zi emas, u bilan imzolangan **180 kunlik robot tokeni** (`POST /api/auth/robot-token`, faqat
+  odam sessiyasi bilan); sir serverdan chiqmaydi, `ROBOT_SECRET` almashtirilsa barcha tokenlar bekor bo'ladi
 - 2026-10-15 — **M13 (umumiy server) rejasi v2 qabul qilindi — Sir.** Qo'shimcha qarorlar: (1) Didox roboti **faqat
   desktop'ning o'zidan** (tray yoki lokal oyna) boshlanadi, serverdagi sahifa holatni faqat ko'rsatadi (CONSTITUTION §13);
   (2) **har ERI kaliti faqat bitta kompyuterda** — oy qulfi jadvali qilinmaydi. CONSTITUTION §5/§13/§16 + Tech stack va
