@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { isTrustedSender } from './trust.js'
+import { isExternalWebUrl, isTrustedSender } from './trust.js'
+
+describe('isExternalWebUrl', () => {
+  it('lets web links go to the browser', () => {
+    expect(isExternalWebUrl('https://didox.uz/')).toBe(true)
+    expect(isExternalWebUrl('http://example.uz/help')).toBe(true)
+  })
+
+  it('keeps every other scheme from reaching the OS', () => {
+    for (const url of ['file:///C:/Windows/System32/calc.exe', 'smb://evil/share', 'ms-msdt:/id', 'javascript:alert(1)', 'not a url']) {
+      expect(isExternalWebUrl(url), url).toBe(false)
+    }
+  })
+})
 
 const app = { webContentsId: 7, origin: 'https://moliya.example.uz' }
 

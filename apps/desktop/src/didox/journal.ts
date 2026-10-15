@@ -281,7 +281,8 @@ export function createJournal({
       else invoice.flagSync = next
     })
 
-  let pushing: Promise<PushResult> | null = null
+  /** Pushes run one after another; each is a full pass over what is on disk when it starts. */
+  let pushes: Promise<unknown> = Promise.resolve()
 
   async function mark(markDraft: MarkDraft, journal: RunJournal, firm: FirmEntry, invoice: InvoiceEntry) {
     if (!invoice.didoxId) {
@@ -487,10 +488,11 @@ export function createJournal({
     /**
      * Sends every queued needs-check to the server, and resolves the server's flag for every invoice that has since
      * been settled here (M13). Runs when the app opens, before a run plans and after it ends; a run still in flight
-     * is included, because a flag is only ever news. One push at a time, so nothing is sent twice in parallel.
+     * is included, because a flag is only ever news. One push at a time, so nothing is sent twice in parallel; a push
+     * asked for while another is going runs after it, over what is queued by then.
      */
     pushFlags(api: FlagSink): Promise<PushResult> {
-      pushing ??= (async () => {
+      const pass = async (): Promise<PushResult> => {
         const result: PushResult = { sent: 0, cleared: 0, left: 0, unauthorized: false }
         for (const journal of await loadAll()) {
           for (const firm of journal.firms) {
@@ -515,10 +517,10 @@ export function createJournal({
           }
         }
         return result
-      })().finally(() => {
-        pushing = null
-      })
-      return pushing
+      }
+      const next = pushes.then(pass, pass)
+      pushes = next.catch(() => undefined)
+      return next
     },
 
     /** Invoices of `month` whose save started but whose draft was never identified — §5 may still find it. */
@@ -550,10 +552,13 @@ function sendFlag(api: FlagSink, journal: RunJournal, invoice: InvoiceEntry): Pr
   })
 }
 
-/** How a flag write ended: `done`, try again later, stop everything (the robot key was refused), or never again. */
+/**
+ * How a flag write ended: `done`, try again later, stop everything, or never again. 401 and 403 say the robot's key
+ * is not accepted — nothing about the flag — so they stop the push and keep everything queued.
+ */
 function pushOutcome(answer: FlagWriteResult, isResolve: boolean): 'done' | 'retry' | 'unauthorized' | 'refused' {
   if (answer.ok) return 'done'
-  if (answer.status === 401) return 'unauthorized'
+  if (answer.status === 401 || answer.status === 403) return 'unauthorized'
   if (answer.status === 0 || answer.status >= 500 || answer.status === 408 || answer.status === 429) return 'retry'
   // A resolve the server has nothing for has reached its goal: there is no unresolved flag.
   return isResolve && answer.status === 404 ? 'done' : 'refused'

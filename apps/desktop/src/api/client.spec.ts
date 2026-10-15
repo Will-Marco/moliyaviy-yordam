@@ -51,15 +51,15 @@ const listBody = {
 
 describe('createApiClient (M8c §6, M13 P6b)', () => {
   let token: string | null = TOKEN
-  let refused = 0
+  let refused: string[] = []
 
   beforeEach(() => {
     token = TOKEN
-    refused = 0
+    refused = []
   })
 
   const client = (f: FetchLike) =>
-    createApiClient({ baseUrl: BASE, token: async () => token, install: INSTALL, onUnauthorized: () => void refused++, fetch: f })
+    createApiClient({ baseUrl: BASE, token: async () => token, install: INSTALL, onUnauthorized: (t) => void refused.push(t), fetch: f })
 
   describe('listInvoices', () => {
     it("reads a month from the server with the robot's token as its session cookie", async () => {
@@ -96,7 +96,7 @@ describe('createApiClient (M8c §6, M13 P6b)', () => {
     it('throws ApiError on 401 and reports the refused token — the run stops rather than guessing', async () => {
       const { fetch } = fakeFetch([{ status: 401, body: { message: 'Sessiya tugagan. Qaytadan kiring.' } }])
       await expect(client(fetch).listInvoices('2026-09')).rejects.toMatchObject({ status: 401, code: 'UNAUTHORIZED' })
-      expect(refused).toBe(1)
+      expect(refused).toEqual([TOKEN])
     })
 
     it('sends nothing without a robot token and asks the person to log in again', async () => {

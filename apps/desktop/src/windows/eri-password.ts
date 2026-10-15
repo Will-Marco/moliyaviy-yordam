@@ -32,6 +32,9 @@ export function createEriPasswordWindows({
 }) {
   let current: Open | null = null
   const fromCurrent = (event: Parameters<typeof isFrom>[1]) => isFrom(current?.win ?? null, event)
+  /** E-IMZO only names the firm and the key serial; a slow or hung E-IMZO must not hold the window up. */
+  const keysWithin = (tin: string) =>
+    Promise.race([readKeys([tin]).catch(() => null), new Promise<null>((ok) => setTimeout(() => ok(null), NAME_WAIT_MS))])
 
   /** The firm as this computer knows it: STIR, and the organisation on its E-IMZO key when E-IMZO answers. */
   ipcMain.handle('eri-window:info', (event) => {
@@ -45,7 +48,7 @@ export function createEriPasswordWindows({
     if (password.length > MAX_PASSWORD) return { ok: false, message: 'Parol juda uzun' }
     const open = current
     // Tie the password to the key it unlocks, so a replaced key asks again (null if E-IMZO is not running now).
-    const key = (await readKeys([open.tin]).catch(() => null))?.get(open.tin)
+    const key = (await keysWithin(open.tin))?.get(open.tin)
     try {
       await eri.set(open.tin, password, key && key.status !== 'missing' ? key.key.serial : null)
     } catch (error) {
@@ -60,36 +63,56 @@ export function createEriPasswordWindows({
     if (fromCurrent(event)) current?.win.close()
   })
 
+  /** Set from the first moment of an open, before anything is awaited, so two requests never make two windows. */
+  let opening: { tin: string; closed: Promise<{ saved: boolean }> } | null = null
+
+  async function create(tin: string): Promise<{ saved: boolean }> {
+    const keys = await keysWithin(tin)
+    const key = keys?.get(tin)
+    const win = localWindow({
+      title: 'ERI paroli',
+      width: 440,
+      height: 380,
+      preload: join(assets, 'eri-password-preload.cjs'),
+      parent: parent(),
+    })
+    let finish: (result: { saved: boolean }) => void = () => undefined
+    const open: Open = {
+      win,
+      tin,
+      name: key && key.status !== 'missing' ? key.key.org : null,
+      saved: false,
+      closed: new Promise((ok) => (finish = ok)),
+    }
+    current = open
+    win.on('closed', () => {
+      if (current === open) current = null
+      finish({ saved: open.saved })
+    })
+    // Closing the window before the page has loaded rejects the load; `closed` above has already answered.
+    win.loadFile(join(assets, 'eri-password.html')).catch(() => undefined)
+    return open.closed
+  }
+
   return {
-    /** Opens (or focuses) the window; resolves once it is closed. One at a time — a second request waits on the first. */
-    async open(tin: string): Promise<{ saved: boolean }> {
-      if (current) {
-        current.win.focus()
-        return current.closed
+    /**
+     * Opens the window for `tin`; resolves once it is closed. One window at a time: a request for the same firm waits
+     * on the open one, a request for another firm only brings the open one forward and reports nothing saved.
+     */
+    open(tin: string): Promise<{ saved: boolean }> {
+      const busy = current ?? opening
+      if (busy) {
+        current?.win.focus()
+        return busy.tin === tin ? busy.closed : Promise.resolve({ saved: false })
       }
-      const key = (await readKeys([tin]).catch(() => null))?.get(tin)
-      const win = localWindow({
-        title: 'ERI paroli',
-        width: 440,
-        height: 380,
-        preload: join(assets, 'eri-password-preload.cjs'),
-        parent: parent(),
+      const closed = create(tin).finally(() => {
+        opening = null
       })
-      let finish: (result: { saved: boolean }) => void = () => undefined
-      const open: Open = {
-        win,
-        tin,
-        name: key && key.status !== 'missing' ? key.key.org : null,
-        saved: false,
-        closed: new Promise((ok) => (finish = ok)),
-      }
-      current = open
-      win.on('closed', () => {
-        if (current === open) current = null
-        finish({ saved: open.saved })
-      })
-      void win.loadFile(join(assets, 'eri-password.html'))
-      return open.closed
+      opening = { tin, closed }
+      return closed
     },
   }
 }
+
+/** How long E-IMZO is waited for: past it the window opens with the STIR alone, and a password is saved untied to a key serial. */
+const NAME_WAIT_MS = 3_000

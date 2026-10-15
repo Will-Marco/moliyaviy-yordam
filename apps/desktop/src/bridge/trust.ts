@@ -7,6 +7,19 @@ export function isSameOrigin(url: string, origin: string): boolean {
   }
 }
 
+/**
+ * Only web links leave the app for the browser. The page now comes from the internet (M13), and handing the OS a
+ * `file:`, `smb:` or custom-protocol URL from it is a known route from a page to running local programs.
+ */
+export function isExternalWebUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url)
+    return protocol === 'https:' || protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
 /** IPC handlers answer only the app window, and only while it shows the app's own origin. */
 export function isTrustedSender(
   sender: { senderId: number; frameUrl: string },

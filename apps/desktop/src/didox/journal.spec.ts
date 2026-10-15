@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FlagWriteResult, MarkDraftBody, MarkDraftResult } from '../api/client.js'
 import { createJournal, type FlagSink, type InvoiceEntry, type RunJournal } from './journal.js'
 
@@ -555,6 +555,33 @@ describe('pushFlags — every needs-check reaches the shared server (M13)', () =
 
     expect(await j.pushFlags(server.sink)).toEqual({ sent: 0, cleared: 0, left: 2, unauthorized: true })
     expect(server.calls).toHaveLength(1)
+  })
+
+  it('keeps the flags queued when the server forbids the robot (403) — a key problem, not the flag', async () => {
+    const { j, run } = await flagged()
+
+    expect(await j.pushFlags(fakeServer([{ ok: false, status: 403, message: 'Forbidden' }]).sink)).toMatchObject({ left: 1, unauthorized: true })
+    expect(await sync(j, run.runId)).toBe('pending')
+  })
+
+  it('does a full pass of its own when asked while another push is still going', async () => {
+    const { j, run } = await flagged()
+    let release: (() => void) | null = null
+    const slow: FlagSink = {
+      recordNeedsCheck: () => new Promise((ok) => (release = () => ok({ ok: true }))),
+      resolveNeedsCheck: async () => ({ ok: true }),
+    }
+    const first = j.pushFlags(slow)
+    await vi.waitFor(() => expect(release).not.toBeNull())
+    // A newer needs-check arrives while the first push is waiting on the server.
+    await run.setInvoice('300000001', 'c2', { state: 'needs_check', code: 'COUNTERPARTY_MISMATCH', message: 'nom mos emas' })
+    const server = fakeServer()
+    const second = j.pushFlags(server.sink)
+    release!()
+    await first
+
+    expect(await second).toMatchObject({ sent: 1 })
+    expect(server.calls.map((c) => c.contractId)).toEqual(['c2'])
   })
 
   it('gives up on a flag the server refuses for good (the contract is gone)', async () => {

@@ -91,7 +91,7 @@ export function createApiClient({
   baseUrl,
   token,
   install,
-  onUnauthorized = () => undefined,
+  onUnauthorized = (_refused: string) => undefined,
   fetch = globalThis.fetch,
 }: {
   baseUrl: string
@@ -99,7 +99,8 @@ export function createApiClient({
   token: () => Promise<string | null>
   /** This install's label, written as `createdByInstall` on the flags it records. */
   install: string
-  onUnauthorized?: () => void
+  /** Told which token the server refused (a renewal may already have replaced it). */
+  onUnauthorized?: (refused: string) => void
   fetch?: FetchLike
 }) {
   const root = `${baseUrl.replace(/\/+$/, '')}/api`
@@ -108,7 +109,7 @@ export function createApiClient({
     const current = await token()
     if (!current) throw new NoToken()
     const res = await fetch(url, { ...init, headers: { ...init.headers, cookie: `${SESSION_COOKIE}=${current}` } })
-    if (res.status === 401) onUnauthorized()
+    if (res.status === 401) onUnauthorized(current)
     return res
   }
 

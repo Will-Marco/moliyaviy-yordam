@@ -106,8 +106,15 @@ export function createRobotKey(deps: RobotKeyDeps) {
     token: async (): Promise<string | null> => (await deps.store.get())?.token ?? null,
     /** Fetches a token when there is none or it runs out soon — only possible while a person is logged in. */
     ensure,
-    /** The server answered 401 to the robot: the token is useless, so drop it and try once to get another. */
-    async invalidate(): Promise<void> {
+    /**
+     * The server answered 401 to `refused`: drop it and try once to get another. Only that token is dropped — when two
+     * requests are refused together, the second must not erase what the first one's renewal just stored — and the
+     * renewal is a fresh one, not one already in flight that still read the old token as good.
+     */
+    async invalidate(refused: string): Promise<void> {
+      await inFlight?.catch(() => undefined)
+      const current = await deps.store.get()
+      if (current && current.token !== refused) return
       await deps.store.clear().catch(() => undefined)
       await ensure()
     },

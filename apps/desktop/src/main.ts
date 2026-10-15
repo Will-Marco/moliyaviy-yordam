@@ -5,7 +5,7 @@ import { createApiClient } from './api/client.js'
 import type { Confirm } from './bridge/confirm.js'
 import { createKeyReader, registerIpc, sendProgress } from './bridge/ipc.js'
 import { createDidoxRequests, type DidoxRequests } from './bridge/requests.js'
-import { isSameOrigin } from './bridge/trust.js'
+import { isExternalWebUrl, isSameOrigin } from './bridge/trust.js'
 import { type AppConfig, installLabel, loadConfig } from './config.js'
 import { autotypePreflight, typeEimzoPassword } from './didox/autotype/index.js'
 import { createJournal } from './didox/journal.js'
@@ -71,23 +71,42 @@ function appWindow(origin: string, onLoad: () => void): BrowserWindow {
       preload: join(assets, 'app-preload.cjs'),
     },
   })
+  // Only web links reach the browser: the page is from the internet, and other schemes can start local programs.
+  const openOutside = (url: string) => {
+    if (isExternalWebUrl(url)) void shell.openExternal(url).catch(() => undefined)
+  }
   // Keep the window on the server's origin (parsed, so `https://host@evil` lookalikes fail); other links go to the browser.
   win.webContents.on('will-navigate', (event, url) => {
     if (!isSameOrigin(url, origin)) {
       event.preventDefault()
-      void shell.openExternal(url)
+      openOutside(url)
     }
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
+    openOutside(url)
     return { action: 'deny' }
   })
   win.webContents.on('did-finish-load', onLoad)
+  /*
+   * Server down (M13 §7.1: accepted, the app then does not work): Chromium shows its error page and the window tries
+   * the server again every so often, so the app comes back by itself when the server does.
+   */
+  win.webContents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
+    if (!isMainFrame || code === ABORTED) return
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.loadURL(origin).catch(() => undefined)
+    }, RELOAD_AFTER_FAIL_MS)
+  })
   // Nobody would see the run's result: stop driving Didox.
   win.on('closed', () => didox?.cancel())
-  void win.loadURL(origin)
+  // A failed load is handled by did-fail-load above; the rejection itself says nothing more.
+  win.loadURL(origin).catch(() => undefined)
   return win
 }
+
+/** Chromium's ERR_ABORTED: a navigation replaced by another one, not a failure. */
+const ABORTED = -3
+const RELOAD_AFTER_FAIL_MS = 15_000
 
 /** The person's server session, read in main only: the robot asks for its own key with it (M13 P6b). */
 async function personSession(origin: string): Promise<string | null> {
@@ -139,7 +158,7 @@ function wire(config: AppConfig): RobotKey {
     if (!removed && cookie.name === SESSION_COOKIE) void robot.ensure()
   })
 
-  const api = createApiClient({ baseUrl: origin, token: robot.token, install: label, onUnauthorized: () => void robot.invalidate() })
+  const api = createApiClient({ baseUrl: origin, token: robot.token, install: label, onUnauthorized: (refused) => void robot.invalidate(refused) })
   /*
    * c1 shipped with DIDOX_MAX_INVOICES=1: one invoice went through end to end before a run was allowed to do many.
    * It stays as a cap for a careful first run on a new computer.
@@ -337,12 +356,12 @@ function createTray(): void {
 /** The tray says what the app is waiting for; it is the one channel that needs nobody's permission. */
 function refreshTray(): void {
   if (!tray) return
-  const month = monthToBill(Date.now())
   tray.setToolTip(waitingMonth ? `Moliyaviy yordam — ${waitingMonth} Didox qoralamalari kutmoqda` : 'Moliyaviy yordam')
   tray.setContextMenu(
     Menu.buildFromTemplate([
       ...(waitingMonth ? [{ label: `${waitingMonth}: Didox qoralamalari kutmoqda`, enabled: false }] : []),
-      ...(requests ? [{ label: `Didox'da qoralama yaratish (${month})`, click: () => void startFromTray() }, { type: 'separator' as const }] : []),
+      // No month in the label: it would go stale across a month's end; the confirmation names the month.
+      ...(requests ? [{ label: "Didox'da qoralama yaratish (o'tgan oy)", click: () => void startFromTray() }, { type: 'separator' as const }] : []),
       { label: 'Ilovani ochish', click: () => void open() },
       { type: 'separator' as const },
       { label: 'Chiqish', click: () => app.quit() },

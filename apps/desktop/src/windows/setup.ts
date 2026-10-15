@@ -17,7 +17,7 @@ export function openSetupWindow({ assets, userData, onDone }: { assets: string; 
   }
   register(userData, onDone)
   setupWin = localWindow({ title: 'Moliyaviy yordam — sozlash', width: 460, height: 420, preload: join(assets, 'setup-preload.cjs') })
-  void setupWin.loadFile(join(assets, 'setup.html'))
+  setupWin.loadFile(join(assets, 'setup.html')).catch(() => undefined)
   return setupWin
 }
 

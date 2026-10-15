@@ -108,9 +108,35 @@ describe('createRobotKey', () => {
   it('drops a token the server refused and fetches a new one when it can', async () => {
     const s = setup({ stored: { token: 'refused.token.value', expiresAt: new Date(NOW + 100 * DAY).toISOString() } })
 
-    await s.key.invalidate()
+    await s.key.invalidate('refused.token.value')
 
     expect(s.store.clear).toHaveBeenCalled()
+    expect(s.obtain).toHaveBeenCalledTimes(1)
+    expect(await s.key.token()).toBe(TOKEN)
+  })
+
+  it('does not drop a token that already replaced the refused one (two requests refused at once)', async () => {
+    const s = setup({ stored: { token: 'fresh.token.value', expiresAt: new Date(NOW + 180 * DAY).toISOString() } })
+
+    await s.key.invalidate('refused.token.value')
+
+    expect(s.store.clear).not.toHaveBeenCalled()
+    expect(await s.key.token()).toBe('fresh.token.value')
+  })
+
+  it('renews after a refusal even when a renewal that still trusted the old token was in flight', async () => {
+    let release: () => void = () => undefined
+    const old = { token: 'refused.token.value', expiresAt: new Date(NOW + 100 * DAY).toISOString() }
+    const s = setup({ stored: old })
+    // A renewal that reads the old token (still "good for 100 days") and so would not fetch a new one.
+    s.store.get.mockImplementationOnce(() => new Promise((ok) => (release = () => ok(old))))
+    const early = s.key.ensure()
+    await vi.waitFor(() => expect(s.store.get).toHaveBeenCalled())
+
+    const refused = s.key.invalidate('refused.token.value')
+    release()
+    await Promise.all([early, refused])
+
     expect(s.obtain).toHaveBeenCalledTimes(1)
     expect(await s.key.token()).toBe(TOKEN)
   })
@@ -118,7 +144,7 @@ describe('createRobotKey', () => {
   it('stays without a token after a refusal when nobody is logged in', async () => {
     const s = setup({ stored: { token: 'refused.token.value', expiresAt: new Date(NOW + 100 * DAY).toISOString() }, person: null })
 
-    await s.key.invalidate()
+    await s.key.invalidate('refused.token.value')
 
     expect(await s.key.token()).toBeNull()
   })
