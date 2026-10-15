@@ -8,7 +8,8 @@
 2. **Halollik:** taxmin yo'q; tekshirilmagan narsa "tayyor" emas.
 3. **TDD** — test-first (red → green → refactor).
 4. **Module-by-module** — har modul Sir tomonidan qabul qilinadi.
-5. Qaytarib bo'lmas operatsiya (deploy/migrate/delete/secret) — faqat Sir ruxsati bilan.
+5. Qaytarib bo'lmas operatsiya (deploy/migrate/delete/secret) — faqat Sir ruxsati bilan. Server bazasida migratsiya yoki
+   deploy'dan **oldin** `pg_dump` snapshot olinadi (M13, 2026-10-15).
 6. Avtonomiya: kod yozishda erkin, arxitektura/muhim qaror oldidan so'rash.
 
 ## Moliyaviy aniqlik (bu loyihaning eng muhim qonuni)
@@ -33,17 +34,25 @@
       imzolovchi funksiyalarini (`create_pkcs7` va h.k.) o'zi **chaqirmaydi**; E-IMZO'dan faqat kalit ro'yxatini o'qiydi.
     - `.pfx` fayli E-IMZO'da qoladi — ilova uni o'qimaydi, ko'chirmaydi. "Запомнить на 6 час." belgisi qo'yilmaydi.
     - Parol xato bo'lsa — to'xtash, firmani "parol xato" deb belgilash, **qayta urinish yo'q** (§15).
+    - **M13 (Sir, 2026-10-15):** UI serverdan (internetdagi origin) keladi. Shuning uchun Didox'ga kirishni boshlaydigan har
+      amal ("Kirishni tekshirish", qoralama yaratish) **faqat desktop ilovaning o'zidan** — tray menyusi yoki lokal oyna;
+      serverdagi sahifa robot holatini **faqat ko'rsatadi**. Server buzilsa ham u buxgalterning ERI kaliti bilan kirishni so'ray olmaydi.
 14. **Didox'ning partner tokeni yoki boshqa maxfiy kaliti ilova kodiga olinmaydi.** Ilova Didox API'sini to'g'ridan-to'g'ri
     chaqirmaydi; faqat buxgalter kirgan **sahifa (DOM)** bilan ishlaydi — xuddi buxgalter o'zi bosganidek. Sahifa Didox
     tokenini o'zi ishlatadi.
 15. Harakat **inson tezligida** (ketma-ket, parallel ommaviy so'rovsiz). Didox sahifasi kutilganidan farq qilsa —
     to'xtash va buxgalterga xabar, "taxmin bilan davom etish" yo'q. Login xatosida avtomatik qayta urinish yo'q.
-16. Ilova buxgalter kompyuterida lokal ishlaydi; Didox sessiyasi kompyuterdan faqat Didox'ga chiqadi.
+16. **Ma'lumot bitta umumiy serverda** (VPS, https) — barcha buxgalterlar bitta bazani ko'radi (M13, Sir 2026-10-15; avval —
+    har kompyuterda lokal baza, M13 qurilguncha amalda shu). E-IMZO, ERI kalitlari va parollari, Didox oynasi buxgalter
+    kompyuterida qoladi; Didox'ga faqat buxgalter kompyuteri chiqadi, server Didox'ni bilmaydi. **Bitta ERI kaliti faqat
+    bitta kompyuterda ishlatiladi** (Sir kafolati) — ikki robot bitta oyni bajarmasligi shunga va Didox'ning o'z ro'yxatiga tayanadi.
 
 ## Tech stack (qat'iy)
 - Backend: NestJS + Prisma + PostgreSQL
 - Frontend: React + Vite + TypeScript + shadcn/ui + Tailwind
-- Infra: lokal o'rnatish (Windows, har buxgalterga alohida) — qadoqlash usuli M9 rejasida tanlanadi (2026-10-11)
+- Infra: **server** — VPS (docker compose: postgres + api + caddy/https; mijoz to'laydi, biz sozlaymiz); **buxgalter
+  kompyuterida** — Electron desktop (Windows): serverdagi web'ni ochadi + E-IMZO va Didox roboti, lokal baza yo'q
+  (M13, Sir 2026-10-15; avvalgi "lokal o'rnatish, har buxgalterga alohida" — 2026-10-11 — o'rnini bosadi)
 - Monorepo: `apps/api`, `apps/web`
 
 ## Kod uslubi / konvensiyalar

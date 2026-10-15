@@ -3,7 +3,7 @@
 > Jarvis'ning diskdagi miyasi — holat uchun yagona haqiqat manbai.
 > Har Jarvis turida birinchi shu fayl o'qiladi.
 
-**Joriy modul:** M8 yopildi (Windows gate W1–W5 o'tdi, 2026-10-15) → keyingisi: M13 qarori, so'ng A1 (Windows o'rnatgich)
+**Joriy modul:** 13 — Umumiy server (reja qabul qilindi 2026-10-15; 13a uchun Sir'dan domen va tashqi zaxira joyi kerak)
 **Oxirgi yangilanish:** 2026-10-15
 
 ## Modullar
@@ -24,6 +24,7 @@
 | 10 | Kiritish qulayliklari | Summa yozilayotganda formatlanadi, noto'g'ri sana xato beradi, hisobotda yil filtri | standard | accepted | FR-10.1–10.3; API unit 106 + e2e 105, web 135; brauzerda summa yozish, 1999 yil xatosi, 12/25 yil filtri | 2026-10-11 |
 | 11 | Shartnomalar ro'yxati | Buxgalter shartnomalarni qidiradi, filtrlaydi, saralaydi; beruvchi/oluvchi alohida | standard | accepted | FR-11.1–11.4; web 153; brauzerda GAMMA → 2, DELTA AGRO → 2 | 2026-10-11 |
 | 12 | Davr hisoboti va Excel | Buxgalter davr tanlab shartnomalar harakatini ko'radi va Excel'ga yuklaydi | complex | accepted | FR-12.1–12.3; API unit 111 + e2e 110 (etalon yanvar–fevral, Excel qayta o'qiladi); brauzerda davr + Excel | 2026-10-11 |
+| 13 | Umumiy server | Barcha buxgalterlar bitta ma'lumotni ko'radi; desktop — serverga mijoz + Didox roboti | complex | pending (reja qabul qilindi 2026-10-15) | `docs/plans/M13-shared-server.md` v2; 13a server muhiti → 13b ko'chish (bir qadamda) → 13c umumiy bayroqlar | |
 
 Status: `pending → in-progress → review → accepted`
 Hajm: `trivial | standard | complex`
@@ -54,6 +55,11 @@ Hajm: `trivial | standard | complex`
   ildizdagi commit qilinmagan `M8b-macOS/` va `docs/M8-toplam.md` taqdiri.
 
 ## Qaror jurnali
+- 2026-10-15 — **M13 (umumiy server) rejasi v2 qabul qilindi — Sir.** Qo'shimcha qarorlar: (1) Didox roboti **faqat
+  desktop'ning o'zidan** (tray yoki lokal oyna) boshlanadi, serverdagi sahifa holatni faqat ko'rsatadi (CONSTITUTION §13);
+  (2) **har ERI kaliti faqat bitta kompyuterda** — oy qulfi jadvali qilinmaydi. CONSTITUTION §5/§13/§16 + Tech stack va
+  SRS §2/§6/§7, FR-8.7, FR-8.10, Modul 9 izohi, yangi Modul 13 yangilandi. A1 (Windows o'rnatgich) M13 dan keyin —
+  desktop roli o'zgaradi (lokal baza yo'q, server manzili so'raladi). 13a dan oldin Sir'dan: domen, tashqi zaxira joyi, VPS
 - 2026-10-15 — **Windows gate (M8d) o'tdi, M8 qabul qilindi — Sir ("barchasi muvoffaqiyatli").** Sinov UTM'dagi
   Windows 11 ARM64 VM'da (E-IMZO v6.4.7 `jre17`, x64 Java emulyatsiyada), dev rejimi: W1 o'rnatish/qurish, W2 sinov
   ma'lumoti (API orqali), W3 Didox oynasi ko'rinib — "Kirishni tekshirish" + qoralama (МХИК to'ldi), W4 oyna

@@ -1,7 +1,7 @@
 # SRS — Moliyaviy yordam: foiz hisobi
 
 > Software Requirements Specification. Living document — qaror o'zgarsa avval shu yerni yangilang.
-> Oxirgi yangilanish: 2026-10-12 · **Holat: Sir tomonidan tasdiqlangan (2026-10-07)**; Didox yo'li — **B: ilova Didox saytini o'z oynasida boshqaradi** (2026-10-12, M8 rejasi tasdiqlangan)
+> Oxirgi yangilanish: 2026-10-15 · **Holat: Sir tomonidan tasdiqlangan (2026-10-07)**; Didox yo'li — **B: ilova Didox saytini o'z oynasida boshqaradi** (2026-10-12, M8 rejasi tasdiqlangan)
 
 ## 1. Maqsad (Goal)
 Firmalar bir-biriga foizli moliyaviy yordam (qarz) beradi. Ilova har bir shartnoma bo'yicha
@@ -20,7 +20,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - Didox'da schyot-faktura **qoralamasi** (imzolash — buxgalter qo'lida)
 - Didox'da qoralamani **ilova o'zi** yaratadi: Didox saytini o'z oynasida ochib, firma ERI kaliti bilan avtomatik kiradi
   va formani to'ldiradi (yo'l B, Modul 8)
-- Har buxgalter kompyuteriga lokal o'rnatiladigan desktop ilova (Electron + lokal baza, Modul 9)
+- **Bitta umumiy server** (VPS) — barcha buxgalterlar bitta ma'lumotni ko'radi; har buxgalter kompyuterida desktop ilova —
+  E-IMZO va Didox roboti uchun (Modul 13, Sir 2026-10-15; Modul 9 dagi lokal baza o'rnini bosadi)
 
 **Kirmaydi (non-goals):**
 - Penya / jarima foizi
@@ -33,6 +34,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - Didox'ning partner tokeni/maxfiy kalitini ilova kodiga olish yoki Didox API'sini to'g'ridan-to'g'ri chaqirish — **taqiqlangan**
   (CONSTITUTION §14); ilova faqat Didox sahifasi bilan, inson kabi ishlaydi
 - Soliq bo'yicha qaror (MXIK kodi, QQS stavkasi buxgalter tomonidan beriladi)
+- Alohida foydalanuvchi hisoblari, IP cheklovi / VPN, "kim nima o'zgartirdi" jurnali (M13, Sir: ortiqcha)
+- Internet uzilganda ishlash (oflayn rejim) — server bo'lmasa ilova ishlamaydi (M13, Sir qabul qilgan)
 
 ## 3. Foydalanuvchilar / aktyorlar
 - **Buxgalter** (beruvchi yoki oluvchi firmadan) — bitta umumiy login bilan kiradi, barcha
@@ -240,6 +243,8 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   (`userData/didox-runs`, oxirgi 50 ta; e'tibor kerak fakturasi bor yozuv o'chirilmaydi), tarmoqqa chiqmaydi. Holat har
   o'zgarishda darhol diskka yoziladi, shuning uchun ilova saqlash o'rtasida yopilsa ham izi qoladi: keyingi ochilishda
   tugamagan ish yopiladi, saqlash boshlangan faktura "e'tibor kerak" bo'ladi, ID'si bor faktura esa belgilanadi.
+  **M13:** jurnal va screenshot'lar lokal qoladi; natija — qoralama belgisi, Didox ID, "e'tibor kerak" / o'tkazilgan
+  bayroqlari — serverga yoziladi va hamma buxgalterga ko'rinadi. Uzilgan saqlashni faqat o'sha kompyuter tiklaydi.
 - FR-8.8 — **Kirish xatosi.** Noto'g'ri parol, E-IMZO oynasi chiqmasligi yoki kirib bo'lmaslik → firma "E'tibor kerak"
   holatiga o'tadi, uning qolgan fakturalari o'tkaziladi, boshqa firmalar davom etadi. Avtomatik qayta urinish **taqiqlangan**;
   firma faqat buxgalter parolni qayta kiritsa yoki "tekshirildi" desa ochiladi.
@@ -253,12 +258,16 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   yoziladi (ruxsat talab qilmaydi, ishlashi tasdiqlangan). Apple Developer ID bilan imzolangach qayta tekshiriladi.
   Vaqtinchalik xatolar uchun 07:00 va 08:00 da faqat o'sha fakturalar qayta uriniladi (kirish xatolari va karantin bundan
   mustasno). Ilova tray'da yashaydi va tizim bilan birga ishga tushadi. Natija vaqti kafolatlanmaydi.
+  **M13:** run faqat desktop'ning o'zidan boshlanadi (CONSTITUTION §13); server yo'q bo'lsa run boshlanmaydi va keyin tutib
+  oladi; `NOTHING_TO_DO` bilan tugagan run ham lokal urinish sifatida yoziladi (aks holda tray "kutmoqda" cheksiz turadi).
 - *Acceptance (modul):* 2 firma × bir nechta faktura → "Didox'da qoralamalarni yaratish" → Didox Қоралама'dagi qoralamalar
   §9.1 ga maydonma-maydon mos, ID'lar ilovada; qayta ishga tushirish hech narsa yaratmaydi; noto'g'ri parol bir urinishdan
   keyin to'xtaydi va firmani belgilaydi; Didox elementi o'zgarsa skrinshot bilan to'xtaydi. macOS'da qabul qilinadi;
   Windows (production) — M8d gate.
 
 ### Modul 9: Lokal desktop ilova (2026-10-11 dan; server yo'q)
+> ⚠️ **Modul 13 bilan almashtiriladi (Sir, 2026-10-15):** lokal baza va API desktop'dan olib tashlanadi, desktop serverga
+> mijoz bo'ladi. M13 qurilguncha quyidagilar amalda.
 > Har buxgalter kompyuteriga alohida o'rnatiladi (umumiy server/baza yo'q). Reja: docs/plans/M9-desktop-shell.md.
 - FR-9.1 — **M9a:** lokal PGlite baza, dastur ichida migratsiya (migratsiyadan oldin snapshot) — qabul qilingan.
 - FR-9.2 — **M9b:** Electron qobig'i (API child-process'da, statik web, birinchi ishga tushishda parol) — o'zak qabul qilingan;
@@ -292,6 +301,19 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
 - *Acceptance:* etalon shartnoma, davr Yanvar–Fevral 2026: berildi 60 mln, qaytarildi 15 mln, foiz 1 035 616,44,
   qoldiq 45 mln; Excel ekran bilan tiyinigacha mos.
 
+### Modul 13: Umumiy server (Sir, 2026-10-15)
+> Reja: `docs/plans/M13-shared-server.md` (v2, qabul qilingan). Bosqichlar 13a → 13b → 13c, har biri alohida qabul qilinadi.
+- FR-13.1 — **13a:** VPS'da docker compose (postgres + api + caddy), faqat https porti ochiq, API porti tashqariga chiqmaydi;
+  `prisma migrate deploy`; kunlik `pg_dump` (14 kun + oylik) va haftada bir **serverdan tashqariga** nusxa; zaxira bo'sh
+  bazaga haqiqatda tiklab ko'riladi.
+- FR-13.2 — **13b:** ma'lumot bir qadamda ko'chiriladi (firmalar → shartnomalar → operatsiyalar → stavkalar → qoralama
+  belgilari + Didox bayroqlari), raqamlar etalon bilan solishtiriladi; desktop serverga ulanadi (birinchi ishga
+  tushishda faqat `https://` manzil), robot o'z kaliti (`ROBOT_SECRET`) bilan ishlaydi; eski lokal baza bir oy saqlanadi.
+- FR-13.3 — **13c:** "e'tibor kerak" / o'tkazilgan bayroqlari serverda (`didox_invoice_flag`) — hamma ko'radi; qaysi
+  kompyuter tiklashi kerakligi ko'rsatiladi; ro'yxat o'qilmasa yoki belgilash yozilmasa firma to'xtaydi.
+- *Acceptance:* ikki kompyuterdan bir xil ma'lumot ko'rinadi; serverdagi raqamlar ko'chishdan oldingi bilan bir xil
+  (yanvar 2026 = 552 328,77; Yanvar–Fevral: 60 mln / 15 mln / 1 035 616,44 / qoldiq 45 mln); Didox roboti ishlaydi.
+
 ## 6. Nofunktsional talablar
 - **Aniqlik:** pul va stavka hech qachon `float`'da hisoblanmaydi — DB'da `Decimal`, kodda decimal kutubxona
   yoki butun son (BigInt, tiyin) — foiz yadrosi BigInt'da.
@@ -300,13 +322,17 @@ tayyorlaydi. Foydalanuvchilar — ikkala tomon (beruvchi va oluvchi) buxgalterla
   (`safeStorage`, FR-8.2) buxgalter kompyuterida; `.pfx` E-IMZO'da qoladi. Didox oynasi ilovadan izolyatsiyalangan.
   Parol + `.pfx` bir kompyuterda bo'lgani uchun imzolash texnik mumkin — bu Sir tomonidan ongli qabul qilingan
   (CONSTITUTION §13), FR-8.9 kod qo'riqchilari bilan ushlanadi.
-- **Reliability:** migratsiyadan oldin baza snapshot'i; kunlik zaxira — M9 qadoqlash bosqichida.
+- **Reliability:** migratsiyadan oldin baza snapshot'i; kunlik zaxira — M9 qadoqlash bosqichida. M13: serverda kunlik
+  `pg_dump` + haftalik serverdan tashqariga nusxa; deploy/migratsiyadan oldin snapshot.
+- **Security (M13):** https majburiy (Caddy), `TRUST_PROXY=1` (login cheklovi har IP uchun ishlashi uchun), umumiy parol
+  kamida 16 belgi, SSH faqat kalit bilan; sessiyalarni bekor qilish — `JWT_SECRET` ni almashtirish.
 - **Til / format:** UI o'zbek (lotin); sana `dd.mm.yyyy`; summa `552 328,77`.
 
 ## 7. Tech stack & arxitektura
 - Backend: NestJS + Prisma + PostgreSQL
 - Frontend: React + Vite + TypeScript + shadcn/ui + Tailwind
-- Infra: Electron desktop ilova (`apps/desktop`), lokal PGlite baza; Windows (production), macOS (dev)
+- Infra: Electron desktop ilova (`apps/desktop`), lokal PGlite baza; Windows (production), macOS (dev).
+  **M13 (2026-10-15):** VPS'da postgres + API + caddy; desktop — serverga mijoz + E-IMZO/Didox roboti, lokal baza yo'q
 - Arxitektura eslatmalari:
   - **Foiz hisoblash yadrosi — sof funksiya** (DB/HTTP'siz): kirish — shartnoma, stavkalar tarixi,
     operatsiyalar; chiqish — kunlik bo'laklar va oylik jadval. Barcha CR qoidalari shu yerda va
@@ -398,4 +424,5 @@ xavfi); brauzer kengaytmasi (Sir API'ni tanladi).
 - [ ] Didox UI'da bir nechta qoralamani birdaniga imzolash imkoni — TEKSHIRILMADI (Didox tomoni, ilovaga ta'sir qilmaydi)
 - [ ] API bo'sh `FacturaNo`/`FacturaDate` bilan qoralamani qabul qiladimi — test muhitida
 - [x] Avtomatik ishga tushish — oy 1-kuni, 09:00 gacha tayyor (start 06:00, qayta urinish 07:00/08:00); natija faqat ilovada
-- [ ] Server: OS, domen, kim boshqaradi (Modul 9 gacha)
+- [x] Server — kichik VPS, mijoz oladi va to'laydi, biz sozlaymiz; bitta umumiy kirish; IP cheklovi yo'q (M13, 2026-10-15)
+- [ ] Server: **domen nomi** va **zaxira serverdan tashqari qayerga** ketadi (M13 §7.2) — 13a dan oldin
