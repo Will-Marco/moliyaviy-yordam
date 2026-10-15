@@ -14,15 +14,15 @@ export { AutotypeCancelledError, type SpawnLike } from './typist.js'
  */
 export async function typeEimzoPassword(
   password: string,
-  opts: { dialogTimeoutMs: number; signal: AbortSignal; platform?: NodeJS.Platform; spawn?: SpawnLike },
+  opts: { dialogTimeoutMs: number; signal: AbortSignal; onReady?: () => void; platform?: NodeJS.Platform; spawn?: SpawnLike },
 ): Promise<AutotypeResult> {
   const platform = opts.platform ?? process.platform
   const spawn: SpawnLike = opts.spawn ?? nodeSpawn
   if (platform === 'darwin') {
-    return typeOnDarwin(password, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal, spawn })
+    return typeOnDarwin(password, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal, onReady: opts.onReady, spawn })
   }
   if (platform === 'win32') {
-    return typeOnWindows(password, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal, spawn })
+    return typeOnWindows(password, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal, onReady: opts.onReady, spawn })
   }
   throw new Error(`E-IMZO parolini avtomatik yozish bu tizimda hali yo'q (${platform})`)
 }

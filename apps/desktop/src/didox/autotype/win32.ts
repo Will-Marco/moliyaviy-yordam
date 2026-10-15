@@ -25,12 +25,13 @@ export const encodeCommand = (script: string): string => Buffer.from(script, 'ut
 
 export function typeOnWindows(
   password: string,
-  { dialogTimeoutMs, signal, spawn }: { dialogTimeoutMs: number; signal: AbortSignal; spawn: SpawnLike },
+  { dialogTimeoutMs, signal, spawn, onReady }: { dialogTimeoutMs: number; signal: AbortSignal; spawn: SpawnLike; onReady?: () => void },
 ): Promise<AutotypeResult> {
   return runTypist(password, {
     dialogTimeoutMs,
     signal,
     spawn,
+    onReady,
     typist: { command: POWERSHELL, args: [...PS_FLAGS, encodeCommand(typistScript(dialogTimeoutMs))] },
   })
 }

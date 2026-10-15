@@ -55,7 +55,7 @@ export interface DidoxRunnerDeps {
   openWindow(opts: { signal: AbortSignal }): DidoxWindow
   login(page: Page, ctx: LoginContext): Promise<void>
   logout(page: Page): Promise<void>
-  typePassword(password: string, opts: { dialogTimeoutMs: number; signal: AbortSignal }): Promise<AutotypeResult>
+  typePassword(password: string, opts: { dialogTimeoutMs: number; signal: AbortSignal; onReady?: () => void }): Promise<AutotypeResult>
   onProgress(e: ProgressEvent): void
   /*
    * Watchdog shape (M8c §3, review B4). There is no whole-run deadline any more: a real run has no sensible total
@@ -153,7 +153,7 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
       tin: firm.tin,
       keyValidTo: firm.keyValidTo,
       armAutotype: (opts) =>
-        deps.eri.withPassword(firm.tin, (pw) => deps.typePassword(pw, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal }), firm.serial),
+        deps.eri.withPassword(firm.tin, (pw) => deps.typePassword(pw, { dialogTimeoutMs: opts.dialogTimeoutMs, signal: opts.signal, onReady: opts.onReady }), firm.serial),
       onProgress,
       signal,
     })

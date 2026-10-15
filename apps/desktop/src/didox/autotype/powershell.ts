@@ -1,4 +1,4 @@
-import { CLOSE_WAIT_MS, EXIT, TYPING_MARKER } from './jxa.js'
+import { CLOSE_WAIT_MS, EXIT, READY_MARKER, TYPING_MARKER } from './jxa.js'
 
 /*
  * The Windows typist (M8d, plan "Autotype adapterlari"). Same contract as the macOS one: the password arrives on
@@ -203,7 +203,9 @@ $EXIT_FAILED = ${EXIT.FAILED}
 # copy and is lost. The nested struct is therefore built on its own and assigned whole.
 $INPUT_SIZE = [Win.Api]::InputSize()
 
-function New-KeyInput([ushort]$vk, [ushort]$scan, [uint32]$flags) {
+# uint16, never the short name ushort: powershell.exe is Windows PowerShell 5.1, which lacks it (PowerShell 7 added
+# it), and the first character died on it — after the TYPING marker, so the gate saw only "interrupted".
+function New-KeyInput([uint16]$vk, [uint16]$scan, [uint32]$flags) {
   $ki = New-Object Win.Api+KEYBDINPUT
   $ki.wVk = $vk
   $ki.wScan = $scan
@@ -227,12 +229,12 @@ function Send-Char([char]$c) {
   $UNICODE = 0x0004
   $KEYUP = 0x0002
   # KEYEVENTF_UNICODE carries the character in wScan, so the keyboard layout cannot change the password.
-  $down = New-KeyInput 0 ([ushort]$c) $UNICODE
-  $up = New-KeyInput 0 ([ushort]$c) ($UNICODE -bor $KEYUP)
+  $down = New-KeyInput 0 ([uint16]$c) $UNICODE
+  $up = New-KeyInput 0 ([uint16]$c) ($UNICODE -bor $KEYUP)
   if ((Send-Pair $down $up) -ne 2) { exit $EXIT_FAILED }
 }
 
-function Send-Key([ushort]$vk) {
+function Send-Key([uint16]$vk) {
   $down = New-KeyInput $vk 0 0
   $up = New-KeyInput $vk 0 0x0002      # KEYUP
   [void](Send-Pair $down $up)
@@ -246,6 +248,9 @@ if ((Get-EimzoWindowCount) -gt 0) {
 
 $password = [Console]::In.ReadToEnd()
 if ([string]::IsNullOrEmpty($password)) { exit $EXIT_FAILED }
+
+# Watching from here on: the app clicks "Кириш" only after this line, so the dialog cannot open before the check above.
+Write-Output '${READY_MARKER}'
 
 $deadline = (Get-Date).AddMilliseconds($timeoutMs)
 $dialog = [IntPtr]::Zero

@@ -25,6 +25,12 @@ export const EXIT = {
 export const TYPING_MARKER = 'TYPING'
 
 /**
+ * Written to stdout once the script has checked that no E-IMZO window was open and is watching for the dialog.
+ * "Кириш" is clicked only after it: a dialog that opens before this line is refused as already open.
+ */
+export const READY_MARKER = 'READY'
+
+/**
  * Input sources whose `keystroke` gives plain US-QWERTY characters. Anything else (Cyrillic, Uzbek, IMEs) stops the
  * run. US International is left out on purpose: its dead keys (' " ` ~ ^) would merge with the next character.
  */
@@ -130,6 +136,7 @@ function main(argv) {
   var se = Application('System Events')
   var baseline = windowCount(se)
   if (baseline > 0) return EXIT.DIALOG_ALREADY_OPEN
+  writeStdout('${READY_MARKER}\\n')
   if (!waitFor(function () { return windowCount(se) > baseline }, timeoutMs)) return EXIT.NO_DIALOG
 
   // 4) Never type unless E-IMZO is frontmost and its password field holds the focus.

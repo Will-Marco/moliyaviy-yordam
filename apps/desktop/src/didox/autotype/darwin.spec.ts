@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AutotypePreflightResult, AutotypeResult } from '../contract.js'
 import type { ChildLike, SpawnLike } from './darwin.js'
 import { AutotypeCancelledError, autotypePreflight, typeEimzoPassword } from './index.js'
-import { EIMZO_PREFLIGHT_JXA, EIMZO_TYPIST_JXA, EXIT, TYPING_MARKER } from './jxa.js'
+import { EIMZO_PREFLIGHT_JXA, EIMZO_TYPIST_JXA, EXIT, READY_MARKER, TYPING_MARKER } from './jxa.js'
 
 const PASSWORD = 'Sir-parol 123'
 
@@ -286,6 +286,13 @@ describe('JXA scripts', () => {
     expect(EIMZO_TYPIST_JXA).toContain('if (baseline > 0) return EXIT.DIALOG_ALREADY_OPEN')
     expect(EIMZO_TYPIST_JXA).toContain('windowCount(se) > baseline')
     expect(EIMZO_TYPIST_JXA).toContain('windowCount(se) <= baseline')
+  })
+
+  /* "Кириш" is clicked on this line: it must come after the open-window check and before the wait for a new one. */
+  it('typist says it is watching between the open-window check and the wait for the dialog', () => {
+    const ready = EIMZO_TYPIST_JXA.indexOf(`writeStdout('${READY_MARKER}\\n')`)
+    expect(ready).toBeGreaterThan(EIMZO_TYPIST_JXA.indexOf('if (baseline > 0) return EXIT.DIALOG_ALREADY_OPEN'))
+    expect(ready).toBeLessThan(EIMZO_TYPIST_JXA.indexOf('windowCount(se) > baseline'))
   })
 
   it('typist prints the marker, then types char by char with a focus check before each and before Return', () => {

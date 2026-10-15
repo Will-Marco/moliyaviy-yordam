@@ -40,8 +40,9 @@ function setup(s: Setup = {}) {
   }
 
   const progress: ProgressEvent[] = []
-  const armAutotype = vi.fn(async (_: { dialogTimeoutMs: number; signal: AbortSignal }) => {
+  const armAutotype = vi.fn(async (opts: { dialogTimeoutMs: number; signal: AbortSignal; onReady?: () => void }) => {
     armedAt = page.calls.length
+    opts.onReady?.()
     const result = s.autotype ?? 'typed'
     if (result === 'typed') page.currentUrl = s.landsOn ?? 'https://didox.uz/documents/new'
     return result
@@ -57,7 +58,10 @@ function setup(s: Setup = {}) {
   return { page, ctx, ac, armAutotype, progress, armedAt: () => armedAt }
 }
 
-const run = (t: ReturnType<typeof setup>) => login(t.page, t.ctx, { random: () => 0.5 }).catch((e: unknown) => e as StepError)
+const run = (t: ReturnType<typeof setup>, readyWaitMs?: number) =>
+  login(t.page, t.ctx, { random: () => 0.5, readyWaitMs }).catch((e: unknown) => e as StepError)
+
+const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms))
 
 describe('login', () => {
   it('opens the login page, picks the firm key, arms the typist, enters and confirms the firm', async () => {
@@ -74,7 +78,7 @@ describe('login', () => {
     expect(t.page.of('waitFor').find((w) => w.snippet === L.exists(L.keyPicker).js)?.timeoutMs).toBe(15_000)
     expect(t.page.of('waitFor').find((w) => w.snippet === L.atDocuments.js)?.timeoutMs).toBe(45_000)
     expect(t.armAutotype).toHaveBeenCalledTimes(1)
-    expect(t.armAutotype).toHaveBeenCalledWith({ dialogTimeoutMs: 20_000, signal: t.ctx.signal })
+    expect(t.armAutotype).toHaveBeenCalledWith({ dialogTimeoutMs: 20_000, signal: t.ctx.signal, onReady: expect.any(Function) })
     expect(t.page.of('type')).toEqual([])
     expect(t.page.of('screenshot')).toEqual([])
     expect(t.progress.filter((p) => p.status === 'done').map((p) => p.step)).toEqual([
@@ -90,10 +94,10 @@ describe('login', () => {
     const t = setup()
     await run(t)
     const pauses = t.page.of('pause').map((p) => p.ms)
-    expect(pauses).toEqual([550, 550, 300])
+    expect(pauses).toEqual([550, 550])
   })
 
-  it('blurs the page, then arms the typist, then clicks "Кириш" 300 ms later', async () => {
+  it('blurs the page, then arms the typist, then clicks "Кириш"', async () => {
     const t = setup()
     await run(t)
 
@@ -102,7 +106,59 @@ describe('login', () => {
     expect(blur).toBeGreaterThanOrEqual(0)
     expect(t.armedAt()).toBeGreaterThan(blur)
     expect(enter).toBeGreaterThanOrEqual(t.armedAt())
-    expect(t.page.calls[enter - 1]).toEqual({ kind: 'pause', ms: 300 })
+  })
+
+  /*
+   * E-IMZO's window opens the moment "Кириш" is clicked, and a typist that is not yet watching takes it for someone
+   * else's. On the Windows gate powershell.exe needed over a second to start, so a fixed 300 ms lead made every
+   * login stop with "E-IMZO'da ochiq oyna bor".
+   */
+  it('clicks "Кириш" only once the typist says it is watching', async () => {
+    const t = setup()
+    let readyAt = -1
+    t.armAutotype.mockImplementation(async (opts) => {
+      await sleep(20)
+      readyAt = t.page.calls.length
+      opts.onReady?.()
+      t.page.currentUrl = 'https://didox.uz/documents/new'
+      return 'typed'
+    })
+
+    await expect(run(t)).resolves.toBeUndefined()
+
+    const enter = t.page.calls.findIndex((c) => c.kind === 'click' && c.snippet === L.enterButton.js)
+    expect(readyAt).toBeGreaterThanOrEqual(0)
+    expect(enter).toBeGreaterThanOrEqual(readyAt)
+  })
+
+  it('does not click "Кириш" when the typist ends before it is watching', async () => {
+    const t = setup()
+    t.armAutotype.mockImplementation(async () => 'dialog_already_open')
+
+    expect(await run(t)).toMatchObject({ code: 'EIMZO_DIALOG_OPEN', step: 'armAndEnter' })
+    expect(t.page.of('click').map((c) => c.snippet)).not.toContain(L.enterButton.js)
+  })
+
+  it('does not click "Кириш" when the password cannot even be read', async () => {
+    const t = setup()
+    t.armAutotype.mockImplementation(async () => {
+      throw new Error('ERI paroli kiritilmagan')
+    })
+
+    expect(await run(t)).toMatchObject({ step: 'armAndEnter' })
+    expect(t.page.of('click').map((c) => c.snippet)).not.toContain(L.enterButton.js)
+  })
+
+  it('clicks anyway once the wait for the typist runs out, leaving the rest to its own checks', async () => {
+    const t = setup()
+    t.armAutotype.mockImplementation(async () => {
+      await sleep(50)
+      t.page.currentUrl = 'https://didox.uz/documents/new'
+      return 'typed'
+    })
+
+    await expect(run(t, 5)).resolves.toBeUndefined()
+    expect(t.page.of('click').map((c) => c.snippet)).toContain(L.enterButton.js)
   })
 
   it('stops with KEY_NOT_IN_DIDOX_LIST when Didox does not list the firm key', async () => {
@@ -174,7 +230,8 @@ describe('login', () => {
   it('waits for the typist even when clicking "Кириш" fails', async () => {
     const t = setup()
     let finished = false
-    t.armAutotype.mockImplementation(async () => {
+    t.armAutotype.mockImplementation(async (opts) => {
+      opts.onReady?.()
       await new Promise((ok) => setTimeout(ok, 5))
       finished = true
       return 'no_dialog'
@@ -252,7 +309,8 @@ describe('login', () => {
 
   it('a rejecting typist verdict wins over a failed (cancelled) "Кириш" click', async () => {
     const t = setup()
-    t.armAutotype.mockImplementation(async () => {
+    t.armAutotype.mockImplementation(async (opts) => {
+      opts.onReady?.()
       await new Promise((ok) => setTimeout(ok, 5))
       return 'rejected'
     })

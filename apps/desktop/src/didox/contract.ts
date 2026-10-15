@@ -107,8 +107,9 @@ export type AutotypeResult =
 /**
  * Arms the typist before "Кириш" is clicked; resolves once it has finished. The password never leaves main.
  * Aborting `signal` before typing has started kills the typist (nothing typed); once typing started it runs to the end.
+ * `onReady` fires once the typist is watching for the dialog — the moment "Кириш" may be clicked.
  */
-export type ArmAutotype = (opts: { dialogTimeoutMs: number; signal: AbortSignal }) => Promise<AutotypeResult>
+export type ArmAutotype = (opts: { dialogTimeoutMs: number; signal: AbortSignal; onReady?: () => void }) => Promise<AutotypeResult>
 
 /** Checked before the Didox window opens or "Кириш" is pressed, so a doomed login never leaves a dialog behind. */
 export type AutotypePreflightResult = 'ok' | 'layout' | 'no_permission' | 'unsupported' | 'dialog_already_open'

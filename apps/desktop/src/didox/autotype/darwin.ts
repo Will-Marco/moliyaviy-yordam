@@ -9,12 +9,13 @@ import { runPreflight, runTypist, type SpawnLike } from './typist.js'
  */
 export function typeOnDarwin(
   password: string,
-  { dialogTimeoutMs, signal, spawn }: { dialogTimeoutMs: number; signal: AbortSignal; spawn: SpawnLike },
+  { dialogTimeoutMs, signal, spawn, onReady }: { dialogTimeoutMs: number; signal: AbortSignal; spawn: SpawnLike; onReady?: () => void },
 ): Promise<AutotypeResult> {
   return runTypist(password, {
     dialogTimeoutMs,
     signal,
     spawn,
+    onReady,
     typist: { command: 'osascript', args: ['-l', 'JavaScript', '-e', EIMZO_TYPIST_JXA, String(dialogTimeoutMs)] },
   })
 }

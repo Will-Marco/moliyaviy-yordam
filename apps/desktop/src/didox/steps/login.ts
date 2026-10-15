@@ -5,13 +5,20 @@ import * as L from '../locators.js'
 export interface LoginOptions {
   /** Source for human-pause jitter (0..1); tests pass a constant. */
   random?: () => number
+  /** How long "Кириш" waits for the typist to be watching; tests shorten it. */
+  readyWaitMs?: number
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000
 const DIALOG_TIMEOUT_MS = 20_000
 const LOGIN_TIMEOUT_MS = 45_000
-/** Gap between arming the typist and clicking "Кириш", so it is already watching when E-IMZO's window opens. */
-const ARM_LEAD_MS = 300
+/*
+ * "Кириш" is clicked once the typist says it is watching, never on a fixed lead: E-IMZO's window opens at once, and
+ * a typist that starts looking after it treats it as someone else's and stops. A fixed 300 ms was enough for
+ * osascript; powershell.exe needed a second or more on the Windows gate, and every login stopped "already open".
+ * Past this wait the click goes ahead anyway — the typist's own "already open" check still keeps the password safe.
+ */
+const READY_WAIT_MS = 15_000
 
 /**
  * Signs one firm in to Didox with its E-IMZO key (plan M8 "Login qadamlari" 3–7). The password is typed by the armed
@@ -43,10 +50,18 @@ export async function login(page: Page, ctx: LoginContext, opts: LoginOptions = 
 
   await run('armAndEnter', async () => {
     await page.read(L.blurActive.js)
-    const typing = ctx.armAutotype({ dialogTimeoutMs: DIALOG_TIMEOUT_MS, signal: ctx.signal })
+    let markReady: () => void = () => undefined
+    const ready = new Promise<void>((ok) => {
+      markReady = ok
+    })
+    const typing = ctx.armAutotype({ dialogTimeoutMs: DIALOG_TIMEOUT_MS, signal: ctx.signal, onReady: () => markReady() })
     typing.catch(() => {}) // awaited below; keeps an early click failure from leaving an unhandled rejection
+    // A typist that ended before watching (a window already open, no saved password) has its verdict: no click.
+    if ((await firstOf(ready, typing, opts.readyWaitMs ?? READY_WAIT_MS)) === 'ended') {
+      const failure = autotypeFailure(await typing)
+      if (failure) throw failure
+    }
     try {
-      await page.pause(ARM_LEAD_MS)
       await page.click(L.enterButton.js, { what: L.enterButton.what })
     } catch (e) {
       // Let the typist finish before the firm is abandoned. If it already typed and was rejected/interrupted, that
@@ -97,6 +112,21 @@ const AUTOTYPE_FAILURES: Record<AutotypeResult, { code: StepErrorCode; message: 
     code: 'ACCESSIBILITY_DENIED',
     message: "Ilovaga Accessibility ruxsati berilmagan (Tizim sozlamalari → Maxfiylik → Accessibility) — parol yozilmadi",
   },
+}
+
+/** Which comes first: the typist watching, the typist ending, or the wait running out. */
+function firstOf(ready: Promise<void>, typing: Promise<unknown>, waitMs: number): Promise<'ready' | 'ended' | 'timeout'> {
+  let timer: NodeJS.Timeout | undefined
+  const timeout = new Promise<'timeout'>((ok) => {
+    timer = setTimeout(() => ok('timeout'), waitMs)
+  })
+  // Subscribed first, so a typist that was ready and has already ended still counts as ready.
+  const watching = ready.then(() => 'ready' as const)
+  const ended = typing.then(
+    () => 'ended' as const,
+    () => 'ended' as const,
+  )
+  return Promise.race([watching, ended, timeout]).finally(() => clearTimeout(timer))
 }
 
 function autotypeFailure(result: AutotypeResult | null): StepError | null {

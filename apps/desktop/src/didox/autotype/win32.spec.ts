@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 import { autotypePreflight, type SpawnLike, typeEimzoPassword } from './index.js'
-import { EXIT, TYPING_MARKER } from './jxa.js'
+import { EXIT, READY_MARKER, TYPING_MARKER } from './jxa.js'
 import { EIMZO_PREFLIGHT_PS, typistScript } from './powershell.js'
 import { encodeCommand } from './win32.js'
 
@@ -30,6 +30,9 @@ class FakeChild extends EventEmitter {
   startedTyping() {
     this.stdout.emit('data', Buffer.from(`${TYPING_MARKER}\n`))
   }
+  watching() {
+    this.stdout.emit('data', Buffer.from(`${READY_MARKER}\n`))
+  }
   complains(text: string) {
     this.stderr.emit('data', Buffer.from(text))
   }
@@ -53,8 +56,8 @@ function fakeSpawn() {
   return { calls, children, spawn }
 }
 
-const typeOnWindows = (spawn: SpawnLike, signal = new AbortController().signal) =>
-  typeEimzoPassword(PASSWORD, { dialogTimeoutMs: 20_000, signal, platform: 'win32', spawn })
+const typeOnWindows = (spawn: SpawnLike, signal = new AbortController().signal, onReady?: () => void) =>
+  typeEimzoPassword(PASSWORD, { dialogTimeoutMs: 20_000, signal, onReady, platform: 'win32', spawn })
 
 describe('the Windows typist', () => {
   it('runs PowerShell with the script, and never the password on the command line', async () => {
@@ -182,6 +185,33 @@ describe('the Windows typist', () => {
     warn.mockRestore()
   })
 
+  /* The app clicks "Кириш" on this signal; a typist that never says it is watching never gets a click from it. */
+  it('tells the app once, when the script says it is watching', async () => {
+    const { children, spawn } = fakeSpawn()
+    const onReady = vi.fn()
+
+    const typing = typeOnWindows(spawn, undefined, onReady)
+    expect(onReady).not.toHaveBeenCalled()
+    children[0]!.watching()
+    children[0]!.watching()
+    children[0]!.startedTyping()
+    children[0]!.exit(EXIT.TYPED)
+
+    await expect(typing).resolves.toBe('typed')
+    expect(onReady).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not tell the app it is watching when the script stops before that', async () => {
+    const { children, spawn } = fakeSpawn()
+    const onReady = vi.fn()
+
+    const typing = typeOnWindows(spawn, undefined, onReady)
+    children[0]!.exit(EXIT.DIALOG_ALREADY_OPEN)
+
+    await expect(typing).resolves.toBe('dialog_already_open')
+    expect(onReady).not.toHaveBeenCalled()
+  })
+
   it('kills the typist when the run is cancelled before it types', async () => {
     const controller = new AbortController()
     const { children, spawn } = fakeSpawn()
@@ -255,6 +285,25 @@ describe('the PowerShell script', () => {
   it('types the character itself, so the keyboard layout cannot change the password', () => {
     expect(script).toContain('0x0004') // KEYEVENTF_UNICODE
     expect(script).toContain('SendInput')
+  })
+
+  /* After the open-window check and the password, before the wait for the dialog: "Кириш" is clicked on it. */
+  it('says it is watching between the open-window check and the wait for the dialog', () => {
+    const ready = script.indexOf(`Write-Output '${READY_MARKER}'`)
+    expect(ready).toBeGreaterThan(script.indexOf('exit $EXIT_DIALOG_ALREADY_OPEN'))
+    expect(ready).toBeGreaterThan(script.indexOf('[Console]::In.ReadToEnd()'))
+    expect(ready).toBeLessThan(script.indexOf('$deadline = '))
+  })
+
+  /*
+   * powershell.exe is Windows PowerShell 5.1, which lacks the short type names PowerShell 7 added — measured on the
+   * Windows gate VM. [ushort] killed the typist on its first character, after the TYPING marker, so every login
+   * ended "interrupted" with nothing typed.
+   */
+  it('uses only type names Windows PowerShell 5.1 knows', () => {
+    const unknownIn51 = /\[(ushort|uint|ulong|short|semver)\]/
+    expect(script).not.toMatch(unknownIn51)
+    expect(EIMZO_PREFLIGHT_PS).not.toMatch(unknownIn51)
   })
 
   it('says it has started before any character goes in', () => {

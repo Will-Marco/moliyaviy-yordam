@@ -1,5 +1,5 @@
 import type { AutotypePreflightResult, AutotypeResult } from '../contract.js'
-import { CLOSE_WAIT_MS, EXIT, TYPING_MARKER } from './jxa.js'
+import { CLOSE_WAIT_MS, EXIT, READY_MARKER, TYPING_MARKER } from './jxa.js'
 
 /*
  * Running one typist, whatever writes it. macOS drives System Events through JXA and Windows drives SendInput
@@ -123,6 +123,7 @@ export interface TypistCommand {
 /**
  * Types `password` with the given typist. Aborting `signal` before typing started kills it and rejects with
  * AutotypeCancelledError; after that the child runs to the end, because a half-typed password must be reported.
+ * `onReady` is called once, when the script says it is watching for the dialog.
  */
 export function runTypist(
   password: string,
@@ -131,7 +132,8 @@ export function runTypist(
     signal,
     spawn,
     typist,
-  }: { dialogTimeoutMs: number; signal: AbortSignal; spawn: SpawnLike; typist: TypistCommand },
+    onReady,
+  }: { dialogTimeoutMs: number; signal: AbortSignal; spawn: SpawnLike; typist: TypistCommand; onReady?: () => void },
 ): Promise<AutotypeResult> {
   if (!password) return Promise.reject(new Error("ERI paroli bo'sh"))
   if (password.length > MAX_PASSWORD_CHARS) return Promise.reject(new Error('ERI paroli juda uzun'))
@@ -142,6 +144,7 @@ export function runTypist(
 
   return new Promise((ok, fail) => {
     let typing = false
+    let ready = false
     let settled = false
     let timer: NodeJS.Timeout | undefined
     const onAbort = () => {
@@ -187,6 +190,10 @@ export function runTypist(
     let err = ''
     child.stdout?.on('data', (chunk) => {
       out += String(chunk)
+      if (!ready && out.includes(READY_MARKER)) {
+        ready = true
+        onReady?.()
+      }
       if (out.includes(TYPING_MARKER)) typing = true
     })
     // Dropped the moment typing starts: after that nothing but "a person must look" is reported anyway.
@@ -202,7 +209,7 @@ export function runTypist(
         // where it is the difference between "a window was open" and knowing which one. Not once typing has
         // started: from there the app says only that a person must look.
         console.info(`[autotype] natija: ${result}`)
-        if (!typing) note(`${out.split(TYPING_MARKER).join(' ')} ${err}`)
+        if (!typing) note(`${out.split(READY_MARKER).join(' ').split(TYPING_MARKER).join(' ')} ${err}`)
         return settle(() => ok(result))
       }
       unconfirmed(`E-IMZO parol yozuvchisi kutilmagan holatda tugadi (${exitSignal ?? `kod ${code}`})`)
