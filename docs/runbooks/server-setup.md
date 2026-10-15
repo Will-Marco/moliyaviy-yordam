@@ -103,8 +103,14 @@ bo'lishi shart — bo'sh bo'lmasa yuklash hech narsani o'zgartirmay to'xtaydi. S
 `didox-skips.json`; asl papkaga tegilmaydi va bir oy saqlanadi (M13 §6). Eksport **o'sha kompyuterda** qilinadi:
 desktop vaqtlarni kompyuter vaqt zonasida saqlagan, eksport ularni shu zona bo'yicha to'g'rilaydi.
 
+Nusxa olingach, **shu kompyuterga yangi (server rejimidagi) desktop'ni o'rnating** va birinchi oynada server manzilini
+kiriting. U `config.json` da bu kompyuterning nomini yasaydi — bayroqlarda "qaysi kompyuter" shu nom bilan ko'rinadi.
+Eksportga aynan shu nom beriladi, aks holda ko'chgan bayroqlar bu kompyuterda "boshqa kompyuterniki" bo'lib ko'rinadi:
+
 ```bash
-node apps/api/scripts/migrate-data.ts export --userdata <nusxa papka> --install "<kompyuter nomi>" --out moliyaviy-export.sql
+# desktop'dagi installLabel bilan bir xil: "<nom> (<installId ning 8 belgisi>)"
+LABEL=$(node -e 'const c=require(process.argv[1]);const s=` (${c.installId.slice(0,8)})`;console.log(c.installName.slice(0,100-s.length)+s)' "<userData>/config.json")
+node apps/api/scripts/migrate-data.ts export --userdata <nusxa papka> --install "$LABEL" --out moliyaviy-export.sql
 ```
 
 `--install` — bayroqlarda "qaysi kompyuter" bo'lib ko'rinadigan nom. Skript jadvallar bo'yicha qator sonini va
