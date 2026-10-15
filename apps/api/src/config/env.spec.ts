@@ -45,4 +45,20 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...valid, AUTH_PASSWORD_HASH: 'secret' })).toThrow(/argon2/);
     expect(() => validateEnv({ ...valid, JWT_SECRET: 'short' })).toThrow(/32/);
   });
+
+  describe('ROBOT_SECRET (M13 §4.2)', () => {
+    it('is optional and empty when unset', () => {
+      expect(validateEnv(valid).ROBOT_SECRET).toBe('');
+      expect(validateEnv({ ...valid, ROBOT_SECRET: '' }).ROBOT_SECRET).toBe('');
+    });
+
+    it('accepts a long secret that differs from JWT_SECRET', () => {
+      expect(validateEnv({ ...valid, ROBOT_SECRET: 'r'.repeat(32) }).ROBOT_SECRET).toBe('r'.repeat(32));
+    });
+
+    it('rejects a short secret and one equal to JWT_SECRET', () => {
+      expect(() => validateEnv({ ...valid, ROBOT_SECRET: 'short' })).toThrow(/ROBOT_SECRET must be at least 32/);
+      expect(() => validateEnv({ ...valid, ROBOT_SECRET: valid.JWT_SECRET })).toThrow(/ROBOT_SECRET must differ from JWT_SECRET/);
+    });
+  });
 });

@@ -7,6 +7,11 @@ export interface Env {
   AUTH_USERNAME: string;
   AUTH_PASSWORD_HASH: string;
   JWT_SECRET: string;
+  /**
+   * Second key the AuthGuard accepts session cookies signed with (M13 §4.2): the desktop robot mints its own token
+   * with it, so an unattended run does not depend on a person's session. Empty → only JWT_SECRET sessions.
+   */
+  ROBOT_SECRET: string;
   COOKIE_SECURE: boolean;
   PORT: number;
   /** Built web UI directory the API serves (desktop, M9b). Empty → web runs separately (dev/server). */
@@ -47,6 +52,7 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     AUTH_USERNAME: str('AUTH_USERNAME'),
     AUTH_PASSWORD_HASH: str('AUTH_PASSWORD_HASH'),
     JWT_SECRET: str('JWT_SECRET'),
+    ROBOT_SECRET: typeof raw.ROBOT_SECRET === 'string' ? raw.ROBOT_SECRET : '',
     COOKIE_SECURE: raw.COOKIE_SECURE !== 'false',
     WEB_ROOT: typeof raw.WEB_ROOT === 'string' ? raw.WEB_ROOT : '',
     PORT: int('PORT', 3000, 0, 65535),
@@ -58,6 +64,13 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   }
   if (env.JWT_SECRET && env.JWT_SECRET.length < 32) {
     errors.push('JWT_SECRET must be at least 32 characters');
+  }
+  if (env.ROBOT_SECRET && env.ROBOT_SECRET.length < 32) {
+    errors.push('ROBOT_SECRET must be at least 32 characters');
+  }
+  // One shared key would make every robot token a person's session and vice versa — the split would mean nothing.
+  if (env.ROBOT_SECRET && env.ROBOT_SECRET === env.JWT_SECRET) {
+    errors.push('ROBOT_SECRET must differ from JWT_SECRET');
   }
   if (errors.length) {
     throw new Error(`Invalid environment:\n- ${errors.join('\n- ')}`);

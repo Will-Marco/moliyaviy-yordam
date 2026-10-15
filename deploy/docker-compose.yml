@@ -45,6 +45,8 @@ services:
       AUTH_USERNAME: ${AUTH_USERNAME}
       AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH}
       JWT_SECRET: ${JWT_SECRET}
+      # Empty → only a person's login sessions are accepted (M13 §4.2).
+      ROBOT_SECRET: ${ROBOT_SECRET:-}
       COOKIE_SECURE: "true"
       # Caddy is the one proxy in front: without this the login limiter would see every request as Caddy's.
       TRUST_PROXY: "1"

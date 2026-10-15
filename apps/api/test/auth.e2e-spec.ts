@@ -157,4 +157,21 @@ describe('Auth (FR-1.1)', () => {
         .expect(401);
     });
   });
+
+  /* M13 §4.2: on the shared server the desktop robot signs its token with ROBOT_SECRET (.env.test sets one). */
+  describe('a robot session (ROBOT_SECRET, M13)', () => {
+    it('accepts an HS256 cookie signed with ROBOT_SECRET next to a person\'s session', async () => {
+      const cookie = `session=${mintToken({ secret: process.env.ROBOT_SECRET! })}`;
+      const me = await request(app.getHttpServer()).get('/api/auth/me').set('Cookie', cookie).expect(200);
+      expect(me.body).toEqual({ username: 'desktop' });
+      await request(app.getHttpServer()).get('/api/invoices').set('Cookie', `session=${mintToken()}`).expect(200);
+    });
+
+    it('rejects an expired robot token and alg:none', async () => {
+      const secret = process.env.ROBOT_SECRET!;
+      for (const token of [mintToken({ secret, ttlSec: -60 }), mintToken({ secret, alg: 'none' })]) {
+        await request(app.getHttpServer()).get('/api/auth/me').set('Cookie', `session=${token}`).expect(401);
+      }
+    });
+  });
 });
