@@ -49,11 +49,13 @@ export interface FirmEntry {
   invoices: InvoiceEntry[]
 }
 
+export type RunTrigger = 'manual' | 'scheduled'
+
 export interface RunJournal {
   runId: string
   month: string
-  /** M8d adds 'scheduled'. */
-  trigger: 'manual'
+  /** Who started it: the accountant, or the monthly schedule (M8d). */
+  trigger: RunTrigger
   startedAt: string
   finishedAt?: string
   status: RunStatus
@@ -286,7 +288,7 @@ export function createJournal({
 
   return {
     /** Creates the run's file before any firm is touched: an unexplained crash still leaves a record. */
-    async start(plan: { month: string; trigger: 'manual'; firms: FirmPlan[] }) {
+    async start(plan: { month: string; trigger: RunTrigger; firms: FirmPlan[] }) {
       const journal = await serially(async () => {
         const startedAt = iso()
         const runId = `${startedAt.replace(/:/g, '-')}-${randomHex()}`

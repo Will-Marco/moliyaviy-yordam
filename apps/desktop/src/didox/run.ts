@@ -16,7 +16,7 @@ import {
 import { type CreateDraftsDeps, planRun, runPlan, type StartOptions } from './create-drafts.js'
 import type { SkipStore } from './skips.js'
 import { createRunEngine, RunBusyError, type RunContext } from './engine.js'
-import type { InvoiceFlag, RunJournal } from './journal.js'
+import type { InvoiceFlag, RunJournal, RunTrigger } from './journal.js'
 
 /** The Didox window as the runner sees it (view.ts implements it with Electron). */
 export interface DidoxWindow {
@@ -279,7 +279,7 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
    * 2026-10-13). Everything that decides whether there is anything to do — the API's list, the skip flags — happens
    * before the lock is taken, so "nothing to do" is an answer, not a run that ends immediately.
    */
-  async function createDrafts({ month, lenderIds }: StartOptions): Promise<StartDraftsResult> {
+  async function createDrafts({ month, lenderIds, trigger = 'manual' }: StartOptions & { trigger?: RunTrigger }): Promise<StartDraftsResult> {
     const refuse = (code: string, message: string): StartDraftsResult => ({ ok: false, code, message })
     const drafts = deps.drafts
     if (!drafts) return { ok: false, code: 'UNAVAILABLE', message: "Didox bilan ishlash bu versiyada yo'q" }
@@ -295,8 +295,16 @@ export function createDidoxRunner(deps: DidoxRunnerDeps) {
       // Anything found in an earlier run but never recorded in the API goes first, before new work is planned (§3).
       await drafts.journal.flushIdFound({ markDraft: drafts.api.markDraft }).catch(() => undefined)
       const plan = await planRun(drafts, { month, lenderIds })
-      if (!plan) return refuse('NOTHING_TO_DO', didoxMessage('NOTHING_TO_DO'))
-      handle = await drafts.journal.start({ month, trigger: 'manual', firms: plan.firms })
+      if (!plan) {
+        // The schedule reads the run record to know whether a month is still owed: an empty answer left a month whose
+        // invoices were all drafted by hand owed for good, so the schedule's look is recorded as a finished attempt.
+        if (trigger === 'scheduled') {
+          const empty = await drafts.journal.start({ month, trigger, firms: [] })
+          await empty.finish('done', { code: 'NOTHING_TO_DO', message: didoxMessage('NOTHING_TO_DO') })
+        }
+        return refuse('NOTHING_TO_DO', didoxMessage('NOTHING_TO_DO'))
+      }
+      handle = await drafts.journal.start({ month, trigger, firms: plan.firms })
       lastRun = handle.runId
       void engine
         .run(async (ctx) => {

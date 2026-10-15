@@ -215,7 +215,7 @@ function startSchedule(journal: ReturnType<typeof createJournal>): void {
       })),
     start: async (month) => {
       console.info(`[didox] jadval bo'yicha ishga tushirilmoqda: ${month}`)
-      const result = await didox?.createDrafts({ month, lenderIds: 'all' })
+      const result = await didox?.createDrafts({ month, lenderIds: 'all', trigger: 'scheduled' })
       if (result?.ok) {
         waitingMonth = null
         refreshTray()

@@ -424,6 +424,32 @@ describe('createDidoxRunner.createDrafts', () => {
     expect(d.spy.journal.start).not.toHaveBeenCalled()
   })
 
+  /*
+   * The schedule decides from the run record whether a month is still owed. With nothing recorded, a month whose
+   * invoices were all drafted by hand stayed owed for good: the schedule started a run every look (29 times in the
+   * Windows gate's W5) and the tray kept saying it was waiting.
+   */
+  it('records a scheduled look that found nothing to do as a finished attempt, so the month is closed', async () => {
+    const d = drafts({ rows: [] })
+    const { runner } = setup({ drafts: d.deps })
+
+    await expect(runner.createDrafts({ month: '2026-09', lenderIds: 'all', trigger: 'scheduled' })).resolves.toMatchObject({
+      ok: false,
+      code: 'NOTHING_TO_DO',
+    })
+    expect(d.spy.journal.start).toHaveBeenCalledWith({ month: '2026-09', trigger: 'scheduled', firms: [] })
+    expect(d.spy.finished).toEqual([{ status: 'done', failure: { code: 'NOTHING_TO_DO', message: expect.any(String) } }])
+  })
+
+  it('marks a run the schedule started as scheduled', async () => {
+    const d = drafts()
+    const { runner } = setup({ drafts: d.deps })
+
+    await runner.createDrafts({ month: '2026-09', lenderIds: 'all', trigger: 'scheduled' })
+
+    expect(d.spy.journal.start).toHaveBeenCalledWith(expect.objectContaining({ trigger: 'scheduled' }))
+  })
+
   it('refuses a month it cannot read', async () => {
     const { runner } = setup({ drafts: drafts().deps })
     await expect(runner.createDrafts({ month: '2026-13', lenderIds: 'all' })).resolves.toMatchObject({ ok: false })
