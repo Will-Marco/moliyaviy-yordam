@@ -75,13 +75,22 @@ function appWindow(origin: string, onLoad: () => void): BrowserWindow {
   const openOutside = (url: string) => {
     if (isExternalWebUrl(url)) void shell.openExternal(url).catch(() => undefined)
   }
-  // Keep the window on the server's origin (parsed, so `https://host@evil` lookalikes fail); other links go to the browser.
-  win.webContents.on('will-navigate', (event, url) => {
-    if (!isSameOrigin(url, origin)) {
-      event.preventDefault()
-      openOutside(url)
-    }
+  /*
+   * Keep the window on the server's origin (parsed, so `https://host@evil` lookalikes fail); other links of the page
+   * itself go to the browser. A frame inside the page is only blocked: the web app has none of its own.
+   */
+  const keepOnOrigin = (event: { preventDefault(): void }, url: string, isMainFrame: boolean) => {
+    if (isSameOrigin(url, origin)) return
+    event.preventDefault()
+    if (isMainFrame) openOutside(url)
+  }
+  win.webContents.on('will-navigate', (event, url) => keepOnOrigin(event, url, true))
+  // will-navigate covers the main frame only; iframes navigate through this one (security review M3a).
+  win.webContents.on('will-frame-navigate', (event) => {
+    if (!event.isMainFrame) keepOnOrigin(event, event.url, false)
   })
+  // A server-side redirect is not a navigation the events above see: an origin URL could 302 the window elsewhere.
+  win.webContents.on('will-redirect', (event) => keepOnOrigin(event, event.url, event.isMainFrame))
   win.webContents.setWindowOpenHandler(({ url }) => {
     openOutside(url)
     return { action: 'deny' }
