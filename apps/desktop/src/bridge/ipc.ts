@@ -1,5 +1,3 @@
-import { mkdir, readdir, stat } from 'node:fs/promises'
-import { join } from 'node:path'
 import { type BrowserWindow, ipcMain, type IpcMainInvokeEvent, shell } from 'electron'
 import { WebSocket } from 'ws'
 import { parseAlias } from '../eimzo/alias.js'
@@ -9,10 +7,11 @@ import type { ProgressEvent } from '../didox/contract.js'
 import type { RunJournal, RunSummary } from '../didox/journal.js'
 import type { CheckLoginResult, StartDraftsResult } from '../didox/run.js'
 import type { EriStore, PasswordStatus } from '../secrets/eri-store.js'
+import type { DidoxRequests } from './requests.js'
+import { MONTH, TIN } from './requests.js'
 import { isTrustedSender } from './trust.js'
 
 const EIMZO_URL = 'ws://127.0.0.1:64646/service/cryptapi'
-const TIN = /^\d{9}$/
 
 /**
  * Bridge contract for `window.desktop.eri.listKeys`. Mirrored in apps/web/src/lib/desktop.ts — change both together.
@@ -28,19 +27,15 @@ export type KeyReport = { passwords: Record<string, PasswordStatus> } & (
   | { eimzo: 'not_running' | 'error'; message: string }
 )
 
-const MAX_PASSWORD = 256
+/** Who this computer is on the shared server (`window.desktop.install`); `label` is what its flags carry. */
+export interface InstallInfo {
+  id: string
+  name: string
+  label: string
+}
 
 /** Tashkent wall-clock time in the certificate date form (`yyyy-mm-ddTHH:mm:ss`). */
 const tashkentNow = () => new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Tashkent' }).replace(' ', 'T')
-
-const DAILY_BACKUP = /^daily-\d{4}-\d{2}-\d{2}\.tgz$/
-
-/** When the newest daily backup (written by the API's BackupService) was saved; null if none yet. */
-async function lastBackup(dir: string): Promise<string | null> {
-  const names = (await readdir(dir).catch(() => [] as string[])).filter((n) => DAILY_BACKUP.test(n)).sort()
-  const newest = names.at(-1)
-  return newest ? (await stat(join(dir, newest))).mtime.toISOString() : null
-}
 
 /** Firm STIR -> the E-IMZO key it would log in with, read live from local E-IMZO (throws EimzoError when it is down). */
 export function createKeyReader(): (tins: string[]) => Promise<Map<string, KeyStatus>> {
@@ -48,27 +43,17 @@ export function createKeyReader(): (tins: string[]) => Promise<Map<string, KeySt
   return async (tins) => matchKeys((await eimzo.listCertificates()).map((c) => parseAlias(c.alias)), tins, tashkentNow())
 }
 
-/** What the IPC layer needs from the Didox runner (didox/run.ts). */
+/** What the IPC layer reads from the Didox runner (didox/run.ts); starting work goes through `requests`. */
 export interface DidoxIpc {
-  checkLogin(tin: string): Promise<CheckLoginResult>
-  createDrafts(opts: { month: string; lenderIds: string[] | 'all' }): Promise<StartDraftsResult>
   status(): Promise<RunJournal | null>
   listRuns(opts: { month?: string; limit?: number }): Promise<RunSummary[]>
   getRun(runId: string): Promise<RunJournal | null>
-  invoiceFlags(month: string): Promise<Record<string, unknown>>
-  skipInvoice(opts: { month: string; contractId: string; skip: boolean }): Promise<void>
-  resolveNeedsCheck(opts: { month: string; contractId: string }): Promise<void>
   cancel(): void
 }
 
 /** Run ids are built from a timestamp and four hex characters (journal.ts). */
 const RUN_ID = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z-[0-9a-f]{4}$/
 const MAX_RUNS_LISTED = 50
-
-const MONTH = /^\d{4}-(?:0[1-9]|1[0-2])$/
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-/** A person picks firms from a list; a page that asks for hundreds is not that. */
-const MAX_LENDERS = 200
 
 /** The runner's `onProgress`: forwards each step to the app window as `didox:progress` (if it is open). */
 export function sendProgress(getAppWindow: () => BrowserWindow | null): (e: ProgressEvent) => void {
@@ -78,19 +63,28 @@ export function sendProgress(getAppWindow: () => BrowserWindow | null): (e: Prog
   }
 }
 
+export interface IpcOptions {
+  /** The current app window (macOS can recreate it), so the guard follows it. */
+  getAppWindow: () => BrowserWindow | null
+  /** The shared server's origin: the only page the bridge answers. */
+  origin: string
+  diagnosticsDir: string
+  eri: Pick<EriStore, 'status' | 'remove'>
+  readKeys: (tins: string[]) => Promise<Map<string, KeyStatus>>
+  /** Validated, natively confirmed starts of Didox work (bridge/requests.ts). */
+  requests: DidoxRequests
+  /** Without it the read-only calls answer empty. */
+  didox?: DidoxIpc
+  /** Opens the bundled ERI password window for a firm; resolves once it is closed. */
+  openPasswordWindow(tin: string): Promise<{ saved: boolean }>
+  install: InstallInfo
+}
+
 /**
- * `getAppWindow` returns the current app window (macOS can recreate it), so the guard follows it.
- * `didox` is optional: without it `didox:check-login` answers UNAVAILABLE instead of hanging the renderer.
+ * The page-callable surface (M13). Nothing here takes or returns a secret: the ERI password is typed in a local
+ * window, and every Didox login is confirmed on this computer before it starts (CONSTITUTION §13).
  */
-export function registerIpc(
-  getAppWindow: () => BrowserWindow | null,
-  origin: string,
-  backupsDir: string,
-  diagnosticsDir: string,
-  eri: EriStore,
-  didox?: DidoxIpc,
-): void {
-  const readKeys = createKeyReader()
+export function registerIpc({ getAppWindow, origin, diagnosticsDir, eri, readKeys, requests, didox, openPasswordWindow, install }: IpcOptions): void {
   const serialOf = (m: KeyStatus | undefined) => (m && m.status !== 'missing' ? m.key.serial : null)
 
   const guarded =
@@ -103,6 +97,13 @@ export function registerIpc(
       }
       return handler(arg)
     }
+
+  const tinOf = (tin: unknown): string => {
+    if (typeof tin !== 'string' || !TIN.test(tin)) throw new Error('Invalid STIR')
+    return tin
+  }
+
+  ipcMain.handle('app:install', guarded(async (): Promise<InstallInfo> => install))
 
   ipcMain.handle(
     'eri:list-keys',
@@ -129,61 +130,18 @@ export function registerIpc(
     }),
   )
 
-  // The password goes renderer -> main -> OS encryption once; nothing ever sends it back.
-  ipcMain.handle(
-    'eri:set-password',
-    guarded(async (arg: unknown): Promise<void> => {
-      const { tin, password } = (arg ?? {}) as { tin?: unknown; password?: unknown }
-      if (typeof tin !== 'string' || !TIN.test(tin)) throw new Error('Invalid STIR')
-      if (typeof password !== 'string' || password.length === 0 || password.length > MAX_PASSWORD) throw new Error('Invalid password')
-      // Tie the password to the key it unlocks, so a replaced key asks again (null if E-IMZO is not running now).
-      const serial = serialOf((await readKeys([tin]).catch(() => null))?.get(tin))
-      await eri.set(tin, password, serial)
-    }),
-  )
+  // The page only asks for the window; the password never passes through it (FR-8.2, CONSTITUTION §13).
+  ipcMain.handle('eri:open-password-window', guarded(async (tin: unknown) => openPasswordWindow(tinOf(tin))))
 
   ipcMain.handle(
     'eri:remove-password',
     guarded(async (tin: unknown): Promise<void> => {
-      if (typeof tin !== 'string' || !TIN.test(tin)) throw new Error('Invalid STIR')
-      await eri.remove(tin)
+      await eri.remove(tinOf(tin))
     }),
   )
 
-  ipcMain.handle('backups:status', guarded(async () => ({ last: await lastBackup(backupsDir) })))
-  ipcMain.handle(
-    'backups:open-folder',
-    guarded(async () => {
-      await mkdir(backupsDir, { recursive: true }) // before the first backup the folder may not exist yet
-      const error = await shell.openPath(backupsDir)
-      if (error) throw new Error(error)
-    }),
-  )
-
-  ipcMain.handle(
-    'didox:check-login',
-    guarded(async (tin: unknown): Promise<CheckLoginResult> => {
-      if (typeof tin !== 'string' || !TIN.test(tin)) throw new Error('Invalid STIR')
-      if (!didox) return { ok: false, code: 'UNAVAILABLE', message: "Didox bilan ishlash bu versiyada yo'q" }
-      return didox.checkLogin(tin)
-    }),
-  )
-  ipcMain.handle(
-    'didox:create-drafts',
-    guarded(async (payload: unknown): Promise<StartDraftsResult> => {
-      const { month, lenderIds } = (payload ?? {}) as { month?: unknown; lenderIds?: unknown }
-      if (typeof month !== 'string' || !MONTH.test(month)) throw new Error('Invalid month')
-      const lenders =
-        lenderIds === 'all'
-          ? ('all' as const)
-          : Array.isArray(lenderIds) && lenderIds.length > 0 && lenderIds.length <= MAX_LENDERS && lenderIds.every((id) => typeof id === 'string' && UUID.test(id))
-            ? (lenderIds as string[])
-            : null
-      if (lenders === null) throw new Error('Invalid lenderIds')
-      if (!didox) return { ok: false, code: 'UNAVAILABLE', message: "Didox bilan ishlash bu versiyada yo'q" }
-      return didox.createDrafts({ month, lenderIds: lenders })
-    }),
-  )
+  ipcMain.handle('didox:check-login', guarded(async (tin: unknown): Promise<CheckLoginResult> => requests.checkLogin(tin)))
+  ipcMain.handle('didox:create-drafts', guarded(async (payload: unknown): Promise<StartDraftsResult> => requests.createDrafts(payload)))
   ipcMain.handle(
     'didox:status',
     guarded(async (): Promise<RunJournal | null> => (didox ? didox.status() : null)),
@@ -205,32 +163,6 @@ export function registerIpc(
     guarded(async (runId: unknown): Promise<RunJournal | null> => {
       if (typeof runId !== 'string' || !RUN_ID.test(runId)) throw new Error('Invalid runId')
       return didox ? didox.getRun(runId) : null
-    }),
-  )
-  ipcMain.handle(
-    'didox:invoice-flags',
-    guarded(async (month: unknown): Promise<Record<string, unknown>> => {
-      if (typeof month !== 'string' || !MONTH.test(month)) throw new Error('Invalid month')
-      return didox ? didox.invoiceFlags(month) : {}
-    }),
-  )
-  ipcMain.handle(
-    'didox:skip-invoice',
-    guarded(async (payload: unknown): Promise<void> => {
-      const { month, contractId, skip } = (payload ?? {}) as { month?: unknown; contractId?: unknown; skip?: unknown }
-      if (typeof month !== 'string' || !MONTH.test(month)) throw new Error('Invalid month')
-      if (typeof contractId !== 'string' || !UUID.test(contractId)) throw new Error('Invalid contractId')
-      if (typeof skip !== 'boolean') throw new Error('Invalid skip')
-      await didox?.skipInvoice({ month, contractId, skip })
-    }),
-  )
-  ipcMain.handle(
-    'didox:resolve-needs-check',
-    guarded(async (payload: unknown): Promise<void> => {
-      const { month, contractId } = (payload ?? {}) as { month?: unknown; contractId?: unknown }
-      if (typeof month !== 'string' || !MONTH.test(month)) throw new Error('Invalid month')
-      if (typeof contractId !== 'string' || !UUID.test(contractId)) throw new Error('Invalid contractId')
-      await didox?.resolveNeedsCheck({ month, contractId })
     }),
   )
   ipcMain.handle(
