@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { DIDOX_DECIMAL_SEP, formatForDidox, parseDidoxMoney, tiyinOf } from './money.js'
 
@@ -72,7 +72,10 @@ describe('formatForDidox — BigInt to text, no floats (§1)', () => {
  */
 describe('no float parsing in the Didox and API layers', () => {
   // autotype/ drives E-IMZO's own window and holds a JXA script (a string run by osascript); no money there.
-  const files = [...walk('src/didox'), ...walk('src/api')].filter((f) => !f.includes('/autotype/') && !f.endsWith('.spec.ts'))
+  // Compared with '/' separators so the exclusion also holds on Windows, where walk() returns `src\didox\…`.
+  const files = [...walk('src/didox'), ...walk('src/api')].filter(
+    (f) => !f.split(sep).join('/').includes('/autotype/') && !f.endsWith('.spec.ts'),
+  )
 
   it('scans a plausible set of files', () => {
     expect(files.length).toBeGreaterThan(8)

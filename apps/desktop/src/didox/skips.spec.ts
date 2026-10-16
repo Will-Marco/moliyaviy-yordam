@@ -74,7 +74,8 @@ describe('createSkipStore (§2, Sir 2026-10-13)', () => {
   it('survives a restart and writes for this user only', async () => {
     await store().set('2026-09', 'c1')
     expect(await store().isSkipped('2026-09', 'c1')).toBe(true)
-    expect((await stat(file)).mode & 0o777).toBe(0o600)
+    // Windows has no POSIX mode bits (Node reports them made up); there the file sits under the user's own profile, whose ACL keeps it theirs.
+    if (process.platform !== 'win32') expect((await stat(file)).mode & 0o777).toBe(0o600)
   })
 
   it('does not drop an entry when two flags are set at once', async () => {

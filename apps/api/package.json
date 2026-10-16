@@ -19,7 +19,7 @@
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
-    "pretest:e2e": "DOTENV_CONFIG_PATH=.env.test prisma migrate deploy",
+    "pretest:e2e": "node --env-file=.env.test node_modules/prisma/build/index.js migrate deploy",
     "postinstall": "prisma generate",
     "hash-password": "node scripts/hash-password.ts",
     "seed:demo": "node scripts/seed-demo.ts",

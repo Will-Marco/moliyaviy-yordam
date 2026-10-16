@@ -38,7 +38,8 @@ describe('ERI password store', () => {
 
     const raw = await readFile(file, 'utf8')
     expect(raw).not.toContain('Maxfiy-Parol-1')
-    expect((await stat(file)).mode & 0o777).toBe(0o600)
+    // Windows has no POSIX mode bits (Node reports them made up); there the file sits under the user's own profile, whose ACL keeps it theirs.
+    if (process.platform !== 'win32') expect((await stat(file)).mode & 0o777).toBe(0o600)
     expect(await store.status(TIN, SERIAL)).toBe('set')
   })
 

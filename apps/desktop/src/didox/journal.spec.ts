@@ -54,7 +54,8 @@ describe('createJournal — the run is on disk, not in memory (§2)', () => {
     expect(saved.firms[0]!.invoices[0]).toMatchObject({ contractId: 'c1', state: 'pending', amount: '552328.77' })
   })
 
-  it('writes the file for this user only', async () => {
+  // Windows has no POSIX mode bits (Node reports them made up); there the file sits under the user's own profile, whose ACL keeps it theirs.
+  it.skipIf(process.platform === 'win32')('writes the file for this user only', async () => {
     const run = await journal().start({ month: '2026-09', trigger: 'manual', firms: [firm('301111111')] })
     expect((await stat(join(dir, `${run.runId}.json`))).mode & 0o777).toBe(0o600)
   })
