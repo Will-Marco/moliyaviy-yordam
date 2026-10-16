@@ -46,6 +46,8 @@ const BEFORE_TYPING: Readonly<Record<number, AutotypeResult>> = {
 const AFTER_TYPING: Readonly<Record<number, AutotypeResult>> = {
   [EXIT.TYPED]: 'typed',
   [EXIT.REJECTED]: 'rejected',
+  // The macOS script ends this way after the marker only when the OS refused the very first keystroke: nothing typed.
+  [EXIT.NO_PERMISSION]: 'no_permission',
 }
 
 const PREFLIGHT: Readonly<Record<number, AutotypePreflightResult>> = {

@@ -306,6 +306,15 @@ describe('the PowerShell script', () => {
     expect(EIMZO_PREFLIGHT_PS).not.toMatch(unknownIn51)
   })
 
+  /* Lost focus before the first character: nothing typed, so not an interruption that marks the password rejected. */
+  it('says it has started only after the first focus check, right before the first character', () => {
+    const check = script.indexOf('if (-not (Test-Foreground $dialog)) { if ($started) { exit $EXIT_FOCUS_LOST }; exit $EXIT_NOT_FOCUSED }')
+    const marker = script.indexOf(`Write-Output '${TYPING_MARKER}'`)
+    expect(check).toBeGreaterThan(0)
+    expect(marker).toBeGreaterThan(check)
+    expect(marker).toBeLessThan(script.indexOf('Send-Char $c'))
+  })
+
   it('says it has started before any character goes in', () => {
     expect(script.indexOf(`Write-Output '${TYPING_MARKER}'`)).toBeLessThan(script.indexOf('Send-Char $c'))
   })

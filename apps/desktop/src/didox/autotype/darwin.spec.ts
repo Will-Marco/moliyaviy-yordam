@@ -101,6 +101,9 @@ describe('typeEimzoPassword on macOS', () => {
   it.each<[number, AutotypeResult]>([
     [0, 'typed'],
     [12, 'rejected'],
+    // The script exits with NO_PERMISSION after the marker only when macOS refused the very first keystroke: nothing
+    // reached the dialog, so the password is not to be marked rejected (2026-10-16: a refused keystroke did exactly that).
+    [14, 'no_permission'],
     [15, 'interrupted'],
     [20, 'interrupted'],
     [1, 'interrupted'],
@@ -302,10 +305,27 @@ describe('JXA scripts', () => {
     expect(count(script, 'se.keyCode(53)')).toBe(1) // only inside escapeOnce
     expect(script).toContain('if (escaped || frontmostName(se) !== PROCESS) return')
     const marker = script.indexOf(`writeStdout('${TYPING_MARKER}\\n')`)
-    const loop = script.indexOf('if (!focusedOnPassword(se, proc)) return focusLost(se)\n    se.keystroke(chars[i])')
+    const loop = script.indexOf('se.keystroke(chars[i])')
     expect(marker).toBeGreaterThan(0)
     expect(loop).toBeGreaterThan(marker)
     expect(script.indexOf('se.keyCode(36)')).toBeGreaterThan(script.lastIndexOf('return focusLost(se)'))
+  })
+
+  /*
+   * The marker means "the password may be on screen". Printed before the first focus check, a focus or permission
+   * failure before any key was sent read as an interrupted typing, and the app marked a correct password rejected.
+   */
+  it('typist prints the marker only once the first focus check passed, right before the first keystroke', () => {
+    const script = EIMZO_TYPIST_JXA
+    const loopCheck = script.indexOf('if (!focusedOnPassword(se, proc)) return typing ? focusLost(se) : EXIT.NOT_FOCUSED')
+    const marker = script.indexOf(`writeStdout('${TYPING_MARKER}\\n')`)
+    expect(loopCheck).toBeGreaterThan(0)
+    expect(marker).toBeGreaterThan(loopCheck)
+    expect(marker).toBeLessThan(script.indexOf('se.keystroke(chars[i])'))
+  })
+
+  it('typist reports a refused first keystroke as missing permission, not as an interruption', () => {
+    expect(EIMZO_TYPIST_JXA).toContain('if (sent === 0 && isPermissionError(e)) code = EXIT.NO_PERMISSION')
   })
 
   it('preflight types nothing and reads no stdin', () => {

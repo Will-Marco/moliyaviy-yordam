@@ -267,10 +267,16 @@ if (-not (Set-Foreground $dialog)) {
   exit $EXIT_NOT_FOCUSED
 }
 
-# From here the password may reach the screen: the marker tells the app that a silent death is "interrupted".
-Write-Output '${TYPING_MARKER}'
+# The marker goes out right before the first character, after its focus check: from there the password may reach the
+# screen and a silent death is "interrupted". Focus lost before any character is just "not focused" — nothing was typed,
+# so a correct password must not be marked rejected (2026-10-16).
+$started = $false
 foreach ($c in $password.ToCharArray()) {
-  if (-not (Test-Foreground $dialog)) { exit $EXIT_FOCUS_LOST }
+  if (-not (Test-Foreground $dialog)) { if ($started) { exit $EXIT_FOCUS_LOST }; exit $EXIT_NOT_FOCUSED }
+  if (-not $started) {
+    Write-Output '${TYPING_MARKER}'
+    $started = $true
+  }
   Send-Char $c
   Start-Sleep -Milliseconds 40
 }

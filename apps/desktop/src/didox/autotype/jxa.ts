@@ -104,6 +104,8 @@ export const EIMZO_TYPIST_JXA = `${COMMON}
 var CLOSE_WAIT_MS = ${CLOSE_WAIT_MS}
 var typing = false
 var escaped = false
+// Keystrokes System Events accepted: 0 means nothing of the password reached the screen.
+var sent = 0
 
 function run(argv) {
   var code = EXIT.FAILED
@@ -111,9 +113,11 @@ function run(argv) {
     code = main(argv)
   } catch (e) {
     // Once typing started darwin.ts treats any unconfirmed end as interrupted; before that a permission error is reported.
+    // A first keystroke that macOS refused sent nothing: that is still a permission problem, not a half-typed password.
     if (typing) {
-      try { escapeOnce(Application('System Events')) } catch (ignored) {}
       code = EXIT.FAILED
+      if (sent === 0 && isPermissionError(e)) code = EXIT.NO_PERMISSION
+      else try { escapeOnce(Application('System Events')) } catch (ignored) {}
     } else {
       code = isPermissionError(e) ? EXIT.NO_PERMISSION : EXIT.FAILED
     }
@@ -145,14 +149,19 @@ function main(argv) {
   delay(0.4)
   if (!focusedOnPassword(se, proc)) return EXIT.NOT_FOCUSED
 
-  // 5) Exactly once, one character at a time, re-checking the focus before each one and before Return.
-  typing = true
-  writeStdout('${TYPING_MARKER}\\n')
+  // 5) Exactly once, one character at a time, re-checking the focus before each one and before Return. The marker goes
+  //    out right before the first keystroke: a focus or permission failure before any key was sent is then reported as
+  //    what it is, and a correct password is not marked rejected (2026-10-16).
   var chars = Array.from(password)
   password = null
   for (var i = 0; i < chars.length; i++) {
-    if (!focusedOnPassword(se, proc)) return focusLost(se)
+    if (!focusedOnPassword(se, proc)) return typing ? focusLost(se) : EXIT.NOT_FOCUSED
+    if (!typing) {
+      typing = true
+      writeStdout('${TYPING_MARKER}\\n')
+    }
     se.keystroke(chars[i])
+    sent++
   }
   chars = null
   if (!focusedOnPassword(se, proc)) return focusLost(se)
